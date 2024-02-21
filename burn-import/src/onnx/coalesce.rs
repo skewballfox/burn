@@ -1,7 +1,7 @@
 use std::{iter::Peekable, slice::Iter};
 
 use super::{
-    from_onnx::OnnxGraphIO,
+    from_onnx::{GraphIOError, OnnxGraphIO},
     ir::{AttributeValue, Node, NodeType},
     proto_conversion::convert_node_proto,
     protos::NodeProto,
@@ -13,14 +13,13 @@ pub fn coalesce(
     node: &mut Node,
     nodes_iter: &mut Peekable<Iter<NodeProto>>,
     graph_io: &OnnxGraphIO,
-) {
+) -> Result<(), GraphIOError> {
     match node.node_type {
         NodeType::Gemm => convert_gemm_to_linear(node),
-        NodeType::MatMul => {
-            convert_matmul_to_linear(node, nodes_iter, graph_io);
-        }
+        NodeType::MatMul => convert_matmul_to_linear(node, nodes_iter, graph_io)?,
         _ => {}
     }
+    Ok(())
 }
 
 /// This function converts a Gemm node into a Linear node
@@ -121,14 +120,14 @@ pub(crate) fn convert_matmul_to_linear(
     node: &mut Node,
     iter_mut: &mut Peekable<Iter<NodeProto>>,
     graph_io: &OnnxGraphIO,
-) {
+) -> Result<(), GraphIOError> {
     if node.inputs.len() != 2 {
         panic!("MatMul node must have 2 inputs");
     }
 
     // if the second input does not have a value, it is not a weight, then proceed to the next node
     if node.inputs[1].value.is_none() {
-        return;
+        return Ok(());
     }
 
     // Check if the second input is a 2D tensor
@@ -143,7 +142,7 @@ pub(crate) fn convert_matmul_to_linear(
 
     // Check the next node for potential conversion
     if let Some(peek_node) = iter_mut.peek() {
-        let peek_node = convert_node_proto(peek_node, graph_io).clone();
+        let peek_node = convert_node_proto(peek_node, graph_io)?;
         if is_add_node_with_bias(&peek_node, node) {
             convert_and_remove_add_node(&peek_node, node);
 
@@ -151,6 +150,7 @@ pub(crate) fn convert_matmul_to_linear(
             let _ = iter_mut.next();
         }
     }
+    Ok(())
 }
 
 /// Helper function to check if the peeked node is an Add node with bias

@@ -2,7 +2,7 @@ use std::str::{from_utf8, FromStr};
 
 use crate::onnx::ir::TensorType;
 
-use super::from_onnx::OnnxGraphIO;
+use super::from_onnx::{GraphIOError, OnnxGraphIO};
 use super::ir::Dim;
 use super::ir::{
     ArgType, Argument, AttributeValue, Attributes, Data, ElementType, Node, NodeType, Tensor,
@@ -180,17 +180,16 @@ pub fn convert_vec_attrs_proto(attrs: Vec<AttributeProto>) -> Attributes {
     result
 }
 
-pub fn convert_node_proto(node: &NodeProto, graph_io: &OnnxGraphIO) -> Node {
+pub fn convert_node_proto(node: &NodeProto, graph_io: &OnnxGraphIO) -> Result<Node, GraphIOError> {
     let name = node.name.clone();
 
     log::debug!("Converting ONNX node with type {:?}", node.op_type.as_str());
 
-    let inputs = node
-        .input
-        .clone()
-        .into_iter()
-        .map(|x| graph_io.init_in(x))
-        .collect();
+    let mut inputs = Vec::with_capacity(node.input.len());
+    for in_proto in node.input.iter() {
+        let input = graph_io.init_in(in_proto)?;
+        inputs.push(input);
+    }
 
     let outputs = node.output.clone().into_iter().map(Argument::new).collect();
 
@@ -198,6 +197,24 @@ pub fn convert_node_proto(node: &NodeProto, graph_io: &OnnxGraphIO) -> Node {
 
     let node_type = NodeType::from_str(node.op_type.as_str()).expect("Unknown node type");
 
+    Ok(Node {
+        node_type,
+        name,
+        inputs,
+        outputs,
+        attrs,
+    })
+}
+
+/// Converts a NodeProto to a Node without checking for the presence of the inputs in the graph
+/// This is only called in the case of an error in the graph_io, and the nodes are only used to
+/// check the validity of the graph
+pub(crate) fn fallback_convert_node_proto(node: &NodeProto) -> Node {
+    let name = node.name.clone();
+    let inputs = node.input.clone().into_iter().map(Argument::new).collect();
+    let outputs = node.output.clone().into_iter().map(Argument::new).collect();
+    let attrs = convert_vec_attrs_proto(node.attribute.clone());
+    let node_type = NodeType::from_str(node.op_type.as_str()).expect("Unknown node type");
     Node {
         node_type,
         name,

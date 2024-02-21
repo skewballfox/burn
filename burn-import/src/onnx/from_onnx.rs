@@ -9,6 +9,7 @@ use crate::onnx::{node_remap::remap_node_type, proto_conversion::convert_node_pr
 use super::{
     coalesce::coalesce,
     ir::{Data, OnnxGraph, TensorType},
+    proto_conversion::fallback_convert_node_proto,
     protos::{ModelProto, TensorProto, ValueInfoProto},
 };
 
@@ -46,6 +47,13 @@ pub(crate) struct OnnxGraphIO {
     pub(crate) old_io_names: HashMap<String, IOEntry>,
 }
 
+#[derive(Debug)]
+pub enum GraphIOError {
+    /// Error which indicates something is wrong with the graph,
+    /// such as requesting an updated name for a graph output
+    InvalidGraphError,
+}
+type IOResult<T> = std::result::Result<T, GraphIOError>;
 impl OnnxGraphIO {
     pub(crate) fn new(
         inputs: &Vec<ValueInfoProto>,
@@ -101,10 +109,11 @@ impl OnnxGraphIO {
         }
     }
 
-    fn update_name(&mut self, arg: &Argument, new_name: &str) {
+    fn update_name(&mut self, arg: &Argument, new_name: &str) -> IOResult<()> {
         match self.old_io_names.get(&arg.name) {
             Some(IOEntry::In(_)) => {
-                panic!("input names are set from the beginning");
+                log::error!("input names are set from the beginning");
+                return Err(GraphIOError::InvalidGraphError);
             }
             Some(IOEntry::Out(i)) => {
                 let arg = self.outputs.get_mut(*i).unwrap();
@@ -116,42 +125,47 @@ impl OnnxGraphIO {
             }
             None => {
                 //Constants, Casts wound up here before API changes
-                panic!(
+                log::error!(
                     "Tried to update the name of {} to {} but entry doesn't exist in the map",
-                    arg.name, new_name
-                )
+                    arg.name,
+                    new_name
+                );
+                return Err(GraphIOError::InvalidGraphError);
             }
         }
+        Ok(())
     }
 
-    ///Used to initialize the input arguments for nodes. Names need to remain the same because
+    /// Used to initialize the input arguments for nodes. Names need to remain the same because
     /// currently the old names are the key for accessing the Argument
-    pub fn init_in(&self, proto_str: String) -> Argument {
-        match self.old_io_names.get(&proto_str) {
+    pub fn init_in(&self, proto_str: &String) -> IOResult<Argument> {
+        let arg = match self.old_io_names.get(proto_str) {
             None => {
-                if let Some(init_arg) = self.initializers.get(&proto_str) {
+                if let Some(init_arg) = self.initializers.get(proto_str) {
                     init_arg.clone()
                 } else {
-                    Argument::new(proto_str)
+                    Argument::new(proto_str.clone())
                 }
             }
 
             Some(IOEntry::In(i)) => {
                 let mut arg = self.inputs[*i].clone();
 
-                arg.name = proto_str;
+                arg.name = proto_str.clone();
                 arg.passed = true;
                 arg
             }
             Some(IOEntry::Node(i)) => {
                 let mut arg = self.node_out[*i].clone();
-                arg.name = proto_str;
+                arg.name = proto_str.clone();
                 arg
             }
             Some(IOEntry::Out(_)) => {
-                panic!("graph output {} can't be a Node input", &proto_str)
+                log::error!("graph output {} can't be a Node input", &proto_str);
+                return Err(GraphIOError::InvalidGraphError);
             }
-        }
+        };
+        Ok(arg)
     }
 
     fn insert(&mut self, arg: &Argument, new_name: &str) {
@@ -162,7 +176,7 @@ impl OnnxGraphIO {
                     return;
                 }
             } else {
-                panic!("arg entry with old name {} is a graph IO", &arg.name);
+                log::error!("arg entry with old name {} is a graph IO", &arg.name);
             }
         }
 
@@ -173,7 +187,7 @@ impl OnnxGraphIO {
         self.node_out[idx].name = new_name.to_string();
     }
 
-    ///iterate over the nodes output and copy them to the graph IO
+    /// iterate over the nodes output and copy them to the graph IO
     pub(crate) fn update_tensor_output(&mut self, node: &Node) {
         for node_output in node.outputs.iter() {
             match self.old_io_names.get(&node_output.name) {
@@ -188,7 +202,7 @@ impl OnnxGraphIO {
                     arg.passed = true;
                 }
                 Some(IOEntry::Node(_)) => {
-                    panic!("This output is from another node");
+                    log::error!("This output is from another node");
                 }
                 None => {
                     log::debug!("inserting with name {:?}", &node_output.name);
@@ -201,23 +215,27 @@ impl OnnxGraphIO {
         }
     }
 
-    ///used by handle unsqeeze to remap the output of a node to a new name
-    ///expected match if it exists is either a graph input or graph output
-    pub(crate) fn get_node_output(&self, old_name: &str) -> Option<&Argument> {
-        match self.old_io_names.get(old_name) {
+    /// Used by handle unsqeeze to remap the output of a node to a new name
+    /// expected match if it exists is either a graph input or graph output
+    pub(crate) fn get_node_output(&self, old_name: &str) -> IOResult<Option<&Argument>> {
+        let arg = match self.old_io_names.get(old_name) {
             Some(IOEntry::In(i)) => self.inputs.get(*i),
             Some(IOEntry::Out(i)) => self.outputs.get(*i),
-            Some(IOEntry::Node(_)) => panic!("This is a node output"),
+            Some(IOEntry::Node(_)) => {
+                log::error!("This is a previous nodes output");
+                return Err(GraphIOError::InvalidGraphError);
+            }
             None => None,
-        }
+        };
+        Ok(arg)
     }
 
-    /// get the updated name of a Node Input, which obviously should be
+    /// Get the updated name of a Node Input, which obviously should be
     /// either a graph input or a node output.
     /// will return None if the it isn't a graph input or node output(like an initializer)
     /// Will panic if it's a graph output
-    fn get_new_name(&mut self, old_name: &str) -> Option<String> {
-        match self.old_io_names.get(old_name) {
+    fn get_new_name(&mut self, old_name: &str) -> IOResult<Option<String>> {
+        let name = match self.old_io_names.get(old_name) {
             Some(IOEntry::In(i)) => {
                 //FIXME: technically in the spec, initializers are default values
                 //for optional inputs, but implementing that would require reworking
@@ -233,19 +251,21 @@ impl OnnxGraphIO {
                 }
             }
             Some(IOEntry::Out(_)) => {
-                panic!(
+                log::error!(
                     "you just tried to get an updated name on a graph output: {}",
                     old_name
-                )
+                );
+                return Err(GraphIOError::InvalidGraphError);
             }
             Some(IOEntry::Node(i)) => Some(self.node_out[*i].name.clone()),
             None => None,
-        }
+        };
+        Ok(name)
     }
 }
 
-#[derive(Default)]
-pub(crate) struct ONNXGraphBuilder {
+pub(crate) struct ONNXGraphBuilder<'parse> {
+    onnx_path: &'parse Path,
     nodes: Vec<Node>,
     inputs: Vec<Argument>,
     outputs: Vec<Argument>,
@@ -260,9 +280,23 @@ pub(crate) struct ONNXGraphBuilder {
     identity_idx: HashMap<String, usize>,
 }
 
-impl ONNXGraphBuilder {
-    pub(crate) fn node_gen(&mut self, model_proto: &ModelProto) {
-        self.constants_types = LIFT_CONSTANTS_FOR_NODE_TYPES.into_iter().collect();
+impl<'parse> ONNXGraphBuilder<'parse> {
+    pub fn new(onnx_path: &'parse Path) -> Self {
+        Self {
+            onnx_path,
+            nodes: Vec::new(),
+            inputs: Vec::new(),
+            outputs: Vec::new(),
+            node_name_counter: HashMap::new(),
+            nodes_to_remove: HashSet::new(),
+            constants_map: HashMap::new(),
+            constants_types: LIFT_CONSTANTS_FOR_NODE_TYPES.into_iter().collect(),
+            identity_idx: HashMap::new(),
+        }
+    }
+
+    pub(crate) fn build(&mut self) -> OnnxGraph {
+        let model_proto = get_model_proto(self.onnx_path);
 
         let mut graph_io = OnnxGraphIO::new(
             &model_proto.graph.input,
@@ -270,12 +304,12 @@ impl ONNXGraphBuilder {
             &model_proto.graph.initializer,
         );
 
-        self.nodes = Vec::with_capacity(model_proto.graph.node.len());
+        let mut nodes = Vec::with_capacity(model_proto.graph.node.len());
         let mut and_idx = 0;
         let mut node_iter = model_proto.graph.node.iter().peekable();
 
         while let Some(node_proto) = node_iter.next() {
-            let mut node = convert_node_proto(node_proto, &graph_io);
+            let mut node = convert_node_proto(node_proto, &graph_io).unwrap();
 
             remap_node_type(&mut node);
 
@@ -287,14 +321,14 @@ impl ONNXGraphBuilder {
 
             dim_inference(&mut node, &mut graph_io);
 
-            rename_io(&mut node, &mut graph_io);
+            rename_io(&mut node, &mut graph_io, self.onnx_path);
 
-            self.nodes.push(node);
+            nodes.push(node);
             and_idx += 1;
         }
 
         let mut i = 0;
-        self.nodes.retain(|_x| {
+        nodes.retain(|_x| {
             let res = !self.nodes_to_remove.contains(&i);
             i += 1;
             res
@@ -307,8 +341,12 @@ impl ONNXGraphBuilder {
 
         // Remove the graph inputs/output that are not used by any node
         remove_unused_graph_inputs(&mut inputs, &mut outputs);
-        self.inputs = inputs;
-        self.outputs = outputs;
+        log::info!("Finished parsing ONNX file: {}", self.onnx_path.display());
+        OnnxGraph {
+            nodes,
+            inputs,
+            outputs,
+        }
     }
 
     fn handle_node_renaming(&mut self, node: &mut Node) {
@@ -361,8 +399,14 @@ impl ONNXGraphBuilder {
     /// Needs to be called after constant lifting to ensure that the rhs value exists
     fn handle_unsqueeze(&mut self, node: &mut Node, graph_io: &OnnxGraphIO) {
         if node.node_type == NodeType::Unsqueeze && node.inputs[1].value.is_none() {
-            if let Some(in_arg) = graph_io.get_node_output(&node.outputs[0].name) {
-                remap_unsqueeze_to_reshape(node, in_arg);
+            match graph_io.get_node_output(&node.outputs[0].name) {
+                Ok(Some(in_arg)) => {
+                    remap_unsqueeze_to_reshape(node, in_arg);
+                }
+                Err(_e) => {
+                    check_validity(self.onnx_path);
+                }
+                _ => (),
             }
         }
     }
@@ -403,6 +447,11 @@ impl ONNXGraphBuilder {
 /// * If the file cannot be parsed
 /// * If the nodes are not topologically sorted
 pub fn parse_onnx(onnx_path: &Path) -> OnnxGraph {
+    let mut builder = ONNXGraphBuilder::new(onnx_path);
+    builder.build()
+}
+
+fn get_model_proto(onnx_path: &Path) -> ModelProto {
     log::info!("Parsing ONNX file: {}", onnx_path.display());
 
     // Open the file
@@ -419,27 +468,7 @@ pub fn parse_onnx(onnx_path: &Path) -> OnnxGraph {
     );
 
     log::debug!("Number of outputs: {:?}", onnx_model.graph.output.len());
-    let mut builder = ONNXGraphBuilder::default();
-    builder.node_gen(&onnx_model);
-
-    let ONNXGraphBuilder {
-        nodes,
-        inputs: inner_inputs,
-        outputs: inner_outputs,
-        ..
-    } = builder;
-
-    // ONNX nodes must be topologically sorted per spec:
-    // https://github.com/onnx/onnx/blob/main/docs/IR.md#graphs
-    assert!(nodes.is_top_sorted(), "Nodes are not topologically sorted");
-
-    log::info!("Finished parsing ONNX file: {}", onnx_path.display());
-
-    OnnxGraph {
-        nodes,
-        inputs: inner_inputs,
-        outputs: inner_outputs,
-    }
+    onnx_model
 }
 
 /// Remap the unsqueeze node to a reshape node, Should only be called after
@@ -487,16 +516,20 @@ fn remap_unsqueeze_to_reshape(node: &mut Node, out_arg: &Argument) {
 /// the naming convention of the nodes and allow to be used as rust identifiers.
 /// Rename the inputs and output in the graph and return a map of
 /// the old names to the new names.
-fn rename_io(node: &mut Node, graph_io: &mut OnnxGraphIO) {
+fn rename_io(node: &mut Node, graph_io: &mut OnnxGraphIO, model_file: &Path) {
     log::debug!("checking inputs for node {:?}", &node.name);
     for node_input in node.inputs.iter_mut() {
         //graph_io.add_input(&node_input.name, i);
-        if let Some(input_name) = graph_io.get_new_name(&node_input.name) {
-            node_input.passed = true;
-            node_input.name = input_name.clone();
-        } else {
-            node_input.name = "".to_string();
-            node_input.passed = false;
+        match graph_io.get_new_name(&node_input.name) {
+            Ok(Some(input_name)) => {
+                node_input.passed = true;
+                node_input.name = input_name.clone();
+            }
+            Ok(None) => {
+                node_input.name = "".to_string();
+                node_input.passed = false;
+            }
+            Err(_e) => check_validity(model_file),
         }
     }
     log::debug!("\n\nchecking outputs");
@@ -594,4 +627,22 @@ pub(crate) fn convert_constant_value(node: &Node) -> Argument {
         .expect("Constant should have a value");
 
     Argument::from(value)
+}
+
+/// Check the validity of an ONNX file,
+/// right now just confirms the nodes are topologically sorted
+fn check_validity(onnx_path: &Path) {
+    // neither of these should fail given that the file has been parsed once already
+    let mut file = File::open(onnx_path).unwrap();
+    let onnx_model: ModelProto = Message::parse_from_reader(&mut file).unwrap();
+    let mut nodes: Vec<Node> = vec![];
+    for onnx_node in onnx_model.graph.node.iter() {
+        let node = fallback_convert_node_proto(onnx_node);
+        //we don't need to remap the node type here
+        // because we only care about node names and io names
+        nodes.push(node);
+    }
+    // ONNX nodes must be topologically sorted per spec:
+    // https://github.com/onnx/onnx/blob/main/docs/IR.md#graphs
+    assert!(nodes.is_top_sorted(), "Nodes are not topologically sorted");
 }
