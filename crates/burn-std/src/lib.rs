@@ -29,27 +29,28 @@ mod cube {
     use cubecl::ir::{ElemType, FloatKind, IntKind, StorageType, UIntKind};
     use cubecl_quant::scheme::QuantScheme;
 
+    use crate::PrimitiveDType;
     use crate::tensor::DType;
     use crate::tensor::quantization::{QuantStore, QuantValue};
 
-    impl From<DType> for cubecl::ir::ElemType {
-        fn from(dtype: DType) -> Self {
+    impl From<PrimitiveDType> for cubecl::ir::ElemType {
+        fn from(dtype: PrimitiveDType) -> Self {
             match dtype {
-                DType::F64 => ElemType::Float(FloatKind::F64),
-                DType::F32 => ElemType::Float(FloatKind::F32),
-                DType::Flex32 => ElemType::Float(FloatKind::Flex32),
-                DType::F16 => ElemType::Float(FloatKind::F16),
-                DType::BF16 => ElemType::Float(FloatKind::BF16),
-                DType::I64 => ElemType::Int(IntKind::I64),
-                DType::I32 => ElemType::Int(IntKind::I32),
-                DType::I16 => ElemType::Int(IntKind::I16),
-                DType::I8 => ElemType::Int(IntKind::I8),
-                DType::U64 => ElemType::UInt(UIntKind::U64),
-                DType::U32 => ElemType::UInt(UIntKind::U32),
-                DType::U16 => ElemType::UInt(UIntKind::U16),
-                DType::U8 => ElemType::UInt(UIntKind::U8),
-                DType::Bool => ElemType::Bool,
-                DType::QFloat(scheme) => match scheme.store {
+                PrimitiveDType::F64 => ElemType::Float(FloatKind::F64),
+                PrimitiveDType::F32 => ElemType::Float(FloatKind::F32),
+                PrimitiveDType::Flex32 => ElemType::Float(FloatKind::Flex32),
+                PrimitiveDType::F16 => ElemType::Float(FloatKind::F16),
+                PrimitiveDType::BF16 => ElemType::Float(FloatKind::BF16),
+                PrimitiveDType::I64 => ElemType::Int(IntKind::I64),
+                PrimitiveDType::I32 => ElemType::Int(IntKind::I32),
+                PrimitiveDType::I16 => ElemType::Int(IntKind::I16),
+                PrimitiveDType::I8 => ElemType::Int(IntKind::I8),
+                PrimitiveDType::U64 => ElemType::UInt(UIntKind::U64),
+                PrimitiveDType::U32 => ElemType::UInt(UIntKind::U32),
+                PrimitiveDType::U16 => ElemType::UInt(UIntKind::U16),
+                PrimitiveDType::U8 => ElemType::UInt(UIntKind::U8),
+                PrimitiveDType::Bool => ElemType::Bool,
+                PrimitiveDType::QFloat(scheme) => match scheme.store {
                     QuantStore::Native => match scheme.value {
                         QuantValue::Q8F | QuantValue::Q8S => Self::Int(IntKind::I8),
                         QuantValue::E4M3 => Self::Float(FloatKind::E4M3),
@@ -68,10 +69,10 @@ mod cube {
         }
     }
 
-    impl From<DType> for cubecl::ir::StorageType {
-        fn from(dtype: DType) -> cubecl::ir::StorageType {
+    impl From<PrimitiveDType> for cubecl::ir::StorageType {
+        fn from(dtype: PrimitiveDType) -> cubecl::ir::StorageType {
             match dtype {
-                DType::QFloat(QuantScheme {
+                PrimitiveDType::QFloat(QuantScheme {
                     store: QuantStore::Native,
                     value: QuantValue::E2M1,
                     ..

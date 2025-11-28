@@ -5,7 +5,7 @@ use crate::distribution::Distribution;
 use burn_std::{DType, bf16, f16};
 
 #[cfg(feature = "cubecl")]
-use burn_std::flex32;
+use burn_std::{PrimitiveDType, flex32};
 
 use super::cast::ToElement;
 
@@ -28,7 +28,7 @@ pub trait Element:
     + 'static
 {
     /// The dtype of the element.
-    fn dtype() -> DType;
+    fn dtype() -> PrimitiveDType;
 }
 
 /// Element conversion trait for tensor.
@@ -100,7 +100,7 @@ macro_rules! make_element {
     ) => {
         impl Element for $type {
             #[inline(always)]
-            fn dtype() -> burn_std::DType {
+            fn dtype() -> burn_std::PrimitiveDType {
                 $dtype
             }
         }
@@ -145,7 +145,7 @@ make_element!(
     convert ToElement::to_f64,
     random |distribution: Distribution, rng: &mut R| distribution.sampler(rng).sample(),
     cmp |a: &f64, b: &f64| a.total_cmp(b),
-    dtype DType::F64
+    dtype PrimitiveDType::F64
 );
 
 make_element!(
@@ -153,7 +153,7 @@ make_element!(
     convert ToElement::to_f32,
     random |distribution: Distribution, rng: &mut R| distribution.sampler(rng).sample(),
     cmp |a: &f32, b: &f32| a.total_cmp(b),
-    dtype DType::F32
+    dtype PrimitiveDType::F32
 );
 
 make_element!(
@@ -161,7 +161,7 @@ make_element!(
     convert ToElement::to_i64,
     random |distribution: Distribution, rng: &mut R| distribution.sampler(rng).sample(),
     cmp |a: &i64, b: &i64| Ord::cmp(a, b),
-    dtype DType::I64
+    dtype PrimitiveDType::I64
 );
 
 make_element!(
@@ -169,7 +169,7 @@ make_element!(
     convert ToElement::to_u64,
     random |distribution: Distribution, rng: &mut R| distribution.sampler(rng).sample(),
     cmp |a: &u64, b: &u64| Ord::cmp(a, b),
-    dtype DType::U64
+    dtype PrimitiveDType::U64
 );
 
 make_element!(
@@ -177,7 +177,7 @@ make_element!(
     convert ToElement::to_i32,
     random |distribution: Distribution, rng: &mut R| distribution.sampler(rng).sample(),
     cmp |a: &i32, b: &i32| Ord::cmp(a, b),
-    dtype DType::I32
+    dtype PrimitiveDType::I32
 );
 
 make_element!(
@@ -185,7 +185,7 @@ make_element!(
     convert ToElement::to_u32,
     random |distribution: Distribution, rng: &mut R| distribution.sampler(rng).sample(),
     cmp |a: &u32, b: &u32| Ord::cmp(a, b),
-    dtype DType::U32
+    dtype PrimitiveDType::U32
 );
 
 make_element!(
@@ -193,7 +193,7 @@ make_element!(
     convert ToElement::to_i16,
     random |distribution: Distribution, rng: &mut R| distribution.sampler(rng).sample(),
     cmp |a: &i16, b: &i16| Ord::cmp(a, b),
-    dtype DType::I16
+    dtype PrimitiveDType::I16
 );
 
 make_element!(
@@ -201,7 +201,7 @@ make_element!(
     convert ToElement::to_u16,
     random |distribution: Distribution, rng: &mut R| distribution.sampler(rng).sample(),
     cmp |a: &u16, b: &u16| Ord::cmp(a, b),
-    dtype DType::U16
+    dtype PrimitiveDType::U16
 );
 
 make_element!(
@@ -209,7 +209,7 @@ make_element!(
     convert ToElement::to_i8,
     random |distribution: Distribution, rng: &mut R| distribution.sampler(rng).sample(),
     cmp |a: &i8, b: &i8| Ord::cmp(a, b),
-    dtype DType::I8
+    dtype PrimitiveDType::I8
 );
 
 make_element!(
@@ -217,7 +217,7 @@ make_element!(
     convert ToElement::to_u8,
     random |distribution: Distribution, rng: &mut R| distribution.sampler(rng).sample(),
     cmp |a: &u8, b: &u8| Ord::cmp(a, b),
-    dtype DType::U8
+    dtype PrimitiveDType::U8
 );
 
 make_element!(
@@ -228,7 +228,7 @@ make_element!(
         f16::from_elem(sample)
     },
     cmp |a: &f16, b: &f16| a.total_cmp(b),
-    dtype DType::F16
+    dtype PrimitiveDType::F16
 );
 make_element!(
     ty bf16,
@@ -238,7 +238,7 @@ make_element!(
         bf16::from_elem(sample)
     },
     cmp |a: &bf16, b: &bf16| a.total_cmp(b),
-    dtype DType::BF16
+    dtype PrimitiveDType::BF16
 );
 
 #[cfg(feature = "cubecl")]
@@ -250,7 +250,7 @@ make_element!(
         flex32::from_elem(sample)
     },
     cmp |a: &flex32, b: &flex32| a.total_cmp(b),
-    dtype DType::Flex32,
+    dtype PrimitiveDType::Flex32,
     min flex32::from_f32(f16::MIN.to_f32_const()),
     max flex32::from_f32(f16::MAX.to_f32_const())
 );
@@ -263,7 +263,7 @@ make_element!(
         bool::from_elem(sample)
     },
     cmp |a: &bool, b: &bool| Ord::cmp(a, b),
-    dtype DType::Bool,
+    dtype PrimitiveDType::Bool,
     min false,
     max true
 );
