@@ -1,3 +1,5 @@
+use burn_backend::element::ElementComparison;
+
 use crate::{DType, Shape, backend::Backend};
 
 /// A type-level representation of the kind of a float tensor

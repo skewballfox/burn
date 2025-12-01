@@ -1,8 +1,12 @@
+use std::marker::PhantomData;
+
+use crate::{FloatTchElement, IntTchElement};
+
 use super::TchTensor;
 use super::element::TchElement;
 use burn_tensor::backend::{Backend, DeviceId, DeviceOps, SyncError};
 use burn_tensor::ops::IntTensorOps;
-use burn_tensor::{Int, Tensor};
+use burn_tensor::{ElementComparison, Int, Tensor};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 /// The device struct when using the `tch` backend.
@@ -104,18 +108,20 @@ impl DeviceOps for LibTorchDevice {}
 ///
 /// Refer to the [tch] crate for more information.
 #[derive(Clone, Copy, Default, Debug)]
-pub struct LibTorch<E = f32> {
-    _e: E,
+pub struct LibTorch<E, I=i64, F=f32> {
+    _e: PhantomData<E>,
+    _i: PhantomData<I>,
+    _f: PhantomData<F>,
 }
 
-impl<E: TchElement> Backend for LibTorch<E> {
+impl<E: TchElement, F: FloatTchElement, I: IntTchElement> Backend for LibTorch<E, F, I> {
     type Device = LibTorchDevice;
 
     type FloatTensorPrimitive = TchTensor;
-    type FloatElem = E;
+    type FloatElem = F;
 
     type IntTensorPrimitive = TchTensor;
-    type IntElem = i64;
+    type IntElem = I;
 
     type BoolTensorPrimitive = TchTensor;
     type BoolElem = bool;

@@ -1,5 +1,8 @@
-use burn_tensor::Element;
+use burn_tensor::{Element, ElementComparison};
 use half::{bf16, f16};
+use tch::Scalar;
+
+
 
 /// The element type for the tch backend.
 pub trait TchElement: Element + tch::kind::Element {
@@ -9,6 +12,8 @@ pub trait TchElement: Element + tch::kind::Element {
     }
 }
 
+pub trait FloatTchElement: TchElement + ElementComparison {}
+pub trait IntTchElement: TchElement + ElementComparison + Into<Scalar> {}
 impl TchElement for f64 {}
 impl TchElement for f32 {}
 impl TchElement for f16 {}
@@ -23,12 +28,31 @@ impl TchElement for bf16 {
     }
 }
 
+impl FloatTchElement for f64 {}
+impl FloatTchElement for f32 {}
+impl FloatTchElement for f16 {}
+impl FloatTchElement for bf16 {
+    
+}
 impl TchElement for i64 {}
 impl TchElement for i32 {}
 impl TchElement for i16 {}
 impl TchElement for i8 {}
 
+
+
+impl IntTchElement for i64 {}
+impl Into<Scalar> for i32 {
+    fn into(self) -> Scalar {
+        Scalar::from(self)
+    }
+}
+impl IntTchElement for i32 {}
+impl IntTchElement for i16 {}
+impl IntTchElement for i8 {}
+
 impl TchElement for u8 {}
+impl IntTchElement for u8 {}
 
 impl TchElement for bool {}
 

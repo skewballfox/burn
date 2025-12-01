@@ -1,3 +1,4 @@
+use burn_tensor::ElementComparison;
 use cubecl::{
     CubeElement as CubeElem, flex32,
     matmul::components::{MatmulPrecision, MatrixPrecision},
@@ -15,11 +16,11 @@ pub trait MatmulElement:
 }
 
 /// The float element type for the jit backend.
-pub trait FloatElement: MatmulElement + Float {}
+pub trait FloatElement: MatmulElement + Float + ElementComparison {}
 
 /// The int element type for the jit backend.
 pub trait IntElement:
-    MatmulElement + Int + ReducePrecision<EI: CubeElement, EA: CubeElement>
+    MatmulElement + Int + ElementComparison +  ReducePrecision<EI: CubeElement, EA: CubeElement>
 {
 }
 

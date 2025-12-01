@@ -1,4 +1,5 @@
 use alloc::vec::Vec;
+use burn_backend::element::ElementComparison;
 
 use crate::alloc::borrow::ToOwned;
 
@@ -1541,7 +1542,7 @@ where
     ///    // [[2, 2, 3], [4, 5, 6], [6, 6, 6]]
     /// }
     /// ```
-    pub fn clamp<E: ElementConversion>(self, min: E, max: E) -> Self {
+    pub fn clamp<E: ElementConversion + ElementComparison>(self, min: E, max: E) -> Self {
         Self::new(K::clamp(self.primitive, min.elem(), max.elem()))
     }
 

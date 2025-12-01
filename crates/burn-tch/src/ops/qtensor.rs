@@ -5,9 +5,9 @@ use burn_tensor::{
     quantization::{QuantScheme, QuantizationParametersPrimitive},
 };
 
-use crate::{LibTorch, LibTorchDevice, TchElement};
+use crate::{FloatTchElement, IntTchElement, LibTorch, LibTorchDevice, TchElement};
 
-impl<E: TchElement> QTensorOps<Self> for LibTorch<E> {
+impl<E: TchElement, F: FloatTchElement, I: IntTchElement> QTensorOps<Self> for LibTorch<E, F,I> {
     fn q_from_data(_data: TensorData, _device: &LibTorchDevice) -> QuantizedTensor<Self> {
         unimplemented!()
     }

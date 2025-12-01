@@ -1,16 +1,14 @@
 use std::ops::Range;
 
 use burn_tensor::{
-    Distribution, IntDType, Shape, TensorData, TensorMetadata,
-    backend::{Backend, ExecutionError},
-    ops::{FloatTensorOps, IntTensor, IntTensorOps},
+    Distribution, IntDType, Shape, TensorData, TensorMetadata, backend::{Backend, ExecutionError}, ops::{FloatTensorOps, IntTensor, IntTensorOps}
 };
 
-use crate::{IntoKind, LibTorch, LibTorchDevice, TchShape, TchTensor, element::TchElement};
+use crate::{FloatTchElement, IntTchElement, IntoKind, LibTorch, LibTorchDevice, TchShape, TchTensor, element::TchElement};
 
 use super::TchOps;
 
-impl<E: TchElement> IntTensorOps<Self> for LibTorch<E> {
+impl<E: TchElement, F: FloatTchElement,I: IntTchElement> IntTensorOps<Self> for LibTorch<E,F, I> {
     fn int_from_data(data: TensorData, device: &LibTorchDevice) -> TchTensor {
         match data.dtype {
             burn_tensor::DType::I64 => TchTensor::from_data::<i64>(data, (*device).into()),
@@ -43,7 +41,7 @@ impl<E: TchElement> IntTensorOps<Self> for LibTorch<E> {
 
     fn int_empty(
         shape: Shape,
-        device: &<LibTorch<E> as Backend>::Device,
+        device: &<LibTorch<E,F,I> as Backend>::Device,
         dtype: IntDType,
     ) -> TchTensor {
         let tensor = tch::Tensor::empty(
@@ -81,7 +79,7 @@ impl<E: TchElement> IntTensorOps<Self> for LibTorch<E> {
         TchOps::equal(lhs, rhs)
     }
 
-    fn int_equal_elem(lhs: TchTensor, rhs: i64) -> TchTensor {
+    fn int_equal_elem(lhs: TchTensor, rhs: I) -> TchTensor {
         TchOps::equal_elem(lhs, rhs)
     }
 
@@ -89,7 +87,7 @@ impl<E: TchElement> IntTensorOps<Self> for LibTorch<E> {
         TchOps::greater(lhs, rhs)
     }
 
-    fn int_greater_elem(lhs: TchTensor, rhs: i64) -> TchTensor {
+    fn int_greater_elem(lhs: TchTensor, rhs: I) -> TchTensor {
         TchOps::greater_elem(lhs, rhs)
     }
 
@@ -97,7 +95,7 @@ impl<E: TchElement> IntTensorOps<Self> for LibTorch<E> {
         TchOps::greater_equal(lhs, rhs)
     }
 
-    fn int_greater_equal_elem(lhs: TchTensor, rhs: i64) -> TchTensor {
+    fn int_greater_equal_elem(lhs: TchTensor, rhs: I) -> TchTensor {
         TchOps::greater_equal_elem(lhs, rhs)
     }
 
@@ -105,7 +103,7 @@ impl<E: TchElement> IntTensorOps<Self> for LibTorch<E> {
         TchOps::lower(lhs, rhs)
     }
 
-    fn int_lower_elem(lhs: TchTensor, rhs: i64) -> TchTensor {
+    fn int_lower_elem(lhs: TchTensor, rhs: I) -> TchTensor {
         TchOps::lower_elem(lhs, rhs)
     }
 
@@ -113,7 +111,7 @@ impl<E: TchElement> IntTensorOps<Self> for LibTorch<E> {
         TchOps::lower_equal(lhs, rhs)
     }
 
-    fn int_lower_equal_elem(lhs: TchTensor, rhs: i64) -> TchTensor {
+    fn int_lower_equal_elem(lhs: TchTensor, rhs: I) -> TchTensor {
         TchOps::lower_equal_elem(lhs, rhs)
     }
 

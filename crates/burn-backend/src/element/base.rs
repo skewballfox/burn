@@ -14,7 +14,7 @@ pub trait Element:
     ToElement
     + ElementRandom
     + ElementConversion
-    + ElementComparison
+    + ElementEquality
     + ElementLimits
     + bytemuck::CheckedBitPattern
     + bytemuck::NoUninit
@@ -61,6 +61,13 @@ pub trait ElementRandom {
     ///
     /// The random value.
     fn random<R: RngCore>(distribution: Distribution, rng: &mut R) -> Self;
+}
+
+
+/// Element equality trait.
+pub trait ElementEquality {
+    /// Returns true if `self` is equal to `other`.
+    fn eq(&self, other: &Self) -> bool;
 }
 
 /// Element ordering trait.
@@ -121,6 +128,14 @@ macro_rules! make_element {
             fn random<R: RngCore>(distribution: Distribution, rng: &mut R) -> Self {
                 #[allow(clippy::redundant_closure_call)]
                 $random(distribution, rng)
+            }
+        }
+
+        impl ElementEquality for $type {
+            fn eq(&self, other: &Self) -> bool {
+                let a = self.elem::<$type>();
+                let b = other.elem::<$type>();
+                a == b
             }
         }
 

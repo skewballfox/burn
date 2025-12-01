@@ -1,4 +1,4 @@
-use burn_tensor::Element;
+use burn_tensor::{Element, ElementComparison};
 use ndarray::LinalgScalar;
 use num_traits::Signed;
 
@@ -11,14 +11,14 @@ use num_traits::Pow;
 use libm::{log1p, log1pf};
 
 /// A float element for ndarray backend.
-pub trait FloatNdArrayElement: NdArrayElement + LinalgScalar + Signed
+pub trait FloatNdArrayElement: NdArrayElement + LinalgScalar + Signed + ElementComparison
 where
     Self: Sized,
 {
 }
 
 /// An int element for ndarray backend.
-pub trait IntNdArrayElement: NdArrayElement {}
+pub trait IntNdArrayElement: NdArrayElement + ElementComparison {}
 
 /// A general element for ndarray backend.
 pub trait NdArrayElement:
