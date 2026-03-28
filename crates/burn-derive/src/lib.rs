@@ -6,11 +6,13 @@
 extern crate derive_new;
 
 use proc_macro::TokenStream;
+use syn::{ItemImpl, parse_macro_input};
 
 pub(crate) mod config;
 pub(crate) mod module;
 pub(crate) mod record;
 pub(crate) mod shared;
+pub(crate) mod backend;
 
 /// Derive macro for the `Module` trait.
 ///
@@ -78,4 +80,12 @@ pub fn record_derive(input: TokenStream) -> TokenStream {
 pub fn config_derive(input: TokenStream) -> TokenStream {
     let item = syn::parse(input).unwrap();
     config::derive_impl(&item)
+}
+
+/// Derive macro for a backend decorator.
+#[proc_macro_attribute]
+pub fn backend_decorator(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let input_impl = parse_macro_input!(item as ItemImpl);
+    
+    backend::parse_backend_impl(input_impl)
 }
