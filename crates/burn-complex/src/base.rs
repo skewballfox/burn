@@ -288,7 +288,6 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
     ) -> impl Future<Output = Result<(TensorData, TensorData), ExecutionError>> + Send;
 
     fn to_complex(tensor: FloatTensor<B>) -> ComplexTensor<B>;
-    
 
     // was going to add a norm function here, but float tensor ops doesn't have a hypot function
     // easy enough to add, but a bit out of scope for this PR
@@ -595,7 +594,7 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
     ///
     /// A complex tensor constructed from polar coordinates.
     fn complex_from_polar(magnitude: FloatTensor<B>, phase: FloatTensor<B>) -> ComplexTensor<B>;
-    
+
     // formula: e^(a + bi) = e^a (cos(b) + i*sin(b)) = from_polar(e^a, b)
     /// Complex exponential function.
     ///

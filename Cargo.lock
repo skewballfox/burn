@@ -801,7 +801,7 @@ dependencies = [
 
 [[package]]
 name = "burn-complex"
-version = "0.21.0-pre.2"
+version = "0.21.0-pre.3"
 dependencies = [
  "bon",
  "burn-std",
@@ -980,6 +980,7 @@ version = "0.21.0-pre.3"
 dependencies = [
  "aligned-vec",
  "burn-backend",
+ "burn-complex",
  "burn-ir",
  "burn-ndarray",
  "burn-std",

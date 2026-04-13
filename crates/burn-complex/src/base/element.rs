@@ -75,25 +75,6 @@ pub struct Complex<E> {
     pub imag: E,
 }
 
-// I need to verify the ways the size and dtype information is used,
-impl<T: TensorMetadata> TensorMetadata for Complex<T> {
-    fn dtype(&self) -> DType {
-        match self.real.dtype() {
-            DType::F32 => DType::Complex32,
-            DType::F64 => DType::Complex64,
-            _ => panic!("Unsupported element type for Complex. Only f32 and f64 are supported."),
-        }
-    }
-
-    fn shape(&self) -> burn_tensor::Shape {
-        self.real.shape()
-    }
-
-    fn rank(&self) -> usize {
-        self.shape().num_dims()
-    }
-}
-
 impl<E: core::fmt::Debug> core::fmt::Debug for Complex<E> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(

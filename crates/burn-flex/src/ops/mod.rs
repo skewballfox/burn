@@ -59,6 +59,8 @@ pub mod binary;
 mod bool;
 pub mod cat;
 pub mod comparison;
+#[cfg(feature = "complex")]
+pub mod complex;
 #[macro_use]
 mod conv_common;
 pub mod conv;

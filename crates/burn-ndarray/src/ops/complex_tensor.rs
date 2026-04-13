@@ -86,7 +86,9 @@ where
     //NOTE: May want to change complex types from ComplexE to Complex<E> in the future to match the element type (and allow quantized complex tensors)
     fn to_complex(tensor: NdArrayTensor) -> NdArrayTensor {
         crate::execute_real_to_complex_op!(tensor, |array: SharedArray<E>| {
-            array.mapv(|a: E| Complex::<E>::new(a, E::zero())).into_shared()
+            array
+                .mapv(|a: E| Complex::<E>::new(a, E::zero()))
+                .into_shared()
         })
     }
 
@@ -160,7 +162,18 @@ where
         lhs: ComplexTensor<NdArray<E, I, Q>>,
         rhs: ComplexTensor<NdArray<E, I, Q>>,
     ) -> ComplexTensor<NdArray<E, I, Q>> {
+        // crate::execute_with_complex_dtype!((lhs, rhs),C,
+        //     |lhs_array: SharedArray<C>, rhs_array: SharedArray<C>| {
+        //         lhs_array
+        //             .iter()
+        //             .zip(rhs_array.iter())
+        //             .mapv(|(a, b)| *a / *b)
+        //             .collect::<Vec<C>>()
+        //             .into_shared()
+
+        // })
         todo!()
+
         //crate::execute_with_complex_dtype!((lhs, rhs), )
     }
 
@@ -182,15 +195,21 @@ where
     fn complex_log(tensor: ComplexTensor<NdArray<E, I, Q>>) -> ComplexTensor<NdArray<E, I, Q>> {
         todo!()
     }
-    
-    fn complex_squared_norm(tensor: ComplexTensor<NdArray<E, I, Q>>) -> FloatTensor<NdArray<E, I, Q>> {
+
+    fn complex_squared_norm(
+        tensor: ComplexTensor<NdArray<E, I, Q>>,
+    ) -> FloatTensor<NdArray<E, I, Q>> {
         crate::execute_complex_to_real_op!(tensor, C, |array: SharedArray<C>| {
-            array.mapv(|x| x.real*x.real+x.imag*x.imag).into_shared()
+            array
+                .mapv(|x| x.real * x.real + x.imag * x.imag)
+                .into_shared()
         })
-    
     }
-    
-    fn complex_from_polar(magnitude: FloatTensor<NdArray<E, I, Q>>, phase: FloatTensor<NdArray<E, I, Q>>) -> ComplexTensor<NdArray<E, I, Q>> {
+
+    fn complex_from_polar(
+        magnitude: FloatTensor<NdArray<E, I, Q>>,
+        phase: FloatTensor<NdArray<E, I, Q>>,
+    ) -> ComplexTensor<NdArray<E, I, Q>> {
         todo!()
     }
 }
@@ -215,7 +234,7 @@ macro_rules! execute_complex_to_real_op {
     }};
 }
 
-/// Macro for ops that return a complex value 
+/// Macro for ops that return a complex value
 #[macro_export]
 macro_rules! execute_real_to_complex_op {
     ($tensor:expr, $op:expr) => {
