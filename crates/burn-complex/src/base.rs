@@ -9,11 +9,7 @@ May get split into separate files at some point, but for now it's easier to keep
 definitions in one spot.
 */
 use burn_tensor::{
-    BasicOps, Bytes, DType, Device, Distribution, Element, ElementConversion, FloatDType,
-    IndexingUpdateOp, Numeric, Scalar, Shape, Slice, TensorData, TensorKind, TensorMetadata,
-    TransactionPrimitive,
-    backend::{Backend, ExecutionError},
-    ops::FloatTensorOps,
+    BasicOps, Bytes, DType, Device, Distribution, Element, ElementConversion, FloatDType, IndexingUpdateOp, Numeric, Scalar, Shape, Slice, TensorData, TensorKind, TensorMetadata, TransactionPrimitive, backend::{Backend, ExecutionError}, get_device_settings, ops::FloatTensorOps
 };
 
 use crate::base::{
@@ -795,7 +791,7 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
     /// # Returns
     ///
     /// A boolean tensor with the result of the comparison.
-    fn complex_equal(lhs: ComplexTensor<B>, rhs: ComplexTensor<B>) -> BoolTensor<B> {
+    fn complex_equal(lhs: ComplexTensor<B>, rhs: ComplexTensor<B>, out_dtype: burn_std::BoolDType) -> BoolTensor<B> {
         todo!()
     }
 
@@ -809,7 +805,7 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
     /// # Returns
     ///
     /// A boolean tensor with the result of the comparison.
-    fn complex_not_equal(lhs: ComplexTensor<B>, rhs: ComplexTensor<B>) -> BoolTensor<B> {
+    fn complex_not_equal(lhs: ComplexTensor<B>, rhs: ComplexTensor<B>, out_dtype: burn_std::BoolDType) -> BoolTensor<B> {
         todo!()
     }
 
@@ -956,10 +952,10 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
         todo!()
     }
 
-    fn complex_equal_elem(lhs: ComplexTensor<B>, rhs: B::ComplexScalar) -> BoolTensor<B> {
+    fn complex_equal_elem(lhs: ComplexTensor<B>, rhs: B::ComplexScalar, out_dtype: burn_std::BoolDType) -> BoolTensor<B> {
         todo!()
     }
-    fn complex_not_equal_elem(lhs: ComplexTensor<B>, rhs: B::ComplexScalar) -> BoolTensor<B>;
+    fn complex_not_equal_elem(lhs: ComplexTensor<B>, rhs: B::ComplexScalar, out_dtype: burn_std::BoolDType) -> BoolTensor<B>;
 
     fn complex_mask_where(
         tensor: ComplexTensor<B>,
@@ -1071,15 +1067,17 @@ where
     fn repeat_dim(tensor: Self::Primitive, dim: usize, times: usize) -> Self::Primitive {
         B::complex_repeat_dim(tensor, dim, times)
     }
-    fn equal(lhs: Self::Primitive, rhs: Self::Primitive) -> <B as Backend>::BoolTensorPrimitive {
-        B::complex_equal(lhs, rhs)
+    fn equal(lhs: Self::Primitive, rhs: Self::Primitive, ) -> <B as Backend>::BoolTensorPrimitive {
+        let out_dtype = get_device_settings::<B>(&B::complex_device(&lhs)).bool_dtype;
+        B::complex_equal(lhs, rhs,out_dtype)
     }
 
     fn not_equal(
         lhs: Self::Primitive,
         rhs: Self::Primitive,
     ) -> <B as Backend>::BoolTensorPrimitive {
-        B::complex_not_equal(lhs, rhs)
+        let out_dtype = get_device_settings::<B>(&B::complex_device(&lhs)).bool_dtype;
+        B::complex_not_equal(lhs, rhs, out_dtype)
     }
 
     fn cat(tensors: Vec<Self::Primitive>, dim: usize) -> Self::Primitive {
@@ -1195,14 +1193,16 @@ where
         lhs: Self::Primitive,
         rhs: burn_tensor::Scalar,
     ) -> <B as Backend>::BoolTensorPrimitive {
-        B::complex_equal_elem(lhs, rhs.elem())
+        let out_dtype = get_device_settings::<B>(&B::complex_device(&lhs)).bool_dtype;
+        B::complex_equal_elem(lhs, rhs.elem(), out_dtype)
     }
 
     fn not_equal_elem(
         lhs: Self::Primitive,
         rhs: burn_tensor::Scalar,
     ) -> <B as Backend>::BoolTensorPrimitive {
-        B::complex_not_equal_elem(lhs, rhs.elem())
+        let out_dtype = get_device_settings::<B>(&B::complex_device(&lhs)).bool_dtype;
+        B::complex_not_equal_elem(lhs, rhs.elem(), out_dtype)
     }
 
     fn full(

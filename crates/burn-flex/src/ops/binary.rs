@@ -342,6 +342,75 @@ where
     binary_op_typed(lhs, rhs, op)
 }
 
+/// Helper to check if binary operation can use in-place optimization
+fn can_use_binary_inplace<E>(lhs: &FlexTensor, rhs: &FlexTensor) -> Option<(usize, usize, usize)>
+where
+    E: Element + bytemuck::Pod,
+{
+    if lhs.is_unique()
+        && let (Some((0, l_end)), Some((r_start, r_end))) = (
+            lhs.layout().contiguous_offsets(),
+            rhs.layout().contiguous_offsets(),
+        )
+    {
+        Some((l_end, r_start, r_end))
+    } else {
+        None
+    }
+}
+
+/// Generic binary operation that converts between element types E -> O.
+pub(crate) fn binary_op_typed_convert<E, O, Op>(
+    lhs: FlexTensor,
+    rhs: &FlexTensor,
+    op: Op,
+) -> FlexTensor
+where
+    E: Element + bytemuck::Pod,
+    O: Element + bytemuck::Pod,
+    Op: Fn(E, E) -> O,
+{
+    let shape = lhs.layout().shape().clone();
+    let lhs_storage: &[E] = lhs.storage();
+    let rhs_storage: &[E] = rhs.storage();
+    let lhs_layout = lhs.layout();
+    let rhs_layout = rhs.layout();
+    // Try contiguous path first
+    let result = {
+        match (
+            lhs_layout.contiguous_offsets(),
+            rhs_layout.contiguous_offsets(),
+        ) {
+            // Both contiguous
+            (Some((l_start, l_end)), Some((r_start, r_end))) => {
+                let l_slice = &lhs_storage[l_start..l_end];
+                let r_slice = &rhs_storage[r_start..r_end];
+
+                l_slice
+                    .iter()
+                    .zip(r_slice)
+                    .map(|(&a, &b)| op(a, b))
+                    .collect()
+            }
+            _ => {
+                // Fast path for 2D non-contiguous (common for transpose)
+                if lhs_layout.num_dims() == 2 {
+                    apply_2d_strided(lhs_storage, rhs_storage, lhs_layout, rhs_layout, op)
+                } else {
+                    // General fallback
+                    let lhs_iter = StridedIter::new(lhs_layout);
+                    let rhs_iter = StridedIter::new(rhs_layout);
+                    lhs_iter
+                        .zip(rhs_iter)
+                        .map(|(li, ri)| op(lhs_storage[li], rhs_storage[ri]))
+                        .collect()
+                }
+            }
+        }
+    };
+    make_tensor(result, shape, O::dtype())
+}
+
 /// Binary operation with in-place optimization for Pod types.
 pub(crate) fn binary_op_typed<E, Op>(mut lhs: FlexTensor, rhs: &FlexTensor, op: Op) -> FlexTensor
 where
@@ -351,12 +420,7 @@ where
     let rhs_storage: &[E] = rhs.storage();
 
     // In-place fast path: lhs unique, contiguous at offset 0, rhs contiguous
-    if lhs.is_unique()
-        && let (Some((0, l_end)), Some((r_start, r_end))) = (
-            lhs.layout().contiguous_offsets(),
-            rhs.layout().contiguous_offsets(),
-        )
-    {
+    if let Some((l_end, r_start, r_end)) = can_use_binary_inplace::<E>(&lhs, rhs) {
         let lhs_storage: &mut [E] = lhs.storage_mut();
         let r_slice = &rhs_storage[r_start..r_end];
         for (l, &r) in lhs_storage[..l_end].iter_mut().zip(r_slice) {
@@ -365,41 +429,8 @@ where
         return lhs;
     }
 
-    // Allocating path
-    let shape = lhs.layout().shape().clone();
-    let dtype = lhs.dtype();
-    let lhs_storage: &[E] = lhs.storage();
-
-    let result: Vec<E> = match (
-        lhs.layout().contiguous_offsets(),
-        rhs.layout().contiguous_offsets(),
-    ) {
-        // Both contiguous (but lhs not at offset 0)
-        (Some((l_start, l_end)), Some((r_start, r_end))) => {
-            let l_slice = &lhs_storage[l_start..l_end];
-            let r_slice = &rhs_storage[r_start..r_end];
-            l_slice
-                .iter()
-                .zip(r_slice)
-                .map(|(&a, &b)| op(a, b))
-                .collect()
-        }
-        // Fast path for 2D non-contiguous (common for transpose)
-        _ if lhs.layout().num_dims() == 2 => {
-            apply_2d_strided(lhs_storage, rhs_storage, lhs.layout(), rhs.layout(), op)
-        }
-        // General fallback
-        _ => {
-            let lhs_iter = StridedIter::new(lhs.layout());
-            let rhs_iter = StridedIter::new(rhs.layout());
-            lhs_iter
-                .zip(rhs_iter)
-                .map(|(li, ri)| op(lhs_storage[li], rhs_storage[ri]))
-                .collect()
-        }
-    };
-
-    make_tensor(result, shape, dtype)
+    // Use the convert version for non-in-place operations
+    binary_op_typed_convert(lhs, rhs, op)
 }
 
 /// Fast 2D strided binary operation using row-based iteration.
