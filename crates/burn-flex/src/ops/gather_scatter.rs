@@ -12,8 +12,45 @@ use rayon::prelude::*;
 
 use crate::{FlexTensor, Layout};
 
-/// Read indices from a tensor as `isize`. Zero-copy when the tensor's dtype
-/// matches the platform's pointer width (i64 on 64-bit, i32 on 32-bit).
+/// Read indices from a tensor as `isize`, the native offset type used by the
+/// gather/scatter/select kernels in this module.
+///
+/// This is the internal index layer for burn-flex: every indexed op
+/// ([`gather`], [`scatter_add`], [`select`], [`select_add`], and the
+/// [`scatter_min`]/[`scatter_max`] variants) routes its index tensor through
+/// this helper before touching the element buffer. Normalising to `isize`
+/// lets the kernels use a single inner-loop signature regardless of how the
+/// caller's index tensor was dtyped.
+///
+/// # Accepted widths
+///
+/// Any of the integer DTypes `I8`, `I16`, `I32`, `I64`, `U8`, `U16`, `U32`,
+/// `U64` is accepted. This is intentional: burn-flex's default `IntElem` is
+/// I32 rather than the I64 convention used by other backends, and users can
+/// also pin index tensors to any width they want via
+/// `Tensor::from_data(.., (&device, DType::Ix))`. Whichever width lands here
+/// is converted to `isize` on the fly.
+///
+/// # Zero-copy vs. owned
+///
+/// The return type is `Cow<'_, [isize]>` because only one width is zero-copy:
+/// the one matching the host pointer width. On 64-bit targets, I64 indices
+/// can be borrowed directly via `bytemuck::cast_slice` (both are 8 bytes).
+/// Every other width requires an owned `Vec<isize>` with an element-wise
+/// cast. U64 indices additionally go through a `try_from` to surface values
+/// that would wrap when cast to `isize`.
+///
+/// # History
+///
+/// Earlier versions of `int_gather`, `int_scatter_add`, `int_select`, and
+/// `int_select_add` carried a `debug_assert_eq!(indices.dtype(), DType::I64,
+/// ..)` that contradicted this helper's contract. The asserts were dropped
+/// in tracel-ai/burn#4776 once it was confirmed that `read_indices` had
+/// always handled every supported width correctly at runtime. If you're
+/// tempted to re-add a dtype check here, don't - the float siblings
+/// ([`gather_f32`], [`select_f32`], ...) already share this helper without a
+/// check, and asymmetry between the int and float paths was what surfaced
+/// the bug.
 fn read_indices(tensor: &FlexTensor) -> Cow<'_, [isize]> {
     match tensor.dtype() {
         #[cfg(target_pointer_width = "64")]
@@ -1026,135 +1063,17 @@ pub fn scatter_or(
     crate::ops::comparison::make_bool_tensor(result, tensor_shape, out_dtype)
 }
 
+// Tests kept here probe flex-specific behavior: non-I64 index dtype
+// acceptance through the internal `read_indices` path and the uninit-
+// buffer + rayon-chunked `select` kernel. Plain gather/scatter/select
+// tests (including an empty-indices edge case) live in
+// crates/burn-backend-tests/tests/tensor/float/ops/{gather_scatter,select}.rs
+// so every backend is exercised. When adding new tests, keep them here
+// only if they probe flex internals; otherwise add them there.
 #[cfg(test)]
 mod tests {
     use super::*;
     use burn_backend::TensorData;
-
-    #[test]
-    fn test_gather_1d() {
-        let tensor = FlexTensor::from_data(TensorData::new(vec![10.0f32, 20.0, 30.0, 40.0], [4]));
-        let indices = FlexTensor::from_data(TensorData::new(vec![3i64, 0, 2], [3]));
-
-        let result = gather_f32(tensor, 0, indices);
-        let data: Vec<f32> = result.into_data().to_vec().unwrap();
-        assert_eq!(data, vec![40.0, 10.0, 30.0]);
-    }
-
-    #[test]
-    fn test_gather_2d_dim1() {
-        let tensor = FlexTensor::from_data(TensorData::new(
-            vec![1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0],
-            [2, 3],
-        ));
-        let indices = FlexTensor::from_data(TensorData::new(vec![0i64, 2, 1, 0], [2, 2]));
-
-        let result = gather_f32(tensor, 1, indices);
-        assert_eq!(result.layout().shape().to_vec(), vec![2, 2]);
-        let data: Vec<f32> = result.into_data().to_vec().unwrap();
-        assert_eq!(data, vec![1.0, 3.0, 5.0, 4.0]);
-    }
-
-    #[test]
-    fn test_gather_2d_dim0() {
-        // tensor shape [2, 3], gather on dim 0, indices must have cols=3
-        let tensor = FlexTensor::from_data(TensorData::new(
-            vec![1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0],
-            [2, 3],
-        ));
-        // row 0: [1.0, 2.0, 3.0]
-        // row 1: [4.0, 5.0, 6.0]
-        let indices = FlexTensor::from_data(TensorData::new(vec![1i64, 0, 1, 0, 1, 0], [2, 3]));
-
-        let result = gather_f32(tensor, 0, indices);
-        assert_eq!(result.layout().shape().to_vec(), vec![2, 3]);
-        let data: Vec<f32> = result.into_data().to_vec().unwrap();
-        // output[i,j] = tensor[indices[i,j], j]
-        // [0,0]: tensor[1, 0] = 4.0
-        // [0,1]: tensor[0, 1] = 2.0
-        // [0,2]: tensor[1, 2] = 6.0
-        // [1,0]: tensor[0, 0] = 1.0
-        // [1,1]: tensor[1, 1] = 5.0
-        // [1,2]: tensor[0, 2] = 3.0
-        assert_eq!(data, vec![4.0, 2.0, 6.0, 1.0, 5.0, 3.0]);
-    }
-
-    #[test]
-    fn test_scatter_add_1d() {
-        let tensor = FlexTensor::from_data(TensorData::new(vec![0.0f32, 0.0, 0.0, 0.0], [4]));
-        let indices = FlexTensor::from_data(TensorData::new(vec![1i64, 2, 1], [3]));
-        let value = FlexTensor::from_data(TensorData::new(vec![1.0f32, 2.0, 3.0], [3]));
-
-        let result = scatter_add_f32(tensor, 0, indices, value);
-        let data: Vec<f32> = result.into_data().to_vec().unwrap();
-        assert_eq!(data, vec![0.0, 4.0, 2.0, 0.0]);
-    }
-
-    #[test]
-    fn test_scatter_add_2d_dim1() {
-        let tensor = FlexTensor::from_data(TensorData::new(
-            vec![0.0f32, 0.0, 0.0, 0.0, 0.0, 0.0],
-            [2, 3],
-        ));
-        let indices = FlexTensor::from_data(TensorData::new(vec![0i64, 2, 1, 0], [2, 2]));
-        let value = FlexTensor::from_data(TensorData::new(vec![1.0f32, 2.0, 3.0, 4.0], [2, 2]));
-
-        let result = scatter_add_f32(tensor, 1, indices, value);
-        let data: Vec<f32> = result.into_data().to_vec().unwrap();
-        assert_eq!(data, vec![1.0, 0.0, 2.0, 4.0, 3.0, 0.0]);
-    }
-
-    #[test]
-    fn test_select_2d_dim0() {
-        let tensor = FlexTensor::from_data(TensorData::new(
-            vec![1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0],
-            [3, 2],
-        ));
-        let indices = FlexTensor::from_data(TensorData::new(vec![2i64, 0], [2]));
-
-        let result = select_f32(tensor, 0, indices);
-        assert_eq!(result.layout().shape().to_vec(), vec![2, 2]);
-        let data: Vec<f32> = result.into_data().to_vec().unwrap();
-        assert_eq!(data, vec![5.0, 6.0, 1.0, 2.0]);
-    }
-
-    #[test]
-    fn test_select_2d_dim1() {
-        let tensor = FlexTensor::from_data(TensorData::new(
-            vec![1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0],
-            [2, 3],
-        ));
-        let indices = FlexTensor::from_data(TensorData::new(vec![2i64, 0], [2]));
-
-        let result = select_f32(tensor, 1, indices);
-        assert_eq!(result.layout().shape().to_vec(), vec![2, 2]);
-        let data: Vec<f32> = result.into_data().to_vec().unwrap();
-        assert_eq!(data, vec![3.0, 1.0, 6.0, 4.0]);
-    }
-
-    #[test]
-    fn test_select_add_2d_dim0() {
-        let tensor = FlexTensor::from_data(TensorData::new(
-            vec![0.0f32, 0.0, 0.0, 0.0, 0.0, 0.0],
-            [3, 2],
-        ));
-        let indices = FlexTensor::from_data(TensorData::new(vec![2i64, 0], [2]));
-        let value = FlexTensor::from_data(TensorData::new(vec![1.0f32, 2.0, 3.0, 4.0], [2, 2]));
-
-        let result = select_add_f32(tensor, 0, indices, value);
-        let data: Vec<f32> = result.into_data().to_vec().unwrap();
-        assert_eq!(data, vec![3.0, 4.0, 0.0, 0.0, 1.0, 2.0]);
-    }
-
-    #[test]
-    fn test_gather_i64() {
-        let tensor = FlexTensor::from_data(TensorData::new(vec![10i64, 20, 30, 40], [4]));
-        let indices = FlexTensor::from_data(TensorData::new(vec![3i64, 0, 2], [3]));
-
-        let result = gather_i64(tensor, 0, indices);
-        let data: Vec<i64> = result.into_data().to_vec().unwrap();
-        assert_eq!(data, vec![40, 10, 30]);
-    }
 
     #[test]
     fn test_gather_with_i32_indices() {
@@ -1177,20 +1096,6 @@ mod tests {
         let result = select::<f32>(tensor, 0, indices);
         let data: Vec<f32> = result.into_data().to_vec().unwrap();
         assert_eq!(data, vec![5.0, 6.0, 1.0, 2.0]);
-    }
-
-    #[test]
-    fn test_select_2d_dim0_empty_indices() {
-        let tensor = FlexTensor::from_data(TensorData::new(
-            vec![1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0],
-            [3, 2],
-        ));
-        let indices = FlexTensor::from_data(TensorData::new(Vec::<i64>::new(), [0]));
-
-        let result = select::<f32>(tensor, 0, indices);
-        assert_eq!(result.layout().shape().to_vec(), vec![0, 2]);
-        let data: Vec<f32> = result.into_data().to_vec().unwrap();
-        assert!(data.is_empty());
     }
 
     /// Exercises the uninit buffer path (dim=0) and, when rayon is enabled,
