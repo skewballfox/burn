@@ -1032,7 +1032,6 @@ dependencies = [
  "blas-src",
  "burn-autodiff",
  "burn-backend",
- "burn-complex",
  "burn-ir",
  "burn-std",
  "bytemuck",

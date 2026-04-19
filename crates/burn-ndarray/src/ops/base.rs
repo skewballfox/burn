@@ -17,7 +17,6 @@ use paste::paste;
 #[allow(unused_imports)]
 use num_traits::Float;
 
-use crate::ExpElement;
 #[cfg(feature = "simd")]
 use crate::ops::simd::{
     binary::try_binary_simd,
@@ -818,6 +817,12 @@ where
         lhs.mapv(var_name).into_shared()
     }
 
+    pub(crate) fn abs(tensor: SharedArray<E>) -> SharedArray<E> {
+        let tensor = dispatch_unary_simd!(E, VecAbs, tensor, i8, i16, i32, f32, f64);
+
+        tensor.mapv_into(|a| a.abs_elem()).into_shared()
+    }
+
     pub(crate) fn equal(lhs: SharedArray<E>, rhs: SharedArray<E>) -> SharedArray<bool> {
         let (lhs, rhs) = dispatch_cmp_simd!(
             E, VecEquals, lhs, rhs, u8, i8, u16, i16, u32, f32, i32, u64, i64, f64
@@ -872,18 +877,6 @@ where
                 }
             })
             .into_shared()
-    }
-}
-
-//Trying to figure out how to how to support the scenario where E:AbsOutput != E while still using Simd when
-impl<E> NdArrayMathOps<E>
-where
-    E: Copy + NdArrayElement + ExpElement<AbsOutput = E>,
-{
-    pub(crate) fn abs(tensor: SharedArray<E>) -> SharedArray<E> {
-        let tensor = dispatch_unary_simd!(E, VecAbs, tensor, i8, i16, i32, f32, f64);
-
-        tensor.mapv_into(|a| a.abs_elem()).into_shared()
     }
 }
 
