@@ -12,8 +12,8 @@ use burn_complex::{
 };
 use burn_std::{BoolDType, DType};
 
-use crate::ops::comparison::{CompareOp, compare_elem_typed};
 use crate::ops::comparison::compare_typed;
+use crate::ops::comparison::{CompareOp, compare_elem_typed};
 
 use crate::{Flex, FlexDevice, FlexTensor, ops::binary::scalar_op_typed, simd::CmpOp};
 
@@ -136,7 +136,11 @@ impl ComplexTensorOps<Flex> for Flex {
         real: burn_complex::base::FloatTensor<Flex>,
         imag: burn_complex::base::FloatTensor<Flex>,
     ) -> ComplexTensor<Flex> {
-        <Flex as ComplexTensorBackend>::complex_from_split_data(real.into_data(), imag.into_data(), &FlexDevice)
+        <Flex as ComplexTensorBackend>::complex_from_split_data(
+            real.into_data(),
+            imag.into_data(),
+            &FlexDevice,
+        )
     }
 
     fn complex_from_polar(
@@ -178,45 +182,47 @@ impl ComplexTensorOps<Flex> for Flex {
         let rhs = rhs;
         let f32_cmp = |a, b| a != b;
         let f64_cmp = |a, b| a != b;
-        let simd_hint = Some(CompareOp::Ne);
-        debug_assert_eq!(lhs.dtype(), rhs.dtype(), "compare: dtype mismatch");
-
-        
+        //let _simd_hint = Some(CompareOp::Ne);
 
         let dtype = lhs.dtype();
 
         match dtype {
-            DType::Complex32 => compare_elem_typed(lhs, &rhs, out_dtype, f32_cmp),
-            DType::Complex64 => compare_elem_typed(lhs, &rhs, out_dtype, f64_cmp),
+            DType::Complex32 => compare_elem_typed(lhs, rhs, out_dtype, f32_cmp),
+            DType::Complex64 => compare_elem_typed(lhs, rhs, out_dtype, f64_cmp),
             _ => panic!("compare: unsupported dtype {:?}", dtype),
         }
     }
 
-    fn complex_equal_elem(lhs: ComplexTensor<Flex>, rhs: <Flex as ComplexTensorBackend>::ComplexScalar, out_dtype: burn_std::BoolDType) -> burn_complex::base::BoolTensor<Flex> {
+    fn complex_equal_elem(
+        lhs: ComplexTensor<Flex>,
+        rhs: <Flex as ComplexTensorBackend>::ComplexScalar,
+        out_dtype: burn_std::BoolDType,
+    ) -> burn_complex::base::BoolTensor<Flex> {
         let lhs = lhs;
         let rhs = rhs;
         let f32_cmp = |a, b| a == b;
         let f64_cmp = |a, b| a == b;
-        let simd_hint = Some(CompareOp::Eq);
-        debug_assert_eq!(lhs.dtype(), rhs.dtype(), "compare: dtype mismatch");
-
-        
+        //let _simd_hint = Some(CompareOp::Eq);
 
         let dtype = lhs.dtype();
 
         match dtype {
-            DType::Complex32 => compare_elem_typed(lhs, &rhs, out_dtype, f32_cmp),
-            DType::Complex64 => compare_elem_typed(lhs, &rhs, out_dtype, f64_cmp),
+            DType::Complex32 => compare_elem_typed(lhs, rhs, out_dtype, f32_cmp),
+            DType::Complex64 => compare_elem_typed(lhs, rhs, out_dtype, f64_cmp),
             _ => panic!("compare: unsupported dtype {:?}", dtype),
         }
     }
 
-    fn complex_equal(lhs: ComplexTensor<Flex>, rhs: ComplexTensor<Flex>, out_dtype: burn_std::BoolDType) -> burn_complex::base::BoolTensor<Flex> {
+    fn complex_equal(
+        lhs: ComplexTensor<Flex>,
+        rhs: ComplexTensor<Flex>,
+        out_dtype: burn_std::BoolDType,
+    ) -> burn_complex::base::BoolTensor<Flex> {
         let lhs = lhs;
         let rhs = rhs;
         let f32_cmp = |a, b| a == b;
         let f64_cmp = |a, b| a == b;
-        let simd_hint = Some(CompareOp::Eq);
+        //let _simd_hint = Some(CompareOp::Eq);
         debug_assert_eq!(lhs.dtype(), rhs.dtype(), "compare: dtype mismatch");
 
         // Broadcast to same shape if needed
@@ -225,18 +231,22 @@ impl ComplexTensorOps<Flex> for Flex {
         let dtype = lhs.dtype();
 
         match dtype {
-            DType::Complex32 => compare_typed(lhs, &rhs, out_dtype, f32_cmp),
-            DType::Complex64 => compare_typed(lhs, &rhs, out_dtype, f64_cmp),
+            DType::Complex32 => compare_typed::<Complex<f32>, _>(lhs, &rhs, out_dtype, f32_cmp),
+            DType::Complex64 => compare_typed::<Complex<f64>, _>(lhs, &rhs, out_dtype, f64_cmp),
             _ => panic!("compare: unsupported dtype {:?}", dtype),
         }
     }
 
-    fn complex_not_equal(lhs: ComplexTensor<Flex>, rhs: ComplexTensor<Flex>, out_dtype: burn_std::BoolDType) -> burn_complex::base::BoolTensor<Flex> {
+    fn complex_not_equal(
+        lhs: ComplexTensor<Flex>,
+        rhs: ComplexTensor<Flex>,
+        out_dtype: burn_std::BoolDType,
+    ) -> burn_complex::base::BoolTensor<Flex> {
         let lhs = lhs;
         let rhs = rhs;
         let f32_cmp = |a, b| a != b;
         let f64_cmp = |a, b| a != b;
-        let simd_hint = Some(CompareOp::Ne);
+        //let _simd_hint = Some(CompareOp::Ne);
         debug_assert_eq!(lhs.dtype(), rhs.dtype(), "compare: dtype mismatch");
 
         // Broadcast to same shape if needed
@@ -245,14 +255,48 @@ impl ComplexTensorOps<Flex> for Flex {
         let dtype = lhs.dtype();
 
         match dtype {
-            DType::Complex32 => compare_typed(lhs, &rhs, out_dtype, f32_cmp),
-            DType::Complex64 => compare_typed(lhs, &rhs, out_dtype, f64_cmp),
+            DType::Complex32 => compare_typed::<Complex<f32>, _>(lhs, &rhs, out_dtype, f32_cmp),
+            DType::Complex64 => compare_typed::<Complex<f64>, _>(lhs, &rhs, out_dtype, f64_cmp),
             _ => panic!("compare: unsupported dtype {:?}", dtype),
         }
     }
+
+    fn complex_gather(
+        dim: usize,
+        tensor: ComplexTensor<Flex>,
+        indices: burn_complex::base::IntTensor<Flex>,
+    ) -> ComplexTensor<Flex> {
+        match tensor.dtype() {
+            DType::Complex32 => {
+                crate::ops::gather_scatter::gather::<Complex<f32>>(tensor, dim, indices)
+            }
+            DType::Complex64 => {
+                crate::ops::gather_scatter::gather::<Complex<f64>>(tensor, dim, indices)
+            }
+            _ => panic!("complex_gather: unsupported dtype {:?}", tensor.dtype()),
+        }
+    }
+
+    fn complex_scatter_add(
+        dim: usize,
+        tensor: ComplexTensor<Flex>,
+        indices: burn_complex::base::IntTensor<Flex>,
+        values: ComplexTensor<Flex>,
+    ) -> ComplexTensor<Flex> {
+        match tensor.dtype() {
+            DType::Complex32 => crate::ops::gather_scatter::scatter_add::<Complex<f32>>(
+                tensor, dim, indices, values,
+            ),
+            DType::Complex64 => crate::ops::gather_scatter::scatter_add::<Complex<f64>>(
+                tensor, dim, indices, values,
+            ),
+            _ => panic!(
+                "complex_scatter_add: unsupported dtype {:?}",
+                tensor.dtype()
+            ),
+        }
+    }
 }
-
-
 
 #[macro_export]
 macro_rules! c2c_binary_op {
@@ -265,7 +309,6 @@ macro_rules! c2c_binary_op {
         )
     };
 }
-
 
 #[macro_export]
 macro_rules! c2c_scalar_op {
@@ -291,29 +334,19 @@ macro_rules! c2r_binary_op {
     };
 }
 
-
 #[macro_export]
 macro_rules! c2r_unary_op {
     ($tensor:expr, $op:expr) => {
-        $crate::ops::complex::c2r_unary_op(
-            $tensor,
-            $op,
-            $op,
-        )
+        $crate::ops::complex::c2r_unary_op($tensor, $op, $op)
     };
 }
 
 #[macro_export]
 macro_rules! c2c_unary_op {
     ($tensor:expr, $op:expr) => {
-        $crate::ops::complex::c2c_unary_op(
-            $tensor,
-            $op,
-            $op,
-        )
+        $crate::ops::complex::c2c_unary_op($tensor, $op, $op)
     };
 }
-
 
 #[macro_export]
 macro_rules! c2r_scalar_op {
@@ -427,11 +460,7 @@ where
     }
 }
 
-pub fn c2r_unary_op<F32Op, F64Op>(
-    tensor: FlexTensor,
-    f32_op: F32Op,
-    f64_op: F64Op,
-) -> FlexTensor
+pub fn c2r_unary_op<F32Op, F64Op>(tensor: FlexTensor, f32_op: F32Op, f64_op: F64Op) -> FlexTensor
 where
     F32Op: Fn(Complex<f32>) -> f32,
     F64Op: Fn(Complex<f64>) -> f64,
@@ -445,11 +474,7 @@ where
     }
 }
 
-pub fn c2c_unary_op<F32Op, F64Op>(
-    tensor: FlexTensor,
-    f32_op: F32Op,
-    f64_op: F64Op,
-) -> FlexTensor
+pub fn c2c_unary_op<F32Op, F64Op>(tensor: FlexTensor, f32_op: F32Op, f64_op: F64Op) -> FlexTensor
 where
     F32Op: Fn(Complex<f32>) -> Complex<f32>,
     F64Op: Fn(Complex<f64>) -> Complex<f64>,

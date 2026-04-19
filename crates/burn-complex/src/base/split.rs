@@ -7,8 +7,9 @@ use crate::{
 };
 use burn_std::{Bytes, DType};
 use burn_tensor::{
-    ElementComparison, Float, TensorData, TensorKind, TensorMetadata,
+    ElementComparison, Float, IndexingUpdateOp, TensorData, TensorKind, TensorMetadata,
     backend::{Backend, DeviceOps},
+    cast::ToElement,
     get_device_settings,
     ops::FloatTensorOps,
 };
@@ -163,8 +164,65 @@ where
     fn complex_not_equal_elem(
         lhs: ComplexTensor<SplitBackend<B>>,
         rhs: <SplitBackend<B> as ComplexTensorBackend>::ComplexScalar,
+        out_dtype: burn_std::BoolDType,
     ) -> super::BoolTensor<SplitBackend<B>> {
-        todo!()
+        let (lhs_real, lhs_imag) = (lhs.real, lhs.imag);
+        let rhs_real = rhs.real();
+        let rhs_imag = rhs.imag();
+
+        let real_cmp = B::float_not_equal_elem(
+            lhs_real,
+            burn_tensor::Scalar::Float(rhs_real.to_f64()),
+            out_dtype,
+        );
+        let imag_cmp = B::float_not_equal_elem(
+            lhs_imag,
+            burn_tensor::Scalar::Float(rhs_imag.to_f64()),
+            out_dtype,
+        );
+        B::bool_or(real_cmp, imag_cmp)
+    }
+
+    fn complex_equal_elem(
+        lhs: ComplexTensor<SplitBackend<B>>,
+        rhs: <SplitBackend<B> as ComplexTensorBackend>::ComplexScalar,
+        out_dtype: burn_std::BoolDType,
+    ) -> super::BoolTensor<SplitBackend<B>> {
+        let (lhs_real, lhs_imag) = (lhs.real, lhs.imag);
+        let rhs_real = rhs.real();
+        let rhs_imag = rhs.imag();
+
+        let real_cmp = B::float_equal_elem(
+            lhs_real,
+            burn_tensor::Scalar::Float(rhs_real.to_f64()),
+            out_dtype,
+        );
+        let imag_cmp = B::float_equal_elem(
+            lhs_imag,
+            burn_tensor::Scalar::Float(rhs_imag.to_f64()),
+            out_dtype,
+        );
+        B::bool_and(real_cmp, imag_cmp)
+    }
+
+    fn complex_equal(
+        lhs: ComplexTensor<SplitBackend<B>>,
+        rhs: ComplexTensor<SplitBackend<B>>,
+        out_dtype: burn_std::BoolDType,
+    ) -> super::BoolTensor<SplitBackend<B>> {
+        let real_cmp = B::float_equal(lhs.real, rhs.real, out_dtype);
+        let imag_cmp = B::float_equal(lhs.imag, rhs.imag, out_dtype);
+        B::bool_and(real_cmp, imag_cmp)
+    }
+
+    fn complex_not_equal(
+        lhs: ComplexTensor<SplitBackend<B>>,
+        rhs: ComplexTensor<SplitBackend<B>>,
+        out_dtype: burn_std::BoolDType,
+    ) -> super::BoolTensor<SplitBackend<B>> {
+        let real_cmp = B::float_not_equal(lhs.real, rhs.real, out_dtype);
+        let imag_cmp = B::float_not_equal(lhs.imag, rhs.imag, out_dtype);
+        B::bool_or(real_cmp, imag_cmp)
     }
 
     async fn complex_into_real_data(
@@ -278,7 +336,12 @@ where
         }
     }
     fn complex_abs(tensor: ComplexTensor<SplitBackend<B>>) -> super::FloatTensor<SplitBackend<B>> {
-        todo!()
+        //todo! https://github.com/tracel-ai/burn/issues/4836
+        // |z| = sqrt(real^2 + imag^2)
+        let real_sq = FlOps::<B>::float_mul(tensor.real.clone(), tensor.real.clone());
+        let imag_sq = FlOps::<B>::float_mul(tensor.imag.clone(), tensor.imag.clone());
+        let norm_sq = FlOps::<B>::float_add(real_sq, imag_sq);
+        FlOps::<B>::float_sqrt(norm_sq)
     }
 
     fn complex_from_parts(
@@ -289,11 +352,36 @@ where
     }
 
     fn complex_exp(tensor: ComplexTensor<SplitBackend<B>>) -> ComplexTensor<SplitBackend<B>> {
-        todo!()
+        // formula: e^(a + bi) = e^a * (cos(b) + i*sin(b)) = from_polar(e^a, b)
+        //TODO: add the checks for corner cases +∞, -∞, and NaN
+        //https://github.com/skewballfox/burn/blob/67d84b677b3d718cb25fbdc2535dbf04706b0863/crates/burn-complex/src/base/element.rs#L322-L323
+        let exp_real = FlOps::<B>::float_exp(tensor.real.clone());
+        let cos_imag = FlOps::<B>::float_cos(tensor.imag.clone());
+        let sin_imag = FlOps::<B>::float_sin(tensor.imag);
+
+        SplitComplexTensor {
+            real: FlOps::<B>::float_mul(exp_real.clone(), cos_imag),
+            imag: FlOps::<B>::float_mul(exp_real, sin_imag),
+        }
     }
 
     fn complex_log(tensor: ComplexTensor<SplitBackend<B>>) -> ComplexTensor<SplitBackend<B>> {
-        todo!()
+        // formula: ln(z) = ln|z| + i*arg(z)
+        // where |z| = sqrt(real^2 + imag^2) and arg(z) = atan2(imag, real)
+
+        // Compute norm: sqrt(real^2 + imag^2)
+        let real_sq = FlOps::<B>::float_mul(tensor.real.clone(), tensor.real.clone());
+        let imag_sq = FlOps::<B>::float_mul(tensor.imag.clone(), tensor.imag.clone());
+        let norm_sq = FlOps::<B>::float_add(real_sq, imag_sq);
+        let norm = FlOps::<B>::float_sqrt(norm_sq);
+
+        // Compute arg: atan2(imag, real)
+        let arg = FlOps::<B>::float_atan2(tensor.imag, tensor.real);
+
+        SplitComplexTensor {
+            real: FlOps::<B>::float_log(norm),
+            imag: arg,
+        }
     }
 
     fn complex_squared_norm(
@@ -311,6 +399,29 @@ where
         SplitComplexTensor {
             real: FlOps::<B>::float_mul(magnitude.clone(), FlOps::<B>::float_cos(phase.clone())),
             imag: FlOps::<B>::float_mul(magnitude, FlOps::<B>::float_sin(phase)),
+        }
+    }
+
+    fn complex_gather(
+        dim: usize,
+        tensor: ComplexTensor<SplitBackend<B>>,
+        indices: super::IntTensor<SplitBackend<B>>,
+    ) -> ComplexTensor<SplitBackend<B>> {
+        SplitComplexTensor {
+            real: B::float_gather(dim, tensor.real, indices.clone()),
+            imag: B::float_gather(dim, tensor.imag, indices),
+        }
+    }
+
+    fn complex_scatter_add(
+        dim: usize,
+        tensor: ComplexTensor<SplitBackend<B>>,
+        indices: super::IntTensor<SplitBackend<B>>,
+        values: ComplexTensor<SplitBackend<B>>,
+    ) -> ComplexTensor<SplitBackend<B>> {
+        SplitComplexTensor {
+            real: B::float_scatter_add(dim, tensor.real, indices.clone(), values.real),
+            imag: B::float_scatter_add(dim, tensor.imag, indices, values.imag),
         }
     }
 }

@@ -9,7 +9,12 @@ May get split into separate files at some point, but for now it's easier to keep
 definitions in one spot.
 */
 use burn_tensor::{
-    BasicOps, Bytes, DType, Device, Distribution, Element, ElementConversion, FloatDType, IndexingUpdateOp, Numeric, Scalar, Shape, Slice, TensorData, TensorKind, TensorMetadata, TransactionPrimitive, backend::{Backend, ExecutionError}, get_device_settings, ops::FloatTensorOps
+    BasicOps, Bytes, DType, Device, Distribution, Element, ElementConversion, FloatDType,
+    IndexingUpdateOp, Numeric, Scalar, Shape, Slice, TensorData, TensorKind, TensorMetadata,
+    TransactionPrimitive,
+    backend::{Backend, ExecutionError},
+    get_device_settings,
+    ops::FloatTensorOps,
 };
 
 use crate::base::{
@@ -712,6 +717,7 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
         dim: usize,
         indices: IntTensor<B>,
         values: ComplexTensor<B>,
+        update: IndexingUpdateOp,
     ) -> ComplexTensor<B> {
         todo!()
     }
@@ -791,7 +797,11 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
     /// # Returns
     ///
     /// A boolean tensor with the result of the comparison.
-    fn complex_equal(lhs: ComplexTensor<B>, rhs: ComplexTensor<B>, out_dtype: burn_std::BoolDType) -> BoolTensor<B> {
+    fn complex_equal(
+        lhs: ComplexTensor<B>,
+        rhs: ComplexTensor<B>,
+        out_dtype: burn_std::BoolDType,
+    ) -> BoolTensor<B> {
         todo!()
     }
 
@@ -805,7 +815,11 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
     /// # Returns
     ///
     /// A boolean tensor with the result of the comparison.
-    fn complex_not_equal(lhs: ComplexTensor<B>, rhs: ComplexTensor<B>, out_dtype: burn_std::BoolDType) -> BoolTensor<B> {
+    fn complex_not_equal(
+        lhs: ComplexTensor<B>,
+        rhs: ComplexTensor<B>,
+        out_dtype: burn_std::BoolDType,
+    ) -> BoolTensor<B> {
         todo!()
     }
 
@@ -952,10 +966,18 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
         todo!()
     }
 
-    fn complex_equal_elem(lhs: ComplexTensor<B>, rhs: B::ComplexScalar, out_dtype: burn_std::BoolDType) -> BoolTensor<B> {
+    fn complex_equal_elem(
+        lhs: ComplexTensor<B>,
+        rhs: B::ComplexScalar,
+        out_dtype: burn_std::BoolDType,
+    ) -> BoolTensor<B> {
         todo!()
     }
-    fn complex_not_equal_elem(lhs: ComplexTensor<B>, rhs: B::ComplexScalar, out_dtype: burn_std::BoolDType) -> BoolTensor<B>;
+    fn complex_not_equal_elem(
+        lhs: ComplexTensor<B>,
+        rhs: B::ComplexScalar,
+        out_dtype: burn_std::BoolDType,
+    ) -> BoolTensor<B>;
 
     fn complex_mask_where(
         tensor: ComplexTensor<B>,
@@ -975,17 +997,13 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
         dim: usize,
         tensor: ComplexTensor<B>,
         indices: IntTensor<B>,
-    ) -> ComplexTensor<B> {
-        todo!()
-    }
-    fn complex_scatter(
+    ) -> ComplexTensor<B>;
+    fn complex_scatter_add(
         dim: usize,
         tensor: ComplexTensor<B>,
         indices: IntTensor<B>,
         values: ComplexTensor<B>,
-    ) -> ComplexTensor<B> {
-        todo!()
-    }
+    ) -> ComplexTensor<B>;
     //todo: add doc strings
     fn complex_sign(tensor: ComplexTensor<B>) -> ComplexTensor<B> {
         todo!()
@@ -1067,9 +1085,9 @@ where
     fn repeat_dim(tensor: Self::Primitive, dim: usize, times: usize) -> Self::Primitive {
         B::complex_repeat_dim(tensor, dim, times)
     }
-    fn equal(lhs: Self::Primitive, rhs: Self::Primitive, ) -> <B as Backend>::BoolTensorPrimitive {
+    fn equal(lhs: Self::Primitive, rhs: Self::Primitive) -> <B as Backend>::BoolTensorPrimitive {
         let out_dtype = get_device_settings::<B>(&B::complex_device(&lhs)).bool_dtype;
-        B::complex_equal(lhs, rhs,out_dtype)
+        B::complex_equal(lhs, rhs, out_dtype)
     }
 
     fn not_equal(
@@ -1141,8 +1159,7 @@ where
         update: IndexingUpdateOp,
     ) -> Self::Primitive {
         // // Uses your existing `select_assign` name.
-        // B::select_assign(tensor, dim, indices, values)
-        todo!()
+        B::select_assign(tensor, dim, indices, values, update)
     }
 
     fn zeros(shape: Shape, device: &<B as Backend>::Device, dtype: DType) -> Self::Primitive {
@@ -1164,7 +1181,7 @@ where
         mask: <B as Backend>::BoolTensorPrimitive,
         source: Self::Primitive,
     ) -> Self::Primitive {
-        todo!()
+        B::complex_mask_where(tensor, mask, source)
     }
 
     fn mask_fill(
@@ -1172,11 +1189,11 @@ where
         mask: <B as Backend>::BoolTensorPrimitive,
         value: burn_tensor::Scalar,
     ) -> Self::Primitive {
-        todo!()
+        B::complex_mask_fill(tensor, mask, value.elem())
     }
 
     fn gather(dim: usize, tensor: Self::Primitive, indices: IntTensor<B>) -> Self::Primitive {
-        todo!()
+        B::complex_gather(dim, tensor, indices)
     }
 
     fn scatter(
@@ -1186,7 +1203,9 @@ where
         values: Self::Primitive,
         update: burn_tensor::IndexingUpdateOp,
     ) -> Self::Primitive {
-        todo!()
+        match update {
+            IndexingUpdateOp::Add => B::complex_scatter_add(dim, tensor, indices, values),
+        }
     }
 
     fn equal_elem(

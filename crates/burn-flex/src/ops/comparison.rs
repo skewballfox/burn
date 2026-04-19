@@ -308,7 +308,7 @@ where
     compare_elem_typed(lhs, rhs, out_dtype, cmp)
 }
 
-fn compare_typed<E, Cmp>(
+pub(crate) fn compare_typed<E, Cmp>(
     lhs: FlexTensor,
     rhs: &FlexTensor,
     out_dtype: BoolDType,
@@ -356,7 +356,12 @@ where
     make_bool_tensor(result, shape, out_dtype)
 }
 
-fn compare_elem_typed<E, Cmp>(lhs: FlexTensor, rhs: E, out_dtype: BoolDType, cmp: Cmp) -> FlexTensor
+pub(crate) fn compare_elem_typed<E, Cmp>(
+    lhs: FlexTensor,
+    rhs: E,
+    out_dtype: BoolDType,
+    cmp: Cmp,
+) -> FlexTensor
 where
     E: Element + Pod + Copy,
     Cmp: Fn(E, E) -> bool,

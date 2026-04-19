@@ -5,6 +5,7 @@ use crate::{
     FloatNdArrayElement, IntNdArrayElement, NdArray, NdArrayTensor, QuantElement, SharedArray,
 };
 
+use burn_std::BoolStore;
 use num_traits::Zero;
 
 use burn_backend::{ElementConversion, TensorData, TensorMetadata, ops::FloatTensorOps};
@@ -101,6 +102,7 @@ where
     fn complex_not_equal_elem(
         lhs: ComplexTensor<NdArray<E, I, Q>>,
         rhs: <NdArray<E, I, Q> as ComplexTensorBackend>::ComplexScalar,
+        out_dtype: BoolStore,
     ) -> NdArrayTensor {
         execute_with_float_dtype!(lhs, FloatElem, |array: SharedArray<FloatElem>| {
             NdArrayMathOps::equal_elem(array, rhs.elem())
@@ -209,6 +211,23 @@ where
     fn complex_from_polar(
         magnitude: FloatTensor<NdArray<E, I, Q>>,
         phase: FloatTensor<NdArray<E, I, Q>>,
+    ) -> ComplexTensor<NdArray<E, I, Q>> {
+        todo!()
+    }
+
+    fn complex_gather(
+        dim: usize,
+        tensor: ComplexTensor<NdArray<E, I, Q>>,
+        indices: burn_complex::base::IntTensor<NdArray<E, I, Q>>,
+    ) -> ComplexTensor<NdArray<E, I, Q>> {
+        todo!()
+    }
+
+    fn complex_scatter_add(
+        dim: usize,
+        tensor: ComplexTensor<NdArray<E, I, Q>>,
+        indices: burn_complex::base::IntTensor<NdArray<E, I, Q>>,
+        values: ComplexTensor<NdArray<E, I, Q>>,
     ) -> ComplexTensor<NdArray<E, I, Q>> {
         todo!()
     }
