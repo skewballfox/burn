@@ -1,3 +1,4 @@
+use burn_backend::Distribution;
 use burn_backend::TensorData;
 use burn_complex::{
     base::{
@@ -10,10 +11,15 @@ use burn_complex::{
         interleaved_data_to_split_data,
     },
 };
-use burn_std::{BoolDType, DType};
+use burn_std::{BoolDType, DType, FloatDType, Slice};
+use num_traits::ToPrimitive;
+use num_traits::Zero;
 
-use crate::ops::comparison::compare_typed;
 use crate::ops::comparison::{CompareOp, compare_elem_typed};
+use crate::ops::{
+    binary::scalar_op_typed_rhs,
+    comparison::{bool_scalar, compare_typed, iter_elements, reduce_bool_dim},
+};
 
 use crate::{Flex, FlexDevice, FlexTensor, ops::binary::scalar_op_typed, simd::CmpOp};
 
@@ -296,6 +302,383 @@ impl ComplexTensorOps<Flex> for Flex {
             ),
         }
     }
+
+    fn complex_random(
+        shape: burn_std::Shape,
+        distribution: Distribution,
+        _device: &ComplexDevice<Flex>,
+        dtype: FloatDType,
+    ) -> ComplexTensor<Flex> {
+        let mut seed = crate::backend::SEED.lock().unwrap();
+        let mut rng = seed.take().unwrap_or_else(crate::backend::get_seeded_rng);
+        let data = match dtype {
+            FloatDType::F32 => {
+                TensorData::random::<Complex<f32>, _, _>(shape, distribution, &mut rng)
+            }
+            FloatDType::F64 => {
+                TensorData::random::<Complex<f64>, _, _>(shape, distribution, &mut rng)
+            }
+            _ => panic!("select: unsupported dtype {:?}", dtype),
+        };
+        *seed = Some(rng);
+        FlexTensor::from_data(data)
+    }
+
+    fn complex_reshape(tensor: ComplexTensor<Flex>, shape: burn_std::Shape) -> ComplexTensor<Flex> {
+        tensor.reshape(shape)
+    }
+
+    fn complex_transpose(tensor: ComplexTensor<Flex>) -> ComplexTensor<Flex> {
+        let ndims = tensor.layout().num_dims();
+        if ndims < 2 {
+            return tensor;
+        }
+        tensor.transpose(ndims - 2, ndims - 1)
+    }
+
+    fn complex_neg(tensor: ComplexTensor<Flex>) -> ComplexTensor<Flex> {
+        crate::c2c_unary_op!(tensor, |a| -a)
+    }
+
+    fn complex_conj(tensor: ComplexTensor<Flex>) -> ComplexTensor<Flex> {
+        crate::c2c_unary_op!(tensor, |a| a.conj())
+    }
+
+    fn complex_arg(tensor: ComplexTensor<Flex>) -> burn_complex::base::FloatTensor<Flex> {
+        crate::c2r_unary_op!(tensor, |a| a.arg())
+    }
+
+    fn complex_powc(lhs: ComplexTensor<Flex>, rhs: ComplexTensor<Flex>) -> ComplexTensor<Flex> {
+        crate::ops::complex::c2c_binary_op(
+            lhs,
+            rhs,
+            |a: Complex<f32>, b: Complex<f32>| a.powc(b),
+            |a: Complex<f64>, b: Complex<f64>| a.powc(b),
+        )
+    }
+
+    fn complex_sqrt(tensor: ComplexTensor<Flex>) -> ComplexTensor<Flex> {
+        crate::c2c_unary_op!(tensor, |a| a.sqrt())
+    }
+
+    fn complex_sin(tensor: ComplexTensor<Flex>) -> ComplexTensor<Flex> {
+        crate::c2c_unary_op!(tensor, |a| a.sin())
+    }
+
+    fn complex_cos(tensor: ComplexTensor<Flex>) -> ComplexTensor<Flex> {
+        crate::c2c_unary_op!(tensor, |a| a.cos())
+    }
+
+    fn complex_tan(tensor: ComplexTensor<Flex>) -> ComplexTensor<Flex> {
+        crate::c2c_unary_op!(tensor, |a| a.tan())
+    }
+
+    fn complex_select(
+        tensor: ComplexTensor<Flex>,
+        dim: usize,
+        indices: burn_complex::base::IntTensor<Flex>,
+    ) -> ComplexTensor<Flex> {
+        match tensor.dtype() {
+            DType::Complex32 => {
+                crate::ops::gather_scatter::select::<Complex<f32>>(tensor, dim, indices)
+            }
+            DType::Complex64 => {
+                crate::ops::gather_scatter::select::<Complex<f64>>(tensor, dim, indices)
+            }
+            _ => panic!("select: unsupported dtype {:?}", tensor.dtype()),
+        }
+    }
+
+    fn complex_select_add(
+        tensor: ComplexTensor<Flex>,
+        dim: usize,
+        indices: burn_complex::base::IntTensor<Flex>,
+        values: ComplexTensor<Flex>,
+    ) -> ComplexTensor<Flex> {
+        match tensor.dtype() {
+            DType::Complex32 => {
+                crate::ops::gather_scatter::select_add::<Complex<f32>>(tensor, dim, indices, values)
+            }
+            DType::Complex64 => {
+                crate::ops::gather_scatter::select_add::<Complex<f64>>(tensor, dim, indices, values)
+            }
+            _ => panic!("complex_select_add: unsupported dtype {:?}", tensor.dtype()),
+        }
+    }
+
+    fn complex_slice(tensor: ComplexTensor<Flex>, slices: &[Slice]) -> ComplexTensor<Flex> {
+        crate::ops::slice::slice(tensor, slices)
+    }
+
+    fn complex_slice_assign(
+        tensor: ComplexTensor<Flex>,
+        ranges: &[Slice],
+        value: ComplexTensor<Flex>,
+    ) -> ComplexTensor<Flex> {
+        crate::ops::slice::slice_assign(tensor, ranges, value)
+    }
+
+    fn complex_swap_dims(
+        tensor: ComplexTensor<Flex>,
+        dim1: usize,
+        dim2: usize,
+    ) -> ComplexTensor<Flex> {
+        tensor.transpose(dim1, dim2)
+    }
+
+    fn complex_repeat_dim(
+        tensor: ComplexTensor<Flex>,
+        dim: usize,
+        times: usize,
+    ) -> ComplexTensor<Flex> {
+        crate::ops::repeat_dim::repeat_dim(tensor, dim, times)
+    }
+
+    fn complex_cat(tensors: Vec<ComplexTensor<Flex>>, dim: usize) -> ComplexTensor<Flex> {
+        crate::ops::cat::cat(tensors, dim)
+    }
+
+    fn complex_any(
+        tensor: ComplexTensor<Flex>,
+        out_dtype: BoolDType,
+    ) -> burn_complex::base::BoolTensor<Flex> {
+        let has_any = match tensor.dtype() {
+            DType::Complex32 => {
+                iter_elements::<Complex<f32>>(&tensor).any(|x| x.real != 0.0 || x.imag != 0.0)
+            }
+            DType::Complex64 => {
+                iter_elements::<Complex<f64>>(&tensor).any(|x| x.real != 0.0 || x.imag != 0.0)
+            }
+            _ => panic!("any_float: unsupported dtype {:?}", tensor.dtype()),
+        };
+        bool_scalar(has_any, out_dtype)
+    }
+
+    fn complex_any_dim(
+        tensor: ComplexTensor<Flex>,
+        dim: usize,
+        out_dtype: BoolDType,
+    ) -> burn_complex::base::BoolTensor<Flex> {
+        reduce_bool_dim(&tensor, dim, false, |a, b| a || b, out_dtype)
+    }
+
+    fn complex_all(
+        tensor: ComplexTensor<Flex>,
+        out_dtype: BoolDType,
+    ) -> burn_complex::base::BoolTensor<Flex> {
+        let all = match tensor.dtype() {
+            DType::Complex32 => {
+                iter_elements::<Complex<f32>>(&tensor).all(|x| x.real != 0.0 || x.imag != 0.0)
+            }
+            DType::Complex64 => {
+                iter_elements::<Complex<f64>>(&tensor).all(|x| x.real != 0.0 || x.imag != 0.0)
+            }
+
+            _ => panic!("all_float: unsupported dtype {:?}", tensor.dtype()),
+        };
+        bool_scalar(all, out_dtype)
+    }
+
+    fn complex_all_dim(
+        tensor: ComplexTensor<Flex>,
+        dim: usize,
+        out_dtype: BoolDType,
+    ) -> burn_complex::base::BoolTensor<Flex> {
+        reduce_bool_dim(&tensor, dim, true, |a, b| a && b, out_dtype)
+    }
+
+    fn complex_permute(tensor: ComplexTensor<Flex>, axes: &[usize]) -> ComplexTensor<Flex> {
+        tensor.permute(axes)
+    }
+
+    fn complex_expand(tensor: ComplexTensor<Flex>, shape: burn_std::Shape) -> ComplexTensor<Flex> {
+        crate::ops::expand::expand(tensor, shape)
+    }
+
+    fn complex_flip(tensor: ComplexTensor<Flex>, axes: &[usize]) -> ComplexTensor<Flex> {
+        crate::ops::flip::flip(tensor, axes)
+    }
+
+    fn complex_unfold(
+        tensor: ComplexTensor<Flex>,
+        dim: usize,
+        size: usize,
+        step: usize,
+    ) -> ComplexTensor<Flex> {
+        crate::ops::unfold::unfold(tensor, dim, size, step)
+    }
+
+    fn complex_sum(tensor: ComplexTensor<Flex>) -> ComplexTensor<Flex> {
+        crate::ops::reduce::sum(tensor)
+    }
+
+    fn complex_sum_dim(tensor: ComplexTensor<Flex>, dim: usize) -> ComplexTensor<Flex> {
+        crate::ops::reduce::sum_dim(tensor, dim)
+    }
+
+    fn complex_prod(tensor: ComplexTensor<Flex>) -> ComplexTensor<Flex> {
+        crate::ops::reduce::prod(tensor)
+    }
+
+    fn complex_prod_dim(tensor: ComplexTensor<Flex>, dim: usize) -> ComplexTensor<Flex> {
+        crate::ops::reduce::prod_dim(tensor, dim)
+    }
+
+    fn complex_mean(tensor: ComplexTensor<Flex>) -> ComplexTensor<Flex> {
+        crate::ops::reduce::mean(tensor)
+    }
+
+    fn complex_mean_dim(tensor: ComplexTensor<Flex>, dim: usize) -> ComplexTensor<Flex> {
+        crate::ops::reduce::mean_dim(tensor, dim)
+    }
+
+    fn complex_remainder(
+        lhs: ComplexTensor<Flex>,
+        rhs: ComplexTensor<Flex>,
+    ) -> ComplexTensor<Flex> {
+        crate::c2c_binary_op!(lhs, rhs, |a, b| a % b)
+    }
+
+    fn complex_remainder_scalar(
+        lhs: ComplexTensor<Flex>,
+        rhs: <Flex as ComplexTensorBackend>::ComplexScalar,
+    ) -> ComplexTensor<Flex> {
+        let dtype = lhs.dtype();
+        match dtype {
+            DType::Complex32 => scalar_op_typed::<Complex<f32>, _>(lhs, rhs, |a, b| a % b),
+            DType::Complex64 => {
+                let rhs64 = Complex::<f64> {
+                    real: rhs.real as f64,
+                    imag: rhs.imag as f64,
+                };
+                scalar_op_typed::<Complex<f64>, _>(lhs, rhs64, |a, b| a % b)
+            }
+            _ => panic!("complex_remainder_scalar: unsupported dtype {:?}", dtype),
+        }
+    }
+
+    fn complex_mask_where(
+        tensor: ComplexTensor<Flex>,
+        mask: burn_complex::base::BoolTensor<Flex>,
+        source: ComplexTensor<Flex>,
+    ) -> ComplexTensor<Flex> {
+        match tensor.dtype() {
+            DType::Complex32 => crate::ops::mask::mask_where::<Complex<f32>>(tensor, mask, source),
+            DType::Complex64 => crate::ops::mask::mask_where::<Complex<f64>>(tensor, mask, source),
+            _ => panic!("complex_mask_where: unsupported dtype {:?}", tensor.dtype()),
+        }
+    }
+
+    fn complex_mask_fill(
+        tensor: ComplexTensor<Flex>,
+        mask: burn_complex::base::BoolTensor<Flex>,
+        value: <Flex as ComplexTensorBackend>::ComplexScalar,
+    ) -> ComplexTensor<Flex> {
+        match tensor.dtype() {
+            DType::Complex32 => crate::ops::mask::mask_fill::<Complex<f32>>(tensor, mask, value),
+            DType::Complex64 => {
+                let value64 = Complex::<f64> {
+                    real: value.real as f64,
+                    imag: value.imag as f64,
+                };
+                crate::ops::mask::mask_fill::<Complex<f64>>(tensor, mask, value64)
+            }
+            _ => panic!("complex_mask_fill: unsupported dtype {:?}", tensor.dtype()),
+        }
+    }
+
+    fn complex_sign(tensor: ComplexTensor<Flex>) -> ComplexTensor<Flex> {
+        crate::c2c_unary_op!(tensor, |a| {
+            if a == Complex::zero() {
+                Complex::zero()
+            } else {
+                let norm = a.norm();
+                Complex {
+                    real: a.real / norm,
+                    imag: a.imag / norm,
+                }
+            }
+        })
+    }
+
+    fn complex_matmul(lhs: ComplexTensor<Flex>, rhs: ComplexTensor<Flex>) -> ComplexTensor<Flex> {
+        crate::ops::matmul::matmul(lhs, rhs)
+    }
+
+    fn complex_cumsum(tensor: ComplexTensor<Flex>, dim: usize) -> ComplexTensor<Flex> {
+        match tensor.dtype() {
+            DType::Complex32 => crate::ops::cumulative::cumsum::<Complex<f32>>(tensor, dim),
+            DType::Complex64 => crate::ops::cumulative::cumsum::<Complex<f64>>(tensor, dim),
+            _ => panic!("complex_cumsum: unsupported dtype {:?}", tensor.dtype()),
+        }
+    }
+
+    fn complex_cumprod(tensor: ComplexTensor<Flex>, dim: usize) -> ComplexTensor<Flex> {
+        match tensor.dtype() {
+            DType::Complex32 => crate::ops::cumulative::cumprod::<Complex<f32>>(tensor, dim),
+            DType::Complex64 => crate::ops::cumulative::cumprod::<Complex<f64>>(tensor, dim),
+            _ => panic!("complex_cumprod: unsupported dtype {:?}", tensor.dtype()),
+        }
+    }
+
+    fn complex_powc_scalar(
+        lhs: ComplexTensor<Flex>,
+        rhs: <Flex as ComplexTensorBackend>::ComplexScalar,
+    ) -> ComplexTensor<Flex> {
+        match lhs.dtype() {
+            DType::Complex32 => scalar_op_typed::<Complex<f32>, _>(lhs, rhs, |a, b| a.powc(b)),
+            DType::Complex64 => {
+                let rhs64 = Complex::<f64> {
+                    real: rhs.real as f64,
+                    imag: rhs.imag as f64,
+                };
+                scalar_op_typed::<Complex<f64>, _>(lhs, rhs64, |a, b| a.powc(b))
+            }
+            _ => panic!("complex_powc_scalar: unsupported dtype {:?}", lhs.dtype()),
+        }
+    }
+
+    fn complex_powf(
+        lhs: ComplexTensor<Flex>,
+        rhs: burn_complex::base::FloatTensor<Flex>,
+    ) -> ComplexTensor<Flex> {
+        todo!()
+    }
+
+    fn complex_powf_scalar(
+        lhs: ComplexTensor<Flex>,
+        rhs: burn_backend::element::Scalar,
+    ) -> ComplexTensor<Flex> {
+        match lhs.dtype() {
+            DType::Complex32 => {
+                let rhs_f32 = rhs
+                    .to_f32()
+                    .expect("complex_powf_scalar: rhs must be a float scalar");
+                scalar_op_typed_rhs::<Complex<f32>, f32, _>(lhs, rhs_f32, |a, b| a.powf(b))
+            }
+            DType::Complex64 => {
+                let rhs_f64 = rhs
+                    .to_f64()
+                    .expect("complex_powf_scalar: rhs must be a float scalar");
+                scalar_op_typed_rhs::<Complex<f64>, f64, _>(lhs, rhs_f64, |a, b| a.powf(b))
+            }
+            _ => panic!("complex_powf_scalar: unsupported dtype {:?}", lhs.dtype()),
+        }
+    }
+}
+
+/// Check if any element is non-zero (complex tensors).
+pub fn any_complex(tensor: FlexTensor, out_dtype: BoolDType) -> FlexTensor {
+    let has_any = match tensor.dtype() {
+        DType::Complex32 => {
+            iter_elements::<Complex<f32>>(&tensor).any(|x| x != Complex::<f32>::new(0.0, 0.0))
+        }
+        DType::Complex64 => {
+            iter_elements::<Complex<f64>>(&tensor).any(|x| x != Complex::<f64>::new(0.0, 0.0))
+        }
+        _ => panic!("any_float: unsupported dtype {:?}", tensor.dtype()),
+    };
+    bool_scalar(has_any, out_dtype)
 }
 
 #[macro_export]

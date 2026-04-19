@@ -866,12 +866,12 @@ pub fn all_bool_dim(tensor: FlexTensor, dim: usize, out_dtype: BoolDType) -> Fle
 // Helpers for any/all
 // ============================================================================
 
-fn bool_scalar(val: bool, out_dtype: BoolDType) -> FlexTensor {
+pub(crate) fn bool_scalar(val: bool, out_dtype: BoolDType) -> FlexTensor {
     let byte: u8 = if val { 1 } else { 0 };
     make_bool_tensor(alloc::vec![byte], Shape::from(alloc::vec![1]), out_dtype)
 }
 
-fn iter_elements<'a, E: Element + Pod + 'a>(
+pub(crate) fn iter_elements<'a, E: Element + Pod + 'a>(
     tensor: &'a FlexTensor,
 ) -> Box<dyn Iterator<Item = E> + 'a> {
     let data: &[E] = tensor.storage();
@@ -922,7 +922,7 @@ fn reduce_bool_dim_with(
 }
 
 /// Reduce along a dimension producing a bool tensor (for float any/all_dim).
-fn reduce_bool_dim(
+pub(crate) fn reduce_bool_dim(
     tensor: &FlexTensor,
     dim: usize,
     init: bool,

@@ -533,6 +533,38 @@ where
     make_tensor(result, shape, dtype)
 }
 
+pub(crate) fn scalar_op_typed_rhs<E, E2, Op>(mut tensor: FlexTensor, scalar: E2, op: Op) -> FlexTensor
+where
+    E: Element + bytemuck::Pod,
+    E2: Element + bytemuck::Pod,
+    Op: Fn(E, E2) -> E,
+{
+    // In-place fast path: unique, contiguous at offset 0
+    if tensor.is_unique()
+        && let Some((0, end)) = tensor.layout().contiguous_offsets()
+    {
+        let storage: &mut [E] = tensor.storage_mut();
+        for x in storage[..end].iter_mut() {
+            *x = op(*x, scalar);
+        }
+        return tensor;
+    }
+
+    // Allocating path
+    let shape = tensor.layout().shape().clone();
+    let dtype = tensor.dtype();
+    let storage: &[E] = tensor.storage();
+
+    let result: Vec<E> = match tensor.layout().contiguous_offsets() {
+        Some((start, end)) => storage[start..end].iter().map(|&x| op(x, scalar)).collect(),
+        None => StridedIter::new(tensor.layout())
+            .map(|i| op(storage[i], scalar))
+            .collect(),
+    };
+
+    make_tensor(result, shape, dtype)
+}
+
 /// Helper to construct a tensor from result data.
 fn make_tensor<E: bytemuck::Pod + Send + Sync>(
     data: Vec<E>,

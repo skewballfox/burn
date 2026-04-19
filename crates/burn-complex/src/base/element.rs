@@ -8,7 +8,7 @@ use burn_tensor::{
 use burn_tensor::{ElementOrdered, TensorMetadata};
 use bytemuck::Zeroable;
 use rand::seq::index;
-
+use num_complex::Complex as NumComplex;
 use core::ops::{AddAssign, Rem};
 use num_traits::FromPrimitive;
 use num_traits::Num;
@@ -73,6 +73,29 @@ impl<E: Element + ElementComparison + bytemuck::Pod> ComplexElement for Complex<
 pub struct Complex<E> {
     pub real: E,
     pub imag: E,
+}
+
+impl<E> From<NumComplex<E>> for Complex<E> {
+    fn from(c: NumComplex<E>) -> Self {
+        Self {
+            real: c.re,
+            imag: c.im,
+        }
+    }
+}
+
+impl<E> From<Complex<E>> for NumComplex<E> {
+    fn from(val: Complex<E>) -> Self {
+        NumComplex::new(val.real, val.imag)
+    }
+}
+
+impl<E: Num + std::marker::Copy> Num for Complex<E> {
+    type FromStrRadixErr = <NumComplex<E> as Num>::FromStrRadixErr;
+
+    fn from_str_radix(str: &str, radix: u32) -> Result<Self, Self::FromStrRadixErr> {
+        NumComplex::from_str_radix(str, radix).map(Self::from)
+    }
 }
 
 impl<E: core::fmt::Debug> core::fmt::Debug for Complex<E> {
@@ -196,6 +219,8 @@ where
         Self::Output::new(re / norm_sqr, im / norm_sqr)
     }
 }
+
+
 
 impl<E> ToElement for Complex<E>
 where
@@ -487,12 +512,35 @@ where
             Self::from_polar(r.sqrt(), theta / two)
         }
     }
+
+    pub fn sin(self) -> Self {
+        // formula: sin(a + bi) = sin(a) cosh(b) + i cos(a) sinh(b)
+        Self::new(
+            self.real.sin() * self.imag.cosh(),
+            self.real.cos() * self.imag.sinh(),
+        )
+    }
+
+    pub fn tan(self) -> Self {
+        // formula: tan(z) = sin(z) / cos(z)
+        self.sin() / self.cos()
+    }
+
+    pub fn cos(self) -> Self {
+        // formula: cos(a + bi) = cos(a) cosh(b) - i sin(a) sinh(b)
+        Self::new(
+            self.real.cos() * self.imag.cosh(),
+            -self.real.sin() * self.imag.sinh(),
+        )
+    }
     /// Get the magnitude (absolute value) of the complex number
     #[inline]
     pub fn abs(self) -> E {
         (self.real * self.real + self.imag * self.imag).sqrt()
     }
+    
 }
+
 
 impl<E: Element + ElementComparison + bytemuck::Pod> Element for Complex<E> {
     #[inline(always)]
