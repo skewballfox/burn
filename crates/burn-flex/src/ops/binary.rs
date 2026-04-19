@@ -343,10 +343,10 @@ where
 }
 
 /// Helper to check if binary operation can use in-place optimization
-fn can_use_binary_inplace<E>(lhs: &FlexTensor, rhs: &FlexTensor) -> Option<(usize, usize, usize)>
-where
-    E: Element + bytemuck::Pod,
-{
+pub(crate) fn can_use_binary_inplace(
+    lhs: &FlexTensor,
+    rhs: &FlexTensor,
+) -> Option<(usize, usize, usize)> {
     if lhs.is_unique()
         && let (Some((0, l_end)), Some((r_start, r_end))) = (
             lhs.layout().contiguous_offsets(),
@@ -411,7 +411,6 @@ where
     make_tensor(result, shape, O::dtype())
 }
 
-/// Binary operation with in-place optimization for Pod types.
 pub(crate) fn binary_op_typed<E, Op>(mut lhs: FlexTensor, rhs: &FlexTensor, op: Op) -> FlexTensor
 where
     E: Element + bytemuck::Pod,
@@ -420,7 +419,7 @@ where
     let rhs_storage: &[E] = rhs.storage();
 
     // In-place fast path: lhs unique, contiguous at offset 0, rhs contiguous
-    if let Some((l_end, r_start, r_end)) = can_use_binary_inplace::<E>(&lhs, rhs) {
+    if let Some((l_end, r_start, r_end)) = can_use_binary_inplace(&lhs, rhs) {
         let lhs_storage: &mut [E] = lhs.storage_mut();
         let r_slice = &rhs_storage[r_start..r_end];
         for (l, &r) in lhs_storage[..l_end].iter_mut().zip(r_slice) {
@@ -570,7 +569,7 @@ where
 }
 
 /// Helper to construct a tensor from result data.
-fn make_tensor<E: bytemuck::Pod + Send + Sync>(
+pub(crate) fn make_tensor<E: bytemuck::Pod + Send + Sync>(
     data: Vec<E>,
     shape: Shape,
     dtype: DType,

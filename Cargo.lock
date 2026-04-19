@@ -811,7 +811,6 @@ dependencies = [
  "cubecl",
  "derive-new",
  "half",
- "macerator",
  "ndarray 0.17.2",
  "num-complex",
  "num-traits",

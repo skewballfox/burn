@@ -37,7 +37,6 @@ bytemuck = { workspace = true }
 cubecl = { workspace = true, optional = true }
 derive-new = { workspace = true }
 half = { workspace = true }
-macerator = { workspace = true }
 rand = { workspace = true, default-features = false }
 num-traits = { workspace = true }
 num-complex = { version = "0.4.6", default-features = false}

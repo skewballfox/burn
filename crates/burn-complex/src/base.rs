@@ -1,5 +1,4 @@
 pub mod element;
-pub mod simd;
 pub mod split;
 /*
 The base implementation for complex tensors, contains everything that would be in burn-tensor.
@@ -270,24 +269,60 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
         tensor: ComplexTensor<B>,
     ) -> impl Future<Output = Result<TensorData, ExecutionError>> + Send;
 
+    /// Converts the tensor's imaginary component to a data structure.
+    ///
+    /// # Arguments
+    ///
+    /// * `tensor` - The tensor.
+    ///
+    /// # Returns
+    ///
+    /// The data structure with the tensor's imaginary data.
     fn complex_into_imag_data(
         tensor: ComplexTensor<B>,
     ) -> impl Future<Output = Result<TensorData, ExecutionError>> + Send;
 
+    /// Converts the tensor to interleaved complex data, where real and imaginary parts alternate.
+    ///
+    /// # Arguments
+    ///
+    /// * `tensor` - The tensor.
+    ///
+    /// # Returns
+    ///
+    /// The data structure with the tensor's data in interleaved format.
     fn complex_into_interleaved_data(
         tensor: ComplexTensor<B>,
     ) -> impl Future<Output = Result<TensorData, ExecutionError>> + Send;
 
+    /// Converts the tensor to split complex data, returning real and imaginary parts separately.
+    ///
+    /// # Arguments
+    ///
+    /// * `tensor` - The tensor.
+    ///
+    /// # Returns
+    ///
+    /// A tuple of data structures containing the real and imaginary parts of the tensor's data.
     fn complex_into_split_data(
         tensor: ComplexTensor<B>,
     ) -> impl Future<Output = Result<(TensorData, TensorData), ExecutionError>> + Send;
 
+    /// Converts a real float tensor to a complex tensor with zero imaginary part.
+    ///
+    /// # Arguments
+    ///
+    /// * `tensor` - The float tensor.
+    ///
+    /// # Returns
+    ///
+    /// A complex tensor with the same values as `tensor` and a zero imaginary part.
     fn to_complex(tensor: FloatTensor<B>) -> ComplexTensor<B>;
 
     // was going to add a norm function here, but float tensor ops doesn't have a hypot function
     // easy enough to add, but a bit out of scope for this PR
 
-    /// Creates a new complex tensor with random values.
+    /// Returns the squared norm (squared magnitude) of each element of the complex tensor.
     ///
     /// # Arguments
     ///
@@ -295,7 +330,7 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
     ///
     /// # Returns
     ///
-    /// The squared norm of the complex tensor as a float tensor.
+    /// A float tensor with the squared norm (i.e., `re² + im²`) of each element.
     fn complex_squared_norm(tensor: ComplexTensor<B>) -> FloatTensor<B>;
 
     /// Creates a new complex tensor with random values.
@@ -401,7 +436,7 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
     /// The tensor on the given device.
     fn complex_to_device(tensor: ComplexTensor<B>, device: &ComplexDevice<B>) -> ComplexTensor<B>;
 
-    /// Converts the tensor to a different element type.
+    /// Converts the tensor to a data structure.
     ///
     /// # Arguments
     ///
@@ -409,7 +444,7 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
     ///
     /// # Returns
     ///
-    /// The tensor with the new element type.
+    /// The data structure with the tensor's data.
     fn complex_into_data(
         tensor: ComplexTensor<B>,
     ) -> impl Future<Output = Result<TensorData, ExecutionError>> + Send {
@@ -673,18 +708,16 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
         indices: IntTensor<B>,
     ) -> ComplexTensor<B>;
 
-    /// Complex slice function.
+    /// Select tensor elements corresponding to the given slices.
     ///
     /// # Arguments
     ///
-    /// * `tensor` - The tensor.
-    /// * `dim` - The dimension to slice.
-    /// * `start` - The start index.
-    /// * `end` - The end index.
+    /// * `tensor` - The tensor to select from.
+    /// * `slices` - The slices specifying ranges and steps for each dimension.
     ///
     /// # Returns
     ///
-    /// The sliced tensor.
+    /// The selected elements in a new tensor.
     fn complex_slice(tensor: ComplexTensor<B>, slices: &[burn_tensor::Slice]) -> ComplexTensor<B>;
 
     /// Assign the selected elements corresponding for the given ranges to the given value.
@@ -833,16 +866,57 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
         out_dtype: burn_std::BoolDType,
     ) -> BoolTensor<B>;
 
-    /// Permute axes.
+    /// Permutes the dimensions of a tensor.
+    ///
+    /// # Arguments
+    ///
+    /// * `tensor` - The tensor to permute the dimensions of.
+    /// * `axes` - The new order of the dimensions.
+    ///
+    /// # Returns
+    ///
+    /// The tensor with the dimensions permuted.
     fn complex_permute(tensor: ComplexTensor<B>, axes: &[usize]) -> ComplexTensor<B>;
 
-    /// Expand to broadcast shape.
+    /// Broadcasts the complex `tensor` to the given `shape`.
+    ///
+    /// # Arguments
+    ///
+    /// * `tensor` - The tensor to broadcast.
+    /// * `shape` - The target shape.
+    ///
+    /// # Returns
+    ///
+    /// The tensor broadcast to the given shape.
     fn complex_expand(tensor: ComplexTensor<B>, shape: Shape) -> ComplexTensor<B>;
 
-    /// Flip along given axes.
+    /// Reverse the order of elements in a tensor along the given axes.
+    ///
+    /// # Arguments
+    ///
+    /// * `tensor` - The tensor to reverse.
+    /// * `axes` - The axes to reverse.
+    ///
+    /// # Returns
+    ///
+    /// The tensor with the elements reversed.
     fn complex_flip(tensor: ComplexTensor<B>, axes: &[usize]) -> ComplexTensor<B>;
 
-    /// Unfold (im2col-like) along a dimension.
+    /// Unfold windows along a dimension.
+    ///
+    /// Returns a view of the tensor with all complete windows of size `size` in dimension `dim`;
+    /// where windows are advanced by `step` at each index.
+    ///
+    /// # Arguments
+    ///
+    /// * `tensor` - The input tensor.
+    /// * `dim` - The selected dimension.
+    /// * `size` - The size of each unfolded window.
+    /// * `step` - The step between each window.
+    ///
+    /// # Returns
+    ///
+    /// A tensor view with an additional trailing dimension of size `size`.
     fn complex_unfold(
         tensor: ComplexTensor<B>,
         dim: usize,
@@ -850,17 +924,19 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
         step: usize,
     ) -> ComplexTensor<B>;
 
-    /// Select tensor elements along the given dimension corresponding for the given indices.
+    /// Assign the selected elements along the given dimension corresponding for the given indices
+    /// to the given value using sum reduction.
     ///
     /// # Arguments
     ///
-    /// * `tensor` - The tensor to select from.
-    /// * `dim` - The dimension to select from.
-    /// * `indices` - The indices to select.
+    /// * `tensor` - The tensor to assign to.
+    /// * `dim` - The dimension to assign along.
+    /// * `indices` - The indices to assign to.
+    /// * `values` - The values to assign.
     ///
     /// # Returns
     ///
-    /// The selected elements.
+    /// The tensor with the selected elements assigned to the given values.
     fn complex_select_add(
         tensor: ComplexTensor<B>,
         dim: usize,
@@ -868,54 +944,252 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
         values: ComplexTensor<B>,
     ) -> ComplexTensor<B>;
 
+    /// Sum of all elements in a complex tensor.
+    ///
+    /// # Arguments
+    ///
+    /// * `tensor` - The tensor to sum.
+    ///
+    /// # Returns
+    ///
+    /// A scalar complex tensor with the sum of all elements in `tensor`.
     fn complex_sum(tensor: ComplexTensor<B>) -> ComplexTensor<B>;
+
+    /// Sum of all elements in a complex tensor along a dimension.
+    ///
+    /// # Arguments
+    ///
+    /// * `tensor` - The tensor to sum.
+    /// * `dim` - The dimension along which to sum.
+    ///
+    /// # Returns
+    ///
+    /// A tensor with the sum of all elements in `tensor` along `dim`.
     fn complex_sum_dim(tensor: ComplexTensor<B>, dim: usize) -> ComplexTensor<B>;
+
+    /// Product of all elements in a complex tensor.
+    ///
+    /// # Arguments
+    ///
+    /// * `tensor` - The tensor to take the product of.
+    ///
+    /// # Returns
+    ///
+    /// A scalar complex tensor with the product of all elements in `tensor`.
     fn complex_prod(tensor: ComplexTensor<B>) -> ComplexTensor<B>;
+
+    /// Product of all elements in a complex tensor along a dimension.
+    ///
+    /// # Arguments
+    ///
+    /// * `tensor` - The tensor to take the product of.
+    /// * `dim` - The dimension along which to take the product.
+    ///
+    /// # Returns
+    ///
+    /// A tensor with the product of all elements in `tensor` along `dim`.
     fn complex_prod_dim(tensor: ComplexTensor<B>, dim: usize) -> ComplexTensor<B>;
+
+    /// Mean of all elements in a complex tensor.
+    ///
+    /// # Arguments
+    ///
+    /// * `tensor` - The tensor to compute the mean of.
+    ///
+    /// # Returns
+    ///
+    /// A scalar complex tensor with the mean of all elements in `tensor`.
     fn complex_mean(tensor: ComplexTensor<B>) -> ComplexTensor<B>;
+
+    /// Mean of all elements in a complex tensor along a dimension.
+    ///
+    /// # Arguments
+    ///
+    /// * `tensor` - The tensor to compute the mean of.
+    /// * `dim` - The dimension along which to compute the mean.
+    ///
+    /// # Returns
+    ///
+    /// A tensor with the mean of all elements in `tensor` along `dim`.
     fn complex_mean_dim(tensor: ComplexTensor<B>, dim: usize) -> ComplexTensor<B>;
 
+    /// Computes the remainder of division between two complex tensors element-wise.
+    ///
+    /// # Arguments
+    ///
+    /// * `lhs` - The left-hand side tensor.
+    /// * `rhs` - The right-hand side tensor.
+    ///
+    /// # Returns
+    ///
+    /// The element-wise remainder when dividing `lhs` by `rhs`.
     fn complex_remainder(lhs: ComplexTensor<B>, rhs: ComplexTensor<B>) -> ComplexTensor<B>;
+
+    /// Computes the remainder of division between a complex tensor and a scalar element-wise.
+    ///
+    /// # Arguments
+    ///
+    /// * `lhs` - The left-hand side tensor.
+    /// * `rhs` - The right-hand side complex scalar.
+    ///
+    /// # Returns
+    ///
+    /// The element-wise remainder when dividing `lhs` by `rhs`.
     fn complex_remainder_scalar(lhs: ComplexTensor<B>, rhs: B::ComplexScalar) -> ComplexTensor<B>;
 
+    /// Equal comparison of a complex tensor and a scalar.
+    ///
+    /// # Arguments
+    ///
+    /// * `lhs` - The left-hand side tensor.
+    /// * `rhs` - The right-hand side complex scalar.
+    /// * `out_dtype` - The output tensor dtype.
+    ///
+    /// # Returns
+    ///
+    /// A boolean tensor with the result of the comparison.
     fn complex_equal_elem(
         lhs: ComplexTensor<B>,
         rhs: B::ComplexScalar,
         out_dtype: burn_std::BoolDType,
     ) -> BoolTensor<B>;
+
+    /// Element-wise non-equality comparison of a complex tensor and a scalar.
+    ///
+    /// # Arguments
+    ///
+    /// * `lhs` - The left-hand side tensor.
+    /// * `rhs` - The right-hand side complex scalar.
+    /// * `out_dtype` - The output tensor dtype.
+    ///
+    /// # Returns
+    ///
+    /// A boolean tensor with the result of the comparison.
     fn complex_not_equal_elem(
         lhs: ComplexTensor<B>,
         rhs: B::ComplexScalar,
         out_dtype: burn_std::BoolDType,
     ) -> BoolTensor<B>;
 
+    /// Update the given tensor with the source tensor where the mask is true.
+    ///
+    /// # Arguments
+    ///
+    /// * `tensor` - The tensor to select from.
+    /// * `mask` - The boolean mask to select with.
+    /// * `source` - The source tensor to assign to the selected elements.
+    ///
+    /// # Returns
+    ///
+    /// The tensor with the selected elements assigned to the corresponding values in `source`.
     fn complex_mask_where(
         tensor: ComplexTensor<B>,
         mask: BoolTensor<B>,
         source: ComplexTensor<B>,
     ) -> ComplexTensor<B>;
+
+    /// Update the given tensor with the scalar value where the mask is true.
+    ///
+    /// # Arguments
+    ///
+    /// * `tensor` - The tensor to select from.
+    /// * `mask` - The boolean mask to select with.
+    /// * `value` - The complex scalar value to assign to the selected elements.
+    ///
+    /// # Returns
+    ///
+    /// The tensor with the selected elements assigned to `value`.
     fn complex_mask_fill(
         tensor: ComplexTensor<B>,
         mask: BoolTensor<B>,
         value: B::ComplexScalar,
     ) -> ComplexTensor<B>;
+
+    /// Gather elements from a complex tensor.
+    ///
+    /// # Arguments
+    ///
+    /// * `dim` - The dimension to gather from.
+    /// * `tensor` - The tensor to gather from.
+    /// * `indices` - The indices to gather.
+    ///
+    /// # Returns
+    ///
+    /// The gathered elements.
     fn complex_gather(
         dim: usize,
         tensor: ComplexTensor<B>,
         indices: IntTensor<B>,
     ) -> ComplexTensor<B>;
+
+    /// Scatter elements into a complex tensor using sum reduction.
+    ///
+    /// # Arguments
+    ///
+    /// * `dim` - The dimension to scatter into.
+    /// * `tensor` - The tensor to scatter into.
+    /// * `indices` - The indices to scatter into.
+    /// * `values` - The values to scatter.
+    ///
+    /// # Returns
+    ///
+    /// The tensor with the scattered elements.
     fn complex_scatter_add(
         dim: usize,
         tensor: ComplexTensor<B>,
         indices: IntTensor<B>,
         values: ComplexTensor<B>,
     ) -> ComplexTensor<B>;
-    //todo: add doc strings
+
+    /// Returns the sign of each complex element as a unit complex number.
+    ///
+    /// Unlike the float sign which returns -1, 0, or 1, the complex sign returns a complex number
+    /// on the unit circle (i.e., `z / |z|`), retaining information about the angle. For zero
+    /// elements, the result is zero.
+    ///
+    /// # Arguments
+    ///
+    /// * `tensor` - The tensor to extract the signs from.
+    ///
+    /// # Returns
+    ///
+    /// A complex tensor with the same shape as `tensor` containing the unit-circle signs.
     fn complex_sign(tensor: ComplexTensor<B>) -> ComplexTensor<B>;
 
+    /// Element-wise complex power with a complex scalar.
+    ///
+    /// # Arguments
+    ///
+    /// * `lhs` - The base tensor.
+    /// * `rhs` - The complex scalar exponent.
+    ///
+    /// # Returns
+    ///
+    /// The elements of `lhs` raised to the power of `rhs`.
     fn complex_powc_scalar(lhs: ComplexTensor<B>, rhs: B::ComplexScalar) -> ComplexTensor<B>;
 
+    /// Element-wise complex power with a float tensor.
+    ///
+    /// # Arguments
+    ///
+    /// * `lhs` - The base complex tensor.
+    /// * `rhs` - The float exponent tensor.
+    ///
+    /// # Returns
+    ///
+    /// The elements of `lhs` raised to the power of the corresponding elements of `rhs`.
     fn complex_powf(lhs: ComplexTensor<B>, rhs: FloatTensor<B>) -> ComplexTensor<B>;
+
+    /// Element-wise complex power with an integer tensor.
+    ///
+    /// # Arguments
+    ///
+    /// * `lhs` - The base complex tensor.
+    /// * `rhs` - The integer exponent tensor.
+    ///
+    /// # Returns
+    ///
+    /// The elements of `lhs` raised to the power of the corresponding elements of `rhs`.
     fn complex_powi(lhs: ComplexTensor<B>, rhs: IntTensor<B>) -> ComplexTensor<B> {
         //TODO: add a method to get inner dtype
         let dtype = lhs.dtype();
@@ -926,14 +1200,68 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
         )
     }
 
+    /// Element-wise complex power with a float scalar.
+    ///
+    /// # Arguments
+    ///
+    /// * `lhs` - The base complex tensor.
+    /// * `rhs` - The float scalar exponent.
+    ///
+    /// # Returns
+    ///
+    /// The elements of `lhs` raised to the power of `rhs`.
     fn complex_powf_scalar(lhs: ComplexTensor<B>, rhs: Scalar) -> ComplexTensor<B>;
+
+    /// Element-wise complex power with an integer scalar.
+    ///
+    /// # Arguments
+    ///
+    /// * `lhs` - The base complex tensor.
+    /// * `rhs` - The integer scalar exponent.
+    ///
+    /// # Returns
+    ///
+    /// The elements of `lhs` raised to the power of `rhs`.
     fn complex_powi_scalar(lhs: ComplexTensor<B>, rhs: Scalar) -> ComplexTensor<B> {
         Self::complex_powf_scalar(lhs, rhs)
     }
 
+    /// Multiplies two complex tensors together using matrix multiplication.
+    ///
+    /// # Arguments
+    ///
+    /// * `lhs` - The left-hand side tensor.
+    /// * `rhs` - The right-hand side tensor.
+    ///
+    /// # Returns
+    ///
+    /// The result of multiplying the two tensors together using matrix multiplication.
     fn complex_matmul(lhs: ComplexTensor<B>, rhs: ComplexTensor<B>) -> ComplexTensor<B>;
 
+    /// Computes the cumulative sum of elements along a dimension.
+    ///
+    /// # Arguments
+    ///
+    /// * `tensor` - The tensor to compute the cumulative sum of.
+    /// * `dim` - The dimension along which to compute the cumulative sum.
+    ///
+    /// # Returns
+    ///
+    /// A tensor with the same shape where each element is the cumulative sum
+    /// of all elements up to and including that position along the dimension.
     fn complex_cumsum(tensor: ComplexTensor<B>, dim: usize) -> ComplexTensor<B>;
+
+    /// Computes the cumulative product of elements along a dimension.
+    ///
+    /// # Arguments
+    ///
+    /// * `tensor` - The tensor to compute the cumulative product of.
+    /// * `dim` - The dimension along which to compute the cumulative product.
+    ///
+    /// # Returns
+    ///
+    /// A tensor with the same shape where each element is the cumulative product
+    /// of all elements up to and including that position along the dimension.
     fn complex_cumprod(tensor: ComplexTensor<B>, dim: usize) -> ComplexTensor<B>;
 }
 

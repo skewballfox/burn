@@ -1,5 +1,5 @@
 use burn_backend::Distribution;
-use burn_backend::TensorData;
+use burn_backend::{Element, TensorData};
 use burn_complex::{
     base::{
         ComplexDevice, ComplexTensor, ComplexTensorBackend, ComplexTensorOps, InterleavedLayout,
@@ -15,13 +15,16 @@ use burn_std::{BoolDType, DType, FloatDType, Slice};
 use num_traits::ToPrimitive;
 use num_traits::Zero;
 
-use crate::ops::comparison::{CompareOp, compare_elem_typed};
+use crate::ops::binary::can_use_binary_inplace;
+use crate::ops::binary::make_tensor;
+use crate::ops::comparison::compare_elem_typed;
 use crate::ops::{
     binary::scalar_op_typed_rhs,
     comparison::{bool_scalar, compare_typed, iter_elements, reduce_bool_dim},
 };
 
-use crate::{Flex, FlexDevice, FlexTensor, ops::binary::scalar_op_typed, simd::CmpOp};
+use crate::strided_index::StridedIter;
+use crate::{Flex, FlexDevice, FlexTensor, ops::binary::scalar_op_typed};
 
 impl ComplexTensorBackend for Flex {
     type InnerBackend = Flex;
@@ -642,7 +645,29 @@ impl ComplexTensorOps<Flex> for Flex {
         lhs: ComplexTensor<Flex>,
         rhs: burn_complex::base::FloatTensor<Flex>,
     ) -> ComplexTensor<Flex> {
-        todo!()
+        match lhs.dtype() {
+            DType::Complex32 => {
+                let rhs = if rhs.dtype() == DType::F32 {
+                    rhs
+                } else {
+                    //let shape = rhs.layout().shape().clone();
+                    //make_tensor(rhs.storage().into_iter().map(|x| f32::from(*x)).collect::<Vec<f32>>(),shape, DType::F32)
+                    todo!("workout how to convert rhs to f32 tensor if it's not already")
+                };
+                binary_op_typed_rhs::<Complex<f32>, f32, _>(lhs, &rhs, |a, b| a.powf(b))
+            }
+            DType::Complex64 => {
+                let rhs = if rhs.dtype() == DType::F64 {
+                    rhs
+                } else {
+                    // let shape = rhs.layout().shape().clone();
+                    // make_tensor(rhs.storage().iter().map(|x| f64::from(*x)).collect::<Vec<f64>>(),shape, DType::F64)
+                    todo!("workout how to convert rhs to f64 tensor if it's not already")
+                };
+                binary_op_typed_rhs::<Complex<f64>, f64, _>(lhs, &rhs, |a, b| a.powf(b))
+            }
+            _ => panic!("complex_powf: unsupported dtype {:?}", lhs.dtype()),
+        }
     }
 
     fn complex_powf_scalar(
@@ -869,4 +894,102 @@ where
         DType::Complex64 => unary_op_typed(tensor, f64_op),
         _ => panic!("c2c_unary_op: unsupported dtype {:?}", tensor.dtype()),
     }
+}
+
+/// Variant of binary_op that allows a different type for the rhs. Right now only needed for one function, and kind of situation unlikely to be
+/// common, if it's useful outside of complex_powf, I'll move it back to binary
+fn binary_op_typed_rhs<E1, E2, Op>(mut lhs: FlexTensor, rhs: &FlexTensor, op: Op) -> FlexTensor
+where
+    E1: Element + bytemuck::Pod,
+    E2: Element + bytemuck::Pod,
+    Op: Fn(E1, E2) -> E1,
+{
+    let rhs_storage: &[E2] = rhs.storage();
+
+    // In-place fast path: lhs unique, contiguous at offset 0, rhs contiguous
+    if let Some((l_end, r_start, r_end)) = can_use_binary_inplace(&lhs, rhs) {
+        let lhs_storage: &mut [E1] = lhs.storage_mut();
+        let r_slice = &rhs_storage[r_start..r_end];
+        for (l, &r) in lhs_storage[..l_end].iter_mut().zip(r_slice) {
+            *l = op(*l, r);
+        }
+        return lhs;
+    }
+
+    // Use the convert version for non-in-place operations
+    binary_op_typed_convert_rhs(lhs, rhs, op)
+}
+
+/// Generic binary operation that converts between element types E -> O.
+pub(crate) fn binary_op_typed_convert_rhs<E1, E2, O, Op>(
+    lhs: FlexTensor,
+    rhs: &FlexTensor,
+    op: Op,
+) -> FlexTensor
+where
+    E1: Element + bytemuck::Pod,
+    E2: Element + bytemuck::Pod,
+    O: Element + bytemuck::Pod,
+    Op: Fn(E1, E2) -> O,
+{
+    let shape = lhs.layout().shape().clone();
+    let lhs_storage: &[E1] = lhs.storage();
+    let rhs_storage: &[E2] = rhs.storage();
+    let lhs_layout = lhs.layout();
+    let rhs_layout = rhs.layout();
+    // Try contiguous path first
+    let result = {
+        match (
+            lhs_layout.contiguous_offsets(),
+            rhs_layout.contiguous_offsets(),
+        ) {
+            // Both contiguous
+            (Some((l_start, l_end)), Some((r_start, r_end))) => {
+                let l_slice = &lhs_storage[l_start..l_end];
+                let r_slice = &rhs_storage[r_start..r_end];
+
+                l_slice
+                    .iter()
+                    .zip(r_slice)
+                    .map(|(&a, &b)| op(a, b))
+                    .collect()
+            }
+            _ => {
+                // Fast path for 2D non-contiguous (common for transpose)
+                if lhs_layout.num_dims() == 2 {
+                    {
+                        let (rows, cols, l_row_stride, l_col_stride) =
+                            lhs_layout.as_2d_strides().unwrap();
+                        let (_, _, r_row_stride, r_col_stride) =
+                            rhs_layout.as_2d_strides().unwrap();
+                        let l_offset = lhs_layout.start_offset() as isize;
+                        let r_offset = rhs_layout.start_offset() as isize;
+
+                        let mut result = Vec::with_capacity(rows * cols);
+
+                        for row in 0..rows {
+                            let l_row_start = l_offset + row as isize * l_row_stride;
+                            let r_row_start = r_offset + row as isize * r_row_stride;
+                            for col in 0..cols {
+                                let l_idx = (l_row_start + col as isize * l_col_stride) as usize;
+                                let r_idx = (r_row_start + col as isize * r_col_stride) as usize;
+                                result.push(op(lhs_storage[l_idx], rhs_storage[r_idx]));
+                            }
+                        }
+
+                        result
+                    }
+                } else {
+                    // General fallback
+                    let lhs_iter = StridedIter::new(lhs_layout);
+                    let rhs_iter = StridedIter::new(rhs_layout);
+                    lhs_iter
+                        .zip(rhs_iter)
+                        .map(|(li, ri)| op(lhs_storage[li], rhs_storage[ri]))
+                        .collect()
+                }
+            }
+        }
+    };
+    make_tensor(result, shape, O::dtype())
 }

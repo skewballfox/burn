@@ -5,12 +5,9 @@ use crate::{
     },
     utils::real_to_complex_dtype,
 };
-use burn_std::{Bytes, DType, FloatDType};
+use burn_std::FloatDType;
 use burn_tensor::{
-    ElementComparison, Float, IndexingUpdateOp, Scalar, TensorData, TensorKind, TensorMetadata,
-    backend::{Backend, DeviceOps},
-    cast::ToElement,
-    get_device_settings,
+    ElementComparison, Scalar, TensorData, TensorMetadata, backend::Backend, cast::ToElement,
     ops::FloatTensorOps,
 };
 use bytemuck::Pod;
