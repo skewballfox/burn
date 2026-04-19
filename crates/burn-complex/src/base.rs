@@ -1,26 +1,20 @@
-#![allow(unused)]
 pub mod element;
 pub mod simd;
 pub mod split;
-use burn_std::dtype;
 /*
 The base implementation for complex tensors, contains everything that would be in burn-tensor.
 May get split into separate files at some point, but for now it's easier to keep all the base
 definitions in one spot.
 */
 use burn_tensor::{
-    BasicOps, Bytes, DType, Device, Distribution, Element, ElementConversion, FloatDType,
-    IndexingUpdateOp, Numeric, Scalar, Shape, Slice, TensorData, TensorKind, TensorMetadata,
-    TransactionPrimitive,
+    BasicOps, Bytes, DType, Device, Distribution, Element, FloatDType, IndexingUpdateOp, Numeric,
+    Scalar, Shape, Slice, TensorData, TensorKind, TensorMetadata, TransactionPrimitive,
     backend::{Backend, ExecutionError},
     get_device_settings,
     ops::{FloatTensorOps, IntTensorOps},
 };
 
-use crate::base::{
-    element::{Complex, ComplexElement},
-    split::SplitComplexTensor,
-};
+use crate::base::{element::ComplexElement, split::SplitComplexTensor};
 
 /// The layout of the complex tensor. Used to define shared behavior only meant
 /// to be used for a specific layout (such as butterfly operations).
@@ -45,8 +39,6 @@ pub type BoolTensor<B> =
 pub trait ComplexTensorBackend: ComplexTensorOps<Self> + Sized {
     /// The inner backend type.
     type InnerBackend: Backend;
-
-    
 
     ///// Tensor primitive to be used for all complex operations.
     //type ComplexTensorPrimitive: TensorMetadata + 'static;
@@ -675,8 +667,11 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
     /// # Returns
     ///
     /// The selected tensor.
-    fn complex_select(tensor: ComplexTensor<B>, dim: usize, indices: IntTensor<B>) -> ComplexTensor<B>;
-
+    fn complex_select(
+        tensor: ComplexTensor<B>,
+        dim: usize,
+        indices: IntTensor<B>,
+    ) -> ComplexTensor<B>;
 
     /// Complex slice function.
     ///
@@ -802,7 +797,11 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
     /// A boolean tensor `Tensor<B, D, Bool>` with the same size as input `tensor`, except in the `dim` axis
     /// where the size is 1. The elem in the `dim` axis is True if any element along this dim in the
     /// input evaluates to True, False otherwise.
-    fn complex_any_dim(tensor: ComplexTensor<B>, dim: usize, out_dtype: burn_std::BoolDType) -> BoolTensor<B>;
+    fn complex_any_dim(
+        tensor: ComplexTensor<B>,
+        dim: usize,
+        out_dtype: burn_std::BoolDType,
+    ) -> BoolTensor<B>;
 
     /// Tests if all elements in the float `tensor` evaluate to True.
     ///
@@ -828,7 +827,11 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
     /// A boolean tensor `Tensor<B, D, Bool>` with the same size as input `tensor`, except in the `dim` axis
     /// where the size is 1. The elem in the `dim` axis is True if all elements along this dim in the input
     /// evaluates to True, False otherwise.
-    fn complex_all_dim(tensor: ComplexTensor<B>, dim: usize, out_dtype: burn_std::BoolDType) -> BoolTensor<B>;
+    fn complex_all_dim(
+        tensor: ComplexTensor<B>,
+        dim: usize,
+        out_dtype: burn_std::BoolDType,
+    ) -> BoolTensor<B>;
 
     /// Permute axes.
     fn complex_permute(tensor: ComplexTensor<B>, axes: &[usize]) -> ComplexTensor<B>;
@@ -916,19 +919,17 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
     fn complex_powi(lhs: ComplexTensor<B>, rhs: IntTensor<B>) -> ComplexTensor<B> {
         //TODO: add a method to get inner dtype
         let dtype = lhs.dtype();
-        
-        Self::complex_powf(lhs, <B::InnerBackend as IntTensorOps<B::InnerBackend>>::int_into_float(rhs, dtype.into()))
+
+        Self::complex_powf(
+            lhs,
+            <B::InnerBackend as IntTensorOps<B::InnerBackend>>::int_into_float(rhs, dtype.into()),
+        )
     }
 
-    
-    
     fn complex_powf_scalar(lhs: ComplexTensor<B>, rhs: Scalar) -> ComplexTensor<B>;
     fn complex_powi_scalar(lhs: ComplexTensor<B>, rhs: Scalar) -> ComplexTensor<B> {
         Self::complex_powf_scalar(lhs, rhs)
     }
-    
-
-    
 
     fn complex_matmul(lhs: ComplexTensor<B>, rhs: ComplexTensor<B>) -> ComplexTensor<B>;
 
@@ -938,10 +939,10 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
 
 /// A type-level representation of the kind of a complex tensor.
 #[derive(Clone, Debug)]
-pub struct ComplexTensorType;
+pub struct ComplexKind;
 
 #[allow(unused_variables)]
-impl<C: ComplexTensorBackend<InnerBackend = C> + Backend> BasicOps<C> for ComplexTensorType
+impl<C: ComplexTensorBackend<InnerBackend = C> + Backend> BasicOps<C> for ComplexKind
 where
     C:,
 {
@@ -1071,14 +1072,8 @@ where
         update: IndexingUpdateOp,
     ) -> Self::Primitive {
         match update {
-            IndexingUpdateOp::Add => C::complex_select_add(
-                tensor,
-                dim,
-                indices,
-                values,
-            ),
+            IndexingUpdateOp::Add => C::complex_select_add(tensor, dim, indices, values),
         }
-        
     }
 
     fn zeros(shape: Shape, device: &<C as Backend>::Device, dtype: DType) -> Self::Primitive {
@@ -1159,7 +1154,7 @@ where
 }
 
 #[allow(unused_variables)]
-impl<C: ComplexTensorBackend<InnerBackend = C> + Backend> Numeric<C> for ComplexTensorType
+impl<C: ComplexTensorBackend<InnerBackend = C> + Backend> Numeric<C> for ComplexKind
 where
     C::ComplexScalar: Element,
 {
@@ -1273,7 +1268,9 @@ where
 
     fn powi(lhs: Self::Primitive, rhs: Self::Primitive) -> Self::Primitive {
         //C::complex_powi(lhs, rhs)
-        panic!("powi is not implemented yet; use complex_powi, or call powf with float exponent instead")
+        panic!(
+            "powi is not implemented yet; use complex_powi, or call powf with float exponent instead"
+        )
     }
 
     fn powi_scalar(lhs: Self::Primitive, rhs: Scalar) -> Self::Primitive {
@@ -1311,7 +1308,7 @@ where
     }
 }
 
-impl<B: ComplexTensorBackend<InnerBackend = B> + Backend> TensorKind<B> for ComplexTensorType {
+impl<B: ComplexTensorBackend<InnerBackend = B> + Backend> TensorKind<B> for ComplexKind {
     type Primitive = ComplexTensor<B>;
     fn name() -> &'static str {
         "Complex"

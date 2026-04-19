@@ -124,8 +124,9 @@ where
                     _scheme => burn_backend::DTypeUsageSet::empty(),
                 }
             }
-            DType::Complex32| DType::Complex64 => unimplemented!("Interleaved complex elements are not yet supported by the ndarray backend"),
-             
+            DType::Complex32 | DType::Complex64 => unimplemented!(
+                "Interleaved complex elements are not yet supported by the ndarray backend"
+            ),
         }
     }
 

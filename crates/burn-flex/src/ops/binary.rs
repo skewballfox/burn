@@ -533,7 +533,11 @@ where
     make_tensor(result, shape, dtype)
 }
 
-pub(crate) fn scalar_op_typed_rhs<E, E2, Op>(mut tensor: FlexTensor, scalar: E2, op: Op) -> FlexTensor
+pub(crate) fn scalar_op_typed_rhs<E, E2, Op>(
+    mut tensor: FlexTensor,
+    scalar: E2,
+    op: Op,
+) -> FlexTensor
 where
     E: Element + bytemuck::Pod,
     E2: Element + bytemuck::Pod,

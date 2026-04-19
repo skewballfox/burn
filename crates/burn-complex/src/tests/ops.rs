@@ -1,42 +1,40 @@
-#[burn_tensor_testgen::testgen(complex)]
+//#[burn_tensor_testgen::testgen(complex)]
 mod tests {
+    use crate::base::{ComplexKind, element::Complex};
+
     use super::*;
-    use burn_tensor::{
-        Complex, Tensor, TensorData,
-        backend::Backend,
-        element::{Complex32, Complex64},
-    };
+    use burn_tensor::{Tensor, TensorData, backend::Backend};
 
     #[test]
     fn test_complex_zeros() {
-        let tensor = Tensor::<TestBackend, 2, Complex>::zeros([2, 3], &Default::default());
+        let tensor = Tensor::<TestBackend, 2, ComplexKind>::zeros([2, 3], &Default::default());
         let data = tensor.into_data();
 
         let expected = TensorData::from([
             [
-                Complex32 {
+                Complex::<f32> {
                     real: 0.0,
                     imag: 0.0,
                 },
-                Complex32 {
+                Complex::<f32> {
                     real: 0.0,
                     imag: 0.0,
                 },
-                Complex32 {
+                Complex::<f32> {
                     real: 0.0,
                     imag: 0.0,
                 },
             ],
             [
-                Complex32 {
+                Complex::<f32> {
                     real: 0.0,
                     imag: 0.0,
                 },
-                Complex32 {
+                Complex::<f32> {
                     real: 0.0,
                     imag: 0.0,
                 },
-                Complex32 {
+                Complex::<f32> {
                     real: 0.0,
                     imag: 0.0,
                 },
@@ -48,26 +46,26 @@ mod tests {
 
     #[test]
     fn test_complex_ones() {
-        let tensor = Tensor::<TestBackend, 2, Complex>::ones([2, 2], &Default::default());
+        let tensor = Tensor::<TestBackend, 2, ComplexKind>::ones([2, 2], &Default::default());
         let data = tensor.into_data();
 
         let expected = TensorData::from([
             [
-                Complex32 {
+                Complex::<f32> {
                     real: 1.0,
                     imag: 0.0,
                 },
-                Complex32 {
+                Complex::<f32> {
                     real: 1.0,
                     imag: 0.0,
                 },
             ],
             [
-                Complex32 {
+                Complex::<f32> {
                     real: 1.0,
                     imag: 0.0,
                 },
-                Complex32 {
+                Complex::<f32> {
                     real: 1.0,
                     imag: 0.0,
                 },
@@ -80,18 +78,18 @@ mod tests {
     #[test]
     fn test_complex_from_data() {
         let data = TensorData::from([[
-            Complex32 {
+            Complex::<f32> {
                 real: 1.0,
                 imag: 2.0,
             },
-            Complex32 {
+            Complex::<f32> {
                 real: 3.0,
                 imag: 4.0,
             },
         ]]);
 
         let tensor =
-            Tensor::<TestBackend, 2, Complex>::from_data(data.clone(), &Default::default());
+            Tensor::<TestBackend, 2, ComplexKind>::from_data(data.clone(), &Default::default());
         let result = tensor.into_data();
 
         result.assert_eq(&data, false);
@@ -99,13 +97,13 @@ mod tests {
 
     #[test]
     fn test_complex_add() {
-        let tensor1 = Tensor::<TestBackend, 2, Complex>::from_data(
+        let tensor1 = Tensor::<TestBackend, 2, ComplexKind>::from_data(
             TensorData::from([[
-                Complex32 {
+                Complex::<f32> {
                     real: 1.0,
                     imag: 2.0,
                 },
-                Complex32 {
+                Complex::<f32> {
                     real: 3.0,
                     imag: 4.0,
                 },
@@ -113,13 +111,13 @@ mod tests {
             &Default::default(),
         );
 
-        let tensor2 = Tensor::<TestBackend, 2, Complex>::from_data(
+        let tensor2 = Tensor::<TestBackend, 2, ComplexKind>::from_data(
             TensorData::from([[
-                Complex32 {
+                Complex::<f32> {
                     real: 5.0,
                     imag: 6.0,
                 },
-                Complex32 {
+                Complex::<f32> {
                     real: 7.0,
                     imag: 8.0,
                 },
@@ -131,11 +129,11 @@ mod tests {
         let data = result.into_data();
 
         let expected = TensorData::from([[
-            Complex32 {
+            Complex::<f32> {
                 real: 6.0,
                 imag: 8.0,
             }, // (1+5) + (2+6)i
-            Complex32 {
+            Complex::<f32> {
                 real: 10.0,
                 imag: 12.0,
             }, // (3+7) + (4+8)i
@@ -146,13 +144,13 @@ mod tests {
 
     #[test]
     fn test_complex_sub() {
-        let tensor1 = Tensor::<TestBackend, 2, Complex>::from_data(
+        let tensor1 = Tensor::<TestBackend, 2, ComplexKind>::from_data(
             TensorData::from([[
-                Complex32 {
+                Complex::<f32> {
                     real: 5.0,
                     imag: 6.0,
                 },
-                Complex32 {
+                Complex::<f32> {
                     real: 7.0,
                     imag: 8.0,
                 },
@@ -160,13 +158,13 @@ mod tests {
             &Default::default(),
         );
 
-        let tensor2 = Tensor::<TestBackend, 2, Complex>::from_data(
+        let tensor2 = Tensor::<TestBackend, 2, ComplexKind>::from_data(
             TensorData::from([[
-                Complex32 {
+                Complex::<f32> {
                     real: 1.0,
                     imag: 2.0,
                 },
-                Complex32 {
+                Complex::<f32> {
                     real: 3.0,
                     imag: 4.0,
                 },
@@ -178,11 +176,11 @@ mod tests {
         let data = result.into_data();
 
         let expected = TensorData::from([[
-            Complex32 {
+            Complex::<f32> {
                 real: 4.0,
                 imag: 4.0,
             }, // (5-1) + (6-2)i
-            Complex32 {
+            Complex::<f32> {
                 real: 4.0,
                 imag: 4.0,
             }, // (7-3) + (8-4)i
@@ -193,13 +191,13 @@ mod tests {
 
     #[test]
     fn test_complex_mul() {
-        let tensor1 = Tensor::<TestBackend, 2, Complex>::from_data(
+        let tensor1 = Tensor::<TestBackend, 2, ComplexKind>::from_data(
             TensorData::from([[
-                Complex32 {
+                Complex::<f32> {
                     real: 1.0,
                     imag: 2.0,
                 },
-                Complex32 {
+                Complex::<f32> {
                     real: 0.0,
                     imag: 1.0,
                 },
@@ -207,13 +205,13 @@ mod tests {
             &Default::default(),
         );
 
-        let tensor2 = Tensor::<TestBackend, 2, Complex>::from_data(
+        let tensor2 = Tensor::<TestBackend, 2, ComplexKind>::from_data(
             TensorData::from([[
-                Complex32 {
+                Complex::<f32> {
                     real: 3.0,
                     imag: 4.0,
                 },
-                Complex32 {
+                Complex::<f32> {
                     real: 0.0,
                     imag: 1.0,
                 },
@@ -227,11 +225,11 @@ mod tests {
         // (1+2i) * (3+4i) = (1*3 - 2*4) + (1*4 + 2*3)i = -5 + 10i
         // (0+1i) * (0+1i) = (0*0 - 1*1) + (0*1 + 1*0)i = -1 + 0i
         let expected = TensorData::from([[
-            Complex32 {
+            Complex::<f32> {
                 real: -5.0,
                 imag: 10.0,
             },
-            Complex32 {
+            Complex::<f32> {
                 real: -1.0,
                 imag: 0.0,
             },
@@ -242,13 +240,13 @@ mod tests {
 
     #[test]
     fn test_complex_div() {
-        let tensor1 = Tensor::<TestBackend, 2, Complex>::from_data(
+        let tensor1 = Tensor::<TestBackend, 2, ComplexKind>::from_data(
             TensorData::from([[
-                Complex32 {
+                Complex::<f32> {
                     real: 1.0,
                     imag: 1.0,
                 },
-                Complex32 {
+                Complex::<f32> {
                     real: 2.0,
                     imag: 0.0,
                 },
@@ -256,13 +254,13 @@ mod tests {
             &Default::default(),
         );
 
-        let tensor2 = Tensor::<TestBackend, 2, Complex>::from_data(
+        let tensor2 = Tensor::<TestBackend, 2, ComplexKind>::from_data(
             TensorData::from([[
-                Complex32 {
+                Complex::<f32> {
                     real: 1.0,
                     imag: -1.0,
                 },
-                Complex32 {
+                Complex::<f32> {
                     real: 1.0,
                     imag: 0.0,
                 },
@@ -276,11 +274,11 @@ mod tests {
         // (1+1i) / (1-1i) = ((1+1i)(1+1i)) / ((1-1i)(1+1i)) = (1+2i-1) / (1+1) = 2i/2 = i
         // (2+0i) / (1+0i) = 2/1 = 2
         let expected = TensorData::from([[
-            Complex32 {
+            Complex::<f32> {
                 real: 0.0,
                 imag: 1.0,
             },
-            Complex32 {
+            Complex::<f32> {
                 real: 2.0,
                 imag: 0.0,
             },
@@ -291,13 +289,13 @@ mod tests {
 
     #[test]
     fn test_complex_neg() {
-        let tensor = Tensor::<TestBackend, 2, Complex>::from_data(
+        let tensor = Tensor::<TestBackend, 2, ComplexKind>::from_data(
             TensorData::from([[
-                Complex32 {
+                Complex::<f32> {
                     real: 1.0,
                     imag: -2.0,
                 },
-                Complex32 {
+                Complex::<f32> {
                     real: -3.0,
                     imag: 4.0,
                 },
@@ -309,11 +307,11 @@ mod tests {
         let data = result.into_data();
 
         let expected = TensorData::from([[
-            Complex32 {
+            Complex::<f32> {
                 real: -1.0,
                 imag: 2.0,
             },
-            Complex32 {
+            Complex::<f32> {
                 real: 3.0,
                 imag: -4.0,
             },
@@ -324,13 +322,13 @@ mod tests {
 
     #[test]
     fn test_complex_conj() {
-        let tensor = Tensor::<TestBackend, 2, Complex>::from_data(
+        let tensor = Tensor::<TestBackend, 2, ComplexKind>::from_data(
             TensorData::from([[
-                Complex32 {
+                Complex::<f32> {
                     real: 1.0,
                     imag: -2.0,
                 },
-                Complex32 {
+                Complex::<f32> {
                     real: -3.0,
                     imag: 4.0,
                 },
@@ -342,11 +340,11 @@ mod tests {
         let data = result.into_data();
 
         let expected = TensorData::from([[
-            Complex32 {
+            Complex::<f32> {
                 real: 1.0,
                 imag: 2.0,
             }, // conjugate flips sign of imaginary part
-            Complex32 {
+            Complex::<f32> {
                 real: -3.0,
                 imag: -4.0,
             },
@@ -357,13 +355,13 @@ mod tests {
 
     #[test]
     fn test_complex_real() {
-        let tensor = Tensor::<TestBackend, 2, Complex>::from_data(
+        let tensor = Tensor::<TestBackend, 2, ComplexKind>::from_data(
             TensorData::from([[
-                Complex32 {
+                Complex::<f32> {
                     real: 1.0,
                     imag: -2.0,
                 },
-                Complex32 {
+                Complex::<f32> {
                     real: -3.0,
                     imag: 4.0,
                 },
@@ -380,13 +378,13 @@ mod tests {
 
     #[test]
     fn test_complex_imag() {
-        let tensor = Tensor::<TestBackend, 2, Complex>::from_data(
+        let tensor = Tensor::<TestBackend, 2, ComplexKind>::from_data(
             TensorData::from([[
-                Complex32 {
+                Complex::<f32> {
                     real: 1.0,
                     imag: -2.0,
                 },
-                Complex32 {
+                Complex::<f32> {
                     real: -3.0,
                     imag: 4.0,
                 },
@@ -403,13 +401,13 @@ mod tests {
 
     #[test]
     fn test_complex_magnitude() {
-        let tensor = Tensor::<TestBackend, 2, Complex>::from_data(
+        let tensor = Tensor::<TestBackend, 2, ComplexKind>::from_data(
             TensorData::from([[
-                Complex32 {
+                Complex::<f32> {
                     real: 3.0,
                     imag: 4.0,
                 }, // |3+4i| = 5
-                Complex32 {
+                Complex::<f32> {
                     real: 0.0,
                     imag: 1.0,
                 }, // |0+1i| = 1
@@ -426,13 +424,13 @@ mod tests {
 
     #[test]
     fn test_complex_phase() {
-        let tensor = Tensor::<TestBackend, 2, Complex>::from_data(
+        let tensor = Tensor::<TestBackend, 2, ComplexKind>::from_data(
             TensorData::from([[
-                Complex32 {
+                Complex::<f32> {
                     real: 1.0,
                     imag: 0.0,
                 }, // arg(1+0i) = 0
-                Complex32 {
+                Complex::<f32> {
                     real: 0.0,
                     imag: 1.0,
                 }, // arg(0+1i) = π/2
@@ -459,26 +457,26 @@ mod tests {
             &Default::default(),
         );
 
-        let result = Tensor::<TestBackend, 2, Complex>::from_parts(real, imag);
+        let result = Tensor::<TestBackend, 2, ComplexKind>::from_parts(real, imag);
         let data = result.into_data();
 
         let expected = TensorData::from([
             [
-                Complex32 {
+                Complex::<f32> {
                     real: 1.0,
                     imag: 5.0,
                 },
-                Complex32 {
+                Complex::<f32> {
                     real: 2.0,
                     imag: 6.0,
                 },
             ],
             [
-                Complex32 {
+                Complex::<f32> {
                     real: 3.0,
                     imag: 7.0,
                 },
-                Complex32 {
+                Complex::<f32> {
                     real: 4.0,
                     imag: 8.0,
                 },
@@ -500,18 +498,18 @@ mod tests {
             &Default::default(),
         );
 
-        let result = Tensor::<TestBackend, 2, Complex>::from_polar(magnitude, phase);
+        let result = Tensor::<TestBackend, 2, ComplexKind>::from_polar(magnitude, phase);
         let data = result.into_data();
 
         // r*cos(θ) + i*r*sin(θ)
         // 1*cos(0) + i*1*sin(0) = 1 + 0i
         // 2*cos(π/2) + i*2*sin(π/2) = 0 + 2i
         let expected = TensorData::from([[
-            Complex32 {
+            Complex::<f32> {
                 real: 1.0,
                 imag: 0.0,
             },
-            Complex32 {
+            Complex::<f32> {
                 real: 0.0,
                 imag: 2.0,
             },
@@ -522,21 +520,21 @@ mod tests {
 
     #[test]
     fn test_complex_reshape() {
-        let tensor = Tensor::<TestBackend, 2, Complex>::from_data(
+        let tensor = Tensor::<TestBackend, 2, ComplexKind>::from_data(
             TensorData::from([[
-                Complex32 {
+                Complex::<f32> {
                     real: 1.0,
                     imag: 2.0,
                 },
-                Complex32 {
+                Complex::<f32> {
                     real: 3.0,
                     imag: 4.0,
                 },
-                Complex32 {
+                Complex::<f32> {
                     real: 5.0,
                     imag: 6.0,
                 },
-                Complex32 {
+                Complex::<f32> {
                     real: 7.0,
                     imag: 8.0,
                 },
@@ -544,26 +542,26 @@ mod tests {
             &Default::default(),
         );
 
-        let result: Tensor<TestBackend, 3, Complex> = tensor.reshape([2, 2, 1]);
+        let result: Tensor<TestBackend, 3, ComplexKind> = tensor.reshape([2, 2, 1]);
         let data = result.into_data();
 
         let expected = TensorData::from([
             [
-                [Complex32 {
+                [Complex::<f32> {
                     real: 1.0,
                     imag: 2.0,
                 }],
-                [Complex32 {
+                [Complex::<f32> {
                     real: 3.0,
                     imag: 4.0,
                 }],
             ],
             [
-                [Complex32 {
+                [Complex::<f32> {
                     real: 5.0,
                     imag: 6.0,
                 }],
-                [Complex32 {
+                [Complex::<f32> {
                     real: 7.0,
                     imag: 8.0,
                 }],
@@ -575,24 +573,24 @@ mod tests {
 
     #[test]
     fn test_complex_transpose() {
-        let tensor = Tensor::<TestBackend, 2, Complex>::from_data(
+        let tensor = Tensor::<TestBackend, 2, ComplexKind>::from_data(
             TensorData::from([
                 [
-                    Complex32 {
+                    Complex::<f32> {
                         real: 1.0,
                         imag: 2.0,
                     },
-                    Complex32 {
+                    Complex::<f32> {
                         real: 3.0,
                         imag: 4.0,
                     },
                 ],
                 [
-                    Complex32 {
+                    Complex::<f32> {
                         real: 5.0,
                         imag: 6.0,
                     },
-                    Complex32 {
+                    Complex::<f32> {
                         real: 7.0,
                         imag: 8.0,
                     },
@@ -606,21 +604,21 @@ mod tests {
 
         let expected = TensorData::from([
             [
-                Complex32 {
+                Complex::<f32> {
                     real: 1.0,
                     imag: 2.0,
                 },
-                Complex32 {
+                Complex::<f32> {
                     real: 5.0,
                     imag: 6.0,
                 },
             ],
             [
-                Complex32 {
+                Complex::<f32> {
                     real: 3.0,
                     imag: 4.0,
                 },
-                Complex32 {
+                Complex::<f32> {
                     real: 7.0,
                     imag: 8.0,
                 },
@@ -632,13 +630,13 @@ mod tests {
 
     #[test]
     fn test_complex_exp() {
-        let tensor = Tensor::<TestBackend, 1, Complex>::from_data(
+        let tensor = Tensor::<TestBackend, 1, ComplexKind>::from_data(
             TensorData::from([
-                Complex32 {
+                Complex::<f32> {
                     real: 0.0,
                     imag: 0.0,
                 }, // exp(0) = 1
-                Complex32 {
+                Complex::<f32> {
                     real: 0.0,
                     imag: std::f32::consts::PI,
                 }, // exp(iπ) = -1
@@ -661,13 +659,13 @@ mod tests {
 
     #[test]
     fn test_complex_sin() {
-        let tensor = Tensor::<TestBackend, 1, Complex>::from_data(
+        let tensor = Tensor::<TestBackend, 1, ComplexKind>::from_data(
             TensorData::from([
-                Complex32 {
+                Complex::<f32> {
                     real: 0.0,
                     imag: 0.0,
                 }, // sin(0) = 0
-                Complex32 {
+                Complex::<f32> {
                     real: std::f32::consts::FRAC_PI_2,
                     imag: 0.0,
                 }, // sin(π/2) = 1
@@ -687,13 +685,13 @@ mod tests {
 
     #[test]
     fn test_complex_cos() {
-        let tensor = Tensor::<TestBackend, 1, Complex>::from_data(
+        let tensor = Tensor::<TestBackend, 1, ComplexKind>::from_data(
             TensorData::from([
-                Complex32 {
+                Complex::<f32> {
                     real: 0.0,
                     imag: 0.0,
                 }, // cos(0) = 1
-                Complex32 {
+                Complex::<f32> {
                     real: std::f32::consts::PI,
                     imag: 0.0,
                 }, // cos(π) = -1
@@ -713,13 +711,13 @@ mod tests {
 
     #[test]
     fn test_complex_log() {
-        let tensor = Tensor::<TestBackend, 1, Complex>::from_data(
+        let tensor = Tensor::<TestBackend, 1, ComplexKind>::from_data(
             TensorData::from([
-                Complex32 {
+                Complex::<f32> {
                     real: 1.0,
                     imag: 0.0,
                 }, // log(1) = 0
-                Complex32 {
+                Complex::<f32> {
                     real: std::f32::consts::E,
                     imag: 0.0,
                 }, // log(e) = 1
@@ -739,13 +737,13 @@ mod tests {
 
     #[test]
     fn test_complex_sqrt() {
-        let tensor = Tensor::<TestBackend, 1, Complex>::from_data(
+        let tensor = Tensor::<TestBackend, 1, ComplexKind>::from_data(
             TensorData::from([
-                Complex32 {
+                Complex::<f32> {
                     real: 4.0,
                     imag: 0.0,
                 }, // sqrt(4) = 2
-                Complex32 {
+                Complex::<f32> {
                     real: -1.0,
                     imag: 0.0,
                 }, // sqrt(-1) = i
@@ -764,14 +762,122 @@ mod tests {
     }
 
     #[test]
+    fn test_complex_matmul_identity() {
+        // a = [[3+4i, 2+0i], [0-2i, 3+0i]]
+        let a = Tensor::<TestBackend, 2, ComplexKind>::from_data(
+            TensorData::from([
+                [
+                    Complex::<f32> {
+                        real: 3.0,
+                        imag: 4.0,
+                    },
+                    Complex::<f32> {
+                        real: 2.0,
+                        imag: 0.0,
+                    },
+                ],
+                [
+                    Complex::<f32> {
+                        real: 0.0,
+                        imag: -2.0,
+                    },
+                    Complex::<f32> {
+                        real: 3.0,
+                        imag: 0.0,
+                    },
+                ],
+            ]),
+            &Default::default(),
+        );
+
+        // identity matrix
+        let eye = Tensor::<TestBackend, 2, ComplexKind>::from_data(
+            TensorData::from([
+                [
+                    Complex::<f32> {
+                        real: 1.0,
+                        imag: 0.0,
+                    },
+                    Complex::<f32> {
+                        real: 0.0,
+                        imag: 0.0,
+                    },
+                ],
+                [
+                    Complex::<f32> {
+                        real: 0.0,
+                        imag: 0.0,
+                    },
+                    Complex::<f32> {
+                        real: 1.0,
+                        imag: 0.0,
+                    },
+                ],
+            ]),
+            &Default::default(),
+        );
+
+        let expected = a.clone().into_data();
+        let result = a.matmul(eye).into_data();
+
+        result.assert_approx_eq(&expected, 4);
+    }
+
+    #[test]
+    fn test_complex_mean_dim() {
+        // a = [[3+4i, 2+0i], [0-2i, 3+0i]]
+        let a = Tensor::<TestBackend, 2, ComplexKind>::from_data(
+            TensorData::from([
+                [
+                    Complex::<f32> {
+                        real: 3.0,
+                        imag: 4.0,
+                    },
+                    Complex::<f32> {
+                        real: 2.0,
+                        imag: 0.0,
+                    },
+                ],
+                [
+                    Complex::<f32> {
+                        real: 0.0,
+                        imag: -2.0,
+                    },
+                    Complex::<f32> {
+                        real: 3.0,
+                        imag: 0.0,
+                    },
+                ],
+            ]),
+            &Default::default(),
+        );
+
+        // mean along dim 0: col0 = (3+4i + 0-2i)/2 = 1.5+1i, col1 = (2+0i + 3+0i)/2 = 2.5+0i
+        let result = a.mean_dim(0).into_data();
+
+        let expected = TensorData::from([[
+            Complex::<f32> {
+                real: 1.5,
+                imag: 1.0,
+            },
+            Complex::<f32> {
+                real: 2.5,
+                imag: 0.0,
+            },
+        ]]);
+
+        result.assert_approx_eq(&expected, 4);
+    }
+
+    #[test]
     fn test_complex_add_scalar() {
-        let tensor = Tensor::<TestBackend, 2, Complex>::from_data(
+        let tensor = Tensor::<TestBackend, 2, ComplexKind>::from_data(
             TensorData::from([[
-                Complex32 {
+                Complex::<f32> {
                     real: 1.0,
                     imag: 2.0,
                 },
-                Complex32 {
+                Complex::<f32> {
                     real: 3.0,
                     imag: 4.0,
                 },
@@ -779,7 +885,7 @@ mod tests {
             &Default::default(),
         );
 
-        let scalar = Complex32 {
+        let scalar = Complex::<f32> {
             real: 5.0,
             imag: 6.0,
         };
@@ -787,11 +893,11 @@ mod tests {
         let data = result.into_data();
 
         let expected = TensorData::from([[
-            Complex32 {
+            Complex::<f32> {
                 real: 6.0,
                 imag: 8.0,
             }, // (1+5) + (2+6)i
-            Complex32 {
+            Complex::<f32> {
                 real: 8.0,
                 imag: 10.0,
             }, // (3+5) + (4+6)i

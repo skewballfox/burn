@@ -5,17 +5,13 @@ use burn_tensor::{
     DType, Distribution, Element, ElementComparison, ElementConversion, ElementEq, ElementLimits,
     ElementRandom, cast::ToElement,
 };
-use burn_tensor::{ElementOrdered, TensorMetadata};
 use bytemuck::Zeroable;
-use rand::seq::index;
-use num_complex::Complex as NumComplex;
 use core::ops::{AddAssign, Rem};
+use num_complex::Complex as NumComplex;
 use num_traits::FromPrimitive;
 use num_traits::Num;
 use num_traits::One;
-use num_traits::Pow;
 use num_traits::Zero;
-use num_traits::float::FloatCore;
 use num_traits::identities::ConstZero;
 use rand::Rng;
 use std::ops::Add;
@@ -31,7 +27,7 @@ mod ndarray {
 
 #[cfg(feature = "tch")]
 mod tch {
-    use super::ComplexTensorType;
+    use super::Complex;
     use tch::kind::Element as TchElement;
     impl<E: TchElement> TchElement for Complex<E> {}
 }
@@ -43,8 +39,6 @@ pub trait ToComplex<C> {
 
 use paste::paste;
 
-use crate::base::ComplexTensorOps;
-use crate::base::ComplexTensorType as ComplexTensor;
 pub trait ToComplexElement: ToElement {
     fn to_complex32(&self) -> Complex<f32>;
     fn to_complex64(&self) -> Complex<f64>;
@@ -219,8 +213,6 @@ where
         Self::Output::new(re / norm_sqr, im / norm_sqr)
     }
 }
-
-
 
 impl<E> ToElement for Complex<E>
 where
@@ -538,9 +530,7 @@ where
     pub fn abs(self) -> E {
         (self.real * self.real + self.imag * self.imag).sqrt()
     }
-    
 }
-
 
 impl<E: Element + ElementComparison + bytemuck::Pod> Element for Complex<E> {
     #[inline(always)]
