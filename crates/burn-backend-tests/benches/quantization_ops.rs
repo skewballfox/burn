@@ -74,19 +74,19 @@ macro_rules! bench_backend {
 
                 #[divan::bench]
                 fn small(bencher: Bencher) {
-                    let scheme = <B as BackendCore>::QuantizedTensorPrimitive::default_scheme();
+                    let scheme = <B as BackendTypes>::QuantizedTensorPrimitive::default_scheme();
                     bencher.bench_synced(|| make_tensor::<B>(SMALL).quantize_dynamic(&scheme));
                 }
 
                 #[divan::bench]
                 fn medium(bencher: Bencher) {
-                    let scheme = <B as BackendCore>::QuantizedTensorPrimitive::default_scheme();
+                    let scheme = <B as BackendTypes>::QuantizedTensorPrimitive::default_scheme();
                     bencher.bench_synced(|| make_tensor::<B>(MEDIUM).quantize_dynamic(&scheme));
                 }
 
                 #[divan::bench]
                 fn large(bencher: Bencher) {
-                    let scheme = <B as BackendCore>::QuantizedTensorPrimitive::default_scheme();
+                    let scheme = <B as BackendTypes>::QuantizedTensorPrimitive::default_scheme();
                     bencher.bench_synced(|| make_tensor::<B>(LARGE).quantize_dynamic(&scheme));
                 }
             }

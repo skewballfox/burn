@@ -18,22 +18,22 @@ pub trait BackendIr: Backend {
     /// The type that can be used to point to a tensor of any kind.
     type Handle: Sync + Send + Clone;
 
-    /// Convert a [handle](BackendIr::Handle) to a [float tensor](burn_backend::BackendCore::FloatTensorPrimitive).
+    /// Convert a [handle](BackendIr::Handle) to a [float tensor](burn_backend::BackendTypes::FloatTensorPrimitive).
     fn float_tensor(handle: TensorHandle<Self::Handle>) -> FloatTensor<Self>;
-    /// Convert a [handle](BackendIr::Handle) to an [int tensor](burn_backend::BackendCore::IntTensorPrimitive).
+    /// Convert a [handle](BackendIr::Handle) to an [int tensor](burn_backend::BackendTypes::IntTensorPrimitive).
     fn int_tensor(handle: TensorHandle<Self::Handle>) -> IntTensor<Self>;
-    /// Convert a [handle](BackendIr::Handle) to a [bool tensor](burn_backend::BackendCore::BoolTensorPrimitive).
+    /// Convert a [handle](BackendIr::Handle) to a [bool tensor](burn_backend::BackendTypes::BoolTensorPrimitive).
     fn bool_tensor(handle: TensorHandle<Self::Handle>) -> BoolTensor<Self>;
-    /// Convert a [handle](BackendIr::Handle) to a [quantized tensor](burn_backend::BackendCore::QuantizedTensorPrimitive).
+    /// Convert a [handle](BackendIr::Handle) to a [quantized tensor](burn_backend::BackendTypes::QuantizedTensorPrimitive).
     fn quantized_tensor(handle: TensorHandle<Self::Handle>) -> QuantizedTensor<Self>;
 
-    /// Convert a [float tensor](burn_backend::BackendCore::FloatTensorPrimitive) to a [handle](BackendIr::Handle).
+    /// Convert a [float tensor](burn_backend::BackendTypes::FloatTensorPrimitive) to a [handle](BackendIr::Handle).
     fn float_tensor_handle(tensor: FloatTensor<Self>) -> Self::Handle;
-    /// Convert an [int tensor](burn_backend::BackendCore::IntTensorPrimitive) to a [handle](BackendIr::Handle).
+    /// Convert an [int tensor](burn_backend::BackendTypes::IntTensorPrimitive) to a [handle](BackendIr::Handle).
     fn int_tensor_handle(tensor: IntTensor<Self>) -> Self::Handle;
-    /// Convert a [bool tensor](burn_backend::BackendCore::BoolTensorPrimitive) to a [handle](BackendIr::Handle).
+    /// Convert a [bool tensor](burn_backend::BackendTypes::BoolTensorPrimitive) to a [handle](BackendIr::Handle).
     fn bool_tensor_handle(tensor: BoolTensor<Self>) -> Self::Handle;
-    /// Convert a [quantized tensor](burn_backend::BackendCore::QuantizedTensorPrimitive) to a [handle](BackendIr::Handle).
+    /// Convert a [quantized tensor](burn_backend::BackendTypes::QuantizedTensorPrimitive) to a [handle](BackendIr::Handle).
     fn quantized_tensor_handle(tensor: QuantizedTensor<Self>) -> Self::Handle;
 }
 

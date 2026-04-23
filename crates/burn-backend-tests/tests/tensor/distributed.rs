@@ -18,8 +18,8 @@ use super::*;
 fn test_all_reduce() {
     // Cuda
     let type_id = 10u16;
-    let device_count = <TestBackend as BackendCore>::Device_count(type_id);
-    let devices = create_devices::<<TestBackend as BackendCore>::Device>(type_id, device_count);
+    let device_count = <TestBackend as BackendTypes>::Device_count(type_id);
+    let devices = create_devices::<<TestBackend as BackendTypes>::Device>(type_id, device_count);
 
     let shape = [20, 20];
     run_all_reduce::<TestBackend>(devices, 100, shape);
@@ -30,8 +30,8 @@ fn test_all_reduce() {
 fn test_all_reduce_multithread() {
     // Cuda
     let type_id = 10u16;
-    let device_count = <TestBackend as BackendCore>::Device_count(type_id);
-    let devices = create_devices::<<TestBackend as BackendCore>::Device>(type_id, device_count);
+    let device_count = <TestBackend as BackendTypes>::Device_count(type_id);
+    let devices = create_devices::<<TestBackend as BackendTypes>::Device>(type_id, device_count);
 
     let shape = [20, 20];
     run_multithread::<TestBackend>(devices, 100, shape);
