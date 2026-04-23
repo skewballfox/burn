@@ -107,7 +107,9 @@ pub mod prelude {
         module::Module,
         tensor::{
             Bool, Device, ElementConversion, Float, Int, Shape, SliceArg, Tensor, TensorData,
-            backend::Backend, cast::ToElement, s,
+            backend::{Backend, BackendCore},
+            cast::ToElement,
+            s,
         },
     };
     pub use burn_std::device::Device as DeviceOps;

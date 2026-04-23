@@ -72,7 +72,7 @@ We are using Flex, so we just need to define the Flex backend as usual
 use burn::{backend::Flex, tensor::Tensor};
 
 type Backend = Flex;
-type BackendDevice = <Backend as burn::tensor::backend::Backend>::Device;
+type BackendDevice = <Backend as burn::tensor::backend::BackendCore>::Device;
 ```
 
 Then inside the `main` function add

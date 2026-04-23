@@ -1,7 +1,8 @@
 use std::marker::PhantomData;
 
 use burn_backend::{
-    BackTrace, Backend, BackendCore, DType, DTypeUsage, DeviceId, DeviceOps, ExecutionError, QTensorPrimitive, tensor::Device
+    BackTrace, Backend, BackendCore, DType, DTypeUsage, DeviceId, DeviceOps, ExecutionError,
+    QTensorPrimitive, tensor::Device,
 };
 use burn_std::{
     rand::{SeedableRng, StdRng},
@@ -207,7 +208,6 @@ impl<F: FloatCandleElement, I: IntCandleElement> BackendCore for Candle<F, I> {
 }
 
 impl<F: FloatCandleElement, I: IntCandleElement> Backend for Candle<F, I> {
-
     fn ad_enabled(_device: &Self::Device) -> bool {
         false
     }

@@ -362,6 +362,7 @@ impl_multi_backend_types!(quad, B1, B2, B3, B4);
 #[cfg(not(target_os = "windows"))] // cannot find a wgpu adapter on windows CI
 #[cfg(test)]
 mod tests {
+    use burn_backend::BackendCore;
     use burn_tensor::{Tensor, backend::Backend};
 
     use super::*;
@@ -369,8 +370,8 @@ mod tests {
 
     #[test]
     fn should_support_dual_byte_bridge() {
-        let device1 = duo::MultiDevice::B1(<TestBackend1 as Backend>::Device::default());
-        let device2 = duo::MultiDevice::B2(<TestBackend2 as Backend>::Device::default());
+        let device1 = duo::MultiDevice::B1(<TestBackend1 as BackendCore>::Device::default());
+        let device2 = duo::MultiDevice::B2(<TestBackend2 as BackendCore>::Device::default());
         let tensor1 = Tensor::<TestBackend, 1>::from_floats([1.0, 2.0, 3.0, 4.0], &device1);
         let tensor2 = Tensor::<TestBackend, 1>::from_floats([5.0, 6.0, 7.0, 8.0], &device2);
 

@@ -112,10 +112,11 @@ mod tests {
     use crate::TestBackend;
     use alloc::vec;
     use burn::tensor::TensorData;
+    use burn_core::prelude::BackendCore;
 
     #[test]
     fn test_generate_autoregressive_mask() {
-        let device = <TestBackend as Backend>::Device::default();
+        let device = <TestBackend as BackendCore>::Device::default();
 
         let mask = generate_autoregressive_mask::<TestBackend>(2, 3, &device);
 
@@ -138,7 +139,7 @@ mod tests {
 
     #[test]
     fn test_generate_padding_mask() {
-        let device = <TestBackend as Backend>::Device::default();
+        let device = <TestBackend as BackendCore>::Device::default();
         let tokens = vec![
             vec![3, 3, 3],
             vec![3, 3, 3],

@@ -16,9 +16,7 @@ use crate::distributed::{DistributedParamId, DistributedParams};
 
 use super::DeviceOps;
 
-
-
-
+/// The mapping of types used by Backend and traits like Numeric, BasicOps
 pub trait BackendCore {
     /// Device type.
     type Device: DeviceOps;
@@ -41,6 +39,7 @@ pub trait BackendCore {
     /// Tensor primitive to be used for all quantized operations.
     type QuantizedTensorPrimitive: TensorMetadata + QTensorPrimitive + 'static;
 }
+
 /// This trait defines all types and functions needed for a backend to be used with burn.
 ///
 /// ## Design
@@ -107,8 +106,6 @@ pub trait Backend:
     + BackendCore
     + 'static
 {
-    
-
     /// If autodiff is enabled.
     fn ad_enabled(_device: &Self::Device) -> bool {
         false

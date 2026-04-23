@@ -2,7 +2,7 @@ use crate::{Autodiff, checkpoint::strategy::CheckpointStrategy, tensor::Autodiff
 use alloc::vec::Vec;
 
 use burn_backend::{
-    Backend, Distribution, ExecutionError, Scalar, TensorData,
+    Backend, BackendCore, Distribution, ExecutionError, Scalar, TensorData,
     ops::IntTensorOps,
     tensor::{BoolTensor, Device, IntTensor},
 };
@@ -35,7 +35,7 @@ impl<B: Backend, C: CheckpointStrategy> IntTensorOps<Self> for Autodiff<B, C> {
 
     fn int_empty(
         shape: Shape,
-        device: &<Autodiff<B> as Backend>::Device,
+        device: &<Autodiff<B> as BackendCore>::Device,
         dtype: IntDType,
     ) -> IntTensor<B> {
         B::int_empty(shape, device, dtype)
@@ -248,7 +248,7 @@ impl<B: Backend, C: CheckpointStrategy> IntTensorOps<Self> for Autodiff<B, C> {
         tensor: IntTensor<B>,
         mask: BoolTensor<B>,
         value: IntTensor<B>,
-    ) -> <Autodiff<B> as Backend>::IntTensorPrimitive {
+    ) -> <Autodiff<B> as BackendCore>::IntTensorPrimitive {
         B::int_mask_where(tensor, mask, value)
     }
 
@@ -256,7 +256,7 @@ impl<B: Backend, C: CheckpointStrategy> IntTensorOps<Self> for Autodiff<B, C> {
         tensor: IntTensor<B>,
         mask: BoolTensor<B>,
         value: Scalar,
-    ) -> <Autodiff<B> as Backend>::IntTensorPrimitive {
+    ) -> <Autodiff<B> as BackendCore>::IntTensorPrimitive {
         B::int_mask_fill(tensor, mask, value)
     }
 
@@ -294,17 +294,17 @@ impl<B: Backend, C: CheckpointStrategy> IntTensorOps<Self> for Autodiff<B, C> {
         B::int_abs(tensor)
     }
     fn int_into_float(
-        tensor: <Autodiff<B> as Backend>::IntTensorPrimitive,
+        tensor: <Autodiff<B> as BackendCore>::IntTensorPrimitive,
         out_dtype: FloatDType,
-    ) -> <Autodiff<B> as Backend>::FloatTensorPrimitive {
+    ) -> <Autodiff<B> as BackendCore>::FloatTensorPrimitive {
         AutodiffTensor::new(B::int_into_float(tensor, out_dtype))
     }
 
     fn int_swap_dims(
-        tensor: <Autodiff<B> as Backend>::IntTensorPrimitive,
+        tensor: <Autodiff<B> as BackendCore>::IntTensorPrimitive,
         dim1: usize,
         dim2: usize,
-    ) -> <Autodiff<B> as Backend>::IntTensorPrimitive {
+    ) -> <Autodiff<B> as BackendCore>::IntTensorPrimitive {
         B::int_swap_dims(tensor, dim1, dim2)
     }
 

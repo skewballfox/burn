@@ -2,7 +2,7 @@ use crate::{Autodiff, checkpoint::strategy::CheckpointStrategy, tensor::Autodiff
 use alloc::vec::Vec;
 
 use burn_backend::{
-    Backend, ExecutionError, Scalar, TensorData,
+    Backend, BackendCore, ExecutionError, Scalar, TensorData,
     ops::BoolTensorOps,
     tensor::{BoolTensor, Device, IntTensor},
 };
@@ -84,15 +84,15 @@ impl<B: Backend, C: CheckpointStrategy> BoolTensorOps<Self> for Autodiff<B, C> {
     fn bool_into_float(
         tensor: BoolTensor<B>,
         out_dtype: FloatDType,
-    ) -> <Autodiff<B> as Backend>::FloatTensorPrimitive {
+    ) -> <Autodiff<B> as BackendCore>::FloatTensorPrimitive {
         AutodiffTensor::new(B::bool_into_float(tensor, out_dtype))
     }
 
     fn bool_swap_dims(
-        tensor: <Autodiff<B> as Backend>::BoolTensorPrimitive,
+        tensor: <Autodiff<B> as BackendCore>::BoolTensorPrimitive,
         dim1: usize,
         dim2: usize,
-    ) -> <Autodiff<B> as Backend>::BoolTensorPrimitive {
+    ) -> <Autodiff<B> as BackendCore>::BoolTensorPrimitive {
         B::bool_swap_dims(tensor, dim1, dim2)
     }
 

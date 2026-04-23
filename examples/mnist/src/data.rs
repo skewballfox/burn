@@ -28,7 +28,9 @@ impl<B: Backend> Batcher<B, MnistItemPrepared, MnistBatch<B>> for MnistBatcher {
             .iter()
             .map(|item| {
                 Tensor::<Flex, 1, Int>::from_data(
-                    TensorData::from([(item.label as i64).elem::<<Flex as Backend>::IntElem>()]),
+                    TensorData::from(
+                        [(item.label as i64).elem::<<Flex as BackendCore>::IntElem>()],
+                    ),
                     &Default::default(),
                 )
             })

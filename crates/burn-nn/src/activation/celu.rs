@@ -65,12 +65,13 @@ mod tests {
     use super::*;
     use crate::TestBackend;
     use burn::tensor::TensorData;
+    use burn::tensor::backend::BackendCore;
     use burn::tensor::{Tolerance, ops::FloatElem};
     type FT = FloatElem<TestBackend>;
 
     #[test]
     fn test_celu_forward() {
-        let device = <TestBackend as Backend>::Device::default();
+        let device = <TestBackend as BackendCore>::Device::default();
         let model: Celu = CeluConfig::new().init();
         let input =
             Tensor::<TestBackend, 2>::from_data(TensorData::from([[0.5, -0.5, -1.0]]), &device);
@@ -85,7 +86,7 @@ mod tests {
 
     #[test]
     fn test_celu_with_alpha() {
-        let device = <TestBackend as Backend>::Device::default();
+        let device = <TestBackend as BackendCore>::Device::default();
         let model: Celu = CeluConfig::new().with_alpha(2.0).init();
         let input = Tensor::<TestBackend, 2>::from_data(TensorData::from([[0.0, -2.0]]), &device);
         let out = model.forward(input);

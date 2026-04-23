@@ -196,7 +196,7 @@ macro_rules! bench_backend {
             use super::*;
 
             type TestBackend = $backend;
-            type TestDevice = <TestBackend as Backend>::Device;
+            type TestDevice = <TestBackend as BackendCore>::Device;
 
             /// File-based loading with copy mode (default)
             #[divan::bench]
@@ -378,7 +378,7 @@ mod verification {
     #[divan::bench]
     fn verify_copy_vs_zero_copy_equality() {
         let static_bytes = get_static_model_bytes();
-        let device: <B as Backend>::Device = Default::default();
+        let device: <B as BackendCore>::Device = Default::default();
 
         // Load with zero-copy
         let mut model_zc = LargeModel::<B>::new(&device);

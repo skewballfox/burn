@@ -19,7 +19,7 @@ use crate::{element::IntNdArrayElement, execute_with_int_dtype};
 
 // Workspace crates
 use super::{NdArrayBitOps, NdArrayMathOps, NdArrayOps};
-use burn_backend::{DType, Shape, TensorData, backend::Backend};
+use burn_backend::{DType, Shape, TensorData, backend::BackendCore};
 
 impl<E: FloatNdArrayElement, I: IntNdArrayElement, Q: QuantElement> IntTensorOps<Self>
     for NdArray<E, I, Q>
@@ -51,13 +51,13 @@ where
         slice!(tensor, slices)
     }
 
-    fn int_device(_tensor: &NdArrayTensor) -> <NdArray<E> as Backend>::Device {
+    fn int_device(_tensor: &NdArrayTensor) -> <NdArray<E> as BackendCore>::Device {
         NdArrayDevice::Cpu
     }
 
     fn int_empty(
         shape: Shape,
-        device: &<NdArray<E> as Backend>::Device,
+        device: &<NdArray<E> as BackendCore>::Device,
         dtype: IntDType,
     ) -> NdArrayTensor {
         Self::int_zeros(shape, device, dtype)

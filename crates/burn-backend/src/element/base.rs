@@ -18,7 +18,6 @@ pub trait Element:
     + ElementRandom
     + ElementConversion
     + ElementEq
-    
     + bytemuck::CheckedBitPattern
     + bytemuck::NoUninit
     + bytemuck::Zeroable
@@ -41,7 +40,7 @@ pub trait Element:
 ///
 /// Backends that implement these operations entirely at the device level do
 /// not rely on this trait. It only constrains the scalar type for generic Rust code.
-pub trait ElementOrdered: Element + ElementComparison + ElementLimits{}
+pub trait ElementOrdered: Element + ElementComparison + ElementLimits {}
 
 /// Element conversion trait for tensor.
 pub trait ElementConversion {

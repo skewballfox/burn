@@ -67,11 +67,12 @@ mod tests {
     use crate::TestBackend;
     use burn::tensor::TensorData;
     use burn::tensor::{Tolerance, ops::FloatElem};
+    use burn_core::prelude::BackendCore;
     type FT = FloatElem<TestBackend>;
 
     #[test]
     fn test_softplus_forward() {
-        let device = <TestBackend as Backend>::Device::default();
+        let device = <TestBackend as BackendCore>::Device::default();
         let model: Softplus = SoftplusConfig::new().init();
         let input =
             Tensor::<TestBackend, 2>::from_data(TensorData::from([[0.0, 1.0, -1.0]]), &device);
@@ -86,7 +87,7 @@ mod tests {
 
     #[test]
     fn test_softplus_with_beta() {
-        let device = <TestBackend as Backend>::Device::default();
+        let device = <TestBackend as BackendCore>::Device::default();
         let model: Softplus = SoftplusConfig::new().with_beta(2.0).init();
         let input = Tensor::<TestBackend, 2>::from_data(TensorData::from([[0.0, 1.0]]), &device);
         let out = model.forward(input);

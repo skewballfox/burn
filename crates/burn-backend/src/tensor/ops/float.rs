@@ -7,7 +7,7 @@ use crate::{
     ops::TransactionPrimitive,
     tensor::{
         BasicAutodiffOps, BasicOps, Device, Float, IndexingUpdateOp, IntTensor, Numeric, Ordered,
-        TensorKind,
+        TensorKind, TransactionOp,
     },
 };
 
@@ -29,7 +29,11 @@ macro_rules! q_bin_ops {
         }
     };
 }
-
+impl<B: Backend> TransactionOp<B> for Float {
+    fn register_transaction(tr: &mut TransactionPrimitive<B>, tensor: Self::Primitive) {
+        tr.register_float(tensor);
+    }
+}
 impl<B: Backend> BasicOps<B> for Float {
     type Elem = B::FloatElem;
 
@@ -46,10 +50,6 @@ impl<B: Backend> BasicOps<B> for Float {
 
     fn full(shape: Shape, fill_value: Scalar, device: &Device<B>, dtype: DType) -> Self::Primitive {
         TensorPrimitive::Float(B::float_full(shape, fill_value, device, dtype.into()))
-    }
-
-    fn register_transaction(tr: &mut TransactionPrimitive<B>, tensor: Self::Primitive) {
-        tr.register_float(tensor);
     }
 
     fn reshape(tensor: Self::Primitive, shape: Shape) -> Self::Primitive {

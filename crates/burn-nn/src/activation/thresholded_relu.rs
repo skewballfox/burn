@@ -62,10 +62,11 @@ mod tests {
     use super::*;
     use crate::TestBackend;
     use burn::tensor::TensorData;
+    use burn_core::prelude::BackendCore;
 
     #[test]
     fn test_thresholded_relu_forward() {
-        let device = <TestBackend as Backend>::Device::default();
+        let device = <TestBackend as BackendCore>::Device::default();
         let model: ThresholdedRelu = ThresholdedReluConfig::new().init();
         let input =
             Tensor::<TestBackend, 2>::from_data(TensorData::from([[0.5, 1.5, -0.2]]), &device);

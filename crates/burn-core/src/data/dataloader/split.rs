@@ -41,10 +41,11 @@ mod tests {
     use crate::data::dataloader::batcher::Batcher;
     use crate::data::dataloader::{BatchDataLoader, FixBatchStrategy};
     use crate::data::dataset::FakeDataset;
+    use burn_tensor::backend::BackendCore;
 
     #[test]
     fn test_split_batch_dataloader() {
-        type TestDevice = <TestBackend as Backend>::Device;
+        type TestDevice = <TestBackend as BackendCore>::Device;
 
         #[derive(new, Clone)]
         pub struct TestBatcher;

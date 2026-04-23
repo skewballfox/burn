@@ -32,12 +32,13 @@ mod tests {
     use super::*;
     use crate::TestBackend;
     use burn::tensor::TensorData;
+    use burn::tensor::backend::BackendCore;
     use burn::tensor::{Tolerance, ops::FloatElem};
     type FT = FloatElem<TestBackend>;
 
     #[test]
     fn test_hard_swish_forward() {
-        let device = <TestBackend as Backend>::Device::default();
+        let device = <TestBackend as BackendCore>::Device::default();
         let model = HardSwish::new();
 
         let input = Tensor::<TestBackend, 2>::from_data(

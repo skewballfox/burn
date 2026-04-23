@@ -4,8 +4,17 @@ use burn_std::{DType, Shape, Slice};
 use crate::{
     AutodiffBackend, Backend, ExecutionError, Scalar, TensorData,
     ops::TransactionPrimitive,
-    tensor::{BasicAutodiffOps, BasicOps, Bool, Device, IndexingUpdateOp, IntTensor, TensorKind},
+    tensor::{
+        BasicAutodiffOps, BasicOps, Bool, Device, IndexingUpdateOp, IntTensor, TensorKind,
+        TransactionOp,
+    },
 };
+
+impl<B: Backend> TransactionOp<B> for Bool {
+    fn register_transaction(tr: &mut TransactionPrimitive<B>, tensor: Self::Primitive) {
+        tr.register_bool(tensor);
+    }
+}
 
 impl<B: Backend> BasicOps<B> for Bool {
     type Elem = B::BoolElem;
@@ -39,10 +48,6 @@ impl<B: Backend> BasicOps<B> for Bool {
         } else {
             B::bool_zeros(shape, device, dtype.into())
         }
-    }
-
-    fn register_transaction(tr: &mut TransactionPrimitive<B>, tensor: Self::Primitive) {
-        tr.register_bool(tensor);
     }
 
     fn reshape(tensor: Self::Primitive, shape: Shape) -> Self::Primitive {

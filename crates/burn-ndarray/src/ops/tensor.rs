@@ -24,7 +24,9 @@ use crate::{execute_with_float_dtype, ops::grid_sample::grid_sample_2d};
 // Workspace crates
 use crate::rand::get_seeded_rng;
 use burn_backend::{Distribution, FloatDType, Scalar};
-use burn_backend::{ElementConversion, Shape, TensorData, backend::Backend, ops::FloatTensorOps};
+use burn_backend::{
+    ElementConversion, Shape, TensorData, backend::BackendCore, ops::FloatTensorOps,
+};
 
 #[cfg(not(feature = "std"))]
 #[allow(unused_imports)]
@@ -93,7 +95,7 @@ where
 
     fn float_empty(
         shape: Shape,
-        device: &<NdArray<E> as Backend>::Device,
+        device: &<NdArray<E> as BackendCore>::Device,
         dtype: FloatDType,
     ) -> FloatTensor<Self> {
         Self::float_zeros(shape, device, dtype)

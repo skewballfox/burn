@@ -1,4 +1,5 @@
 use burn_core as burn;
+use burn_core::prelude::BackendCore;
 
 use crate::{ModuleSnapshot, ModuleStore, SafetensorsStore};
 use burn_core::module::{Module, Param};
@@ -262,7 +263,7 @@ fn test_forward_pass_preservation_after_save_load() {
 
 #[test]
 fn should_save_load_compose() {
-    let device = <TestBackend as Backend>::Device::default();
+    let device = <TestBackend as BackendCore>::Device::default();
     let module_1 = ModuleComposed::<TestBackend>::new(&device);
     let mut module_2 = ModuleComposed::<TestBackend>::new(&device);
     assert_ne!(module_1.weight.to_data(), module_2.weight.to_data());

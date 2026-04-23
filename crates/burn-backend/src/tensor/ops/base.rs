@@ -2,12 +2,22 @@ use alloc::vec::Vec;
 use burn_std::{DType, Shape, Slice};
 
 use crate::{
-    Backend, ExecutionError, Scalar, TensorData, TensorMetadata,
+    Backend, BackendCore, ExecutionError, Scalar, TensorData, TensorMetadata,
     element::Element,
     ops::TransactionPrimitive,
     tensor::{IndexingUpdateOp, IntTensor, TensorKind},
 };
 
+pub trait TransactionOp<B: Backend>: TensorKind<B> {
+    /// Read the data from the tensor using a transaction.
+    ///
+    /// # Remarks
+    ///
+    /// This is a low-level function used internally by the library to call different backend functions
+    /// with static dispatch. It is not designed for direct usage by users, and not recommended to import
+    /// or use this function directly.
+    fn register_transaction(tr: &mut TransactionPrimitive<B>, tensor: Self::Primitive);
+}
 /// Trait that list all operations that can be applied on all tensors.
 ///
 /// # Warnings
@@ -16,7 +26,7 @@ use crate::{
 #[cfg_attr(doc, doc = crate::doc_tensor!())]
 #[cfg_attr(not(doc), doc = "`Tensor`")]
 /// struct.
-pub trait BasicOps<B: Backend>: TensorKind<B> {
+pub trait BasicOps<B: BackendCore>: TensorKind<B> {
     /// The type of the tensor elements.
     type Elem: Element;
 
@@ -490,15 +500,6 @@ pub trait BasicOps<B: Backend>: TensorKind<B> {
     fn into_data_async(
         tensor: Self::Primitive,
     ) -> impl Future<Output = Result<TensorData, ExecutionError>> + Send;
-
-    /// Read the data from the tensor using a transaction.
-    ///
-    /// # Remarks
-    ///
-    /// This is a low-level function used internally by the library to call different backend functions
-    /// with static dispatch. It is not designed for direct usage by users, and not recommended to import
-    /// or use this function directly.
-    fn register_transaction(tr: &mut TransactionPrimitive<B>, tensor: Self::Primitive);
 
     /// Creates a tensor from the given data enforcing the provided data type.
     ///
