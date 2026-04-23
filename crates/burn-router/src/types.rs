@@ -363,7 +363,7 @@ impl_multi_backend_types!(quad, B1, B2, B3, B4);
 #[cfg(test)]
 mod tests {
     use burn_backend::BackendCore;
-    use burn_tensor::{Tensor, backend::Backend};
+    use burn_tensor::Tensor;
 
     use super::*;
     use crate::tests::{TestBackend, TestBackend1, TestBackend2};

@@ -61,7 +61,7 @@ fn cast<T, E>(tensor: SharedArray<T>) -> SharedArray<E> {
 }
 
 mod nhwc {
-    use burn_backend::{ElementLimits, ElementOrdered};
+    use burn_backend::ElementOrdered;
     use itertools::Itertools;
     use macerator::{Simd, vload_unaligned, vstore_unaligned};
     use ndarray::{ArrayView3, ArrayViewMut3, Ix4};

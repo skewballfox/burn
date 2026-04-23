@@ -1,6 +1,6 @@
 use super::*;
 use burn_tensor::TensorData;
-use burn_tensor::backend::{Backend, BackendCore};
+use burn_tensor::backend::BackendCore;
 
 #[test]
 fn test_arange() {
