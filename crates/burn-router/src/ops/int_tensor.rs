@@ -1,5 +1,5 @@
 use alloc::vec::Vec;
-use burn_backend::BackendCore;
+use burn_backend::BackendTypes;
 use burn_backend::backend::ExecutionError;
 use burn_std::{BoolDType, FloatDType};
 
@@ -31,7 +31,7 @@ impl<R: RunnerChannel> IntTensorOps<Self> for BackendRouter<R> {
             .into_data()
             .await?
             // Since underlying backends can have different data types, we convert to the current elem
-            .convert::<<Self as BackendCore>::IntElem>())
+            .convert::<<Self as BackendTypes>::IntElem>())
     }
 
     fn int_from_data(data: TensorData, device: &Device<Self>) -> IntTensor<Self> {

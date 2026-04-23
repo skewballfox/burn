@@ -55,7 +55,7 @@ impl<B: Backend> MixedDtypeModel<B> {
 #[cfg(test)]
 #[allow(clippy::excessive_precision)]
 mod tests {
-    use burn_core::prelude::BackendCore;
+    use burn_core::prelude::BackendTypes;
     use burn_tensor::{BoolStore, DType};
 
     use super::*;
@@ -142,7 +142,7 @@ mod tests {
     #[test]
     fn test_extreme_values() {
         type TestBackend = burn_flex::Flex;
-        let device = <TestBackend as BackendCore>::Device::default();
+        let device = <TestBackend as BackendTypes>::Device::default();
 
         #[derive(Module, Debug)]
         struct ExtremeValueModel<B: Backend> {

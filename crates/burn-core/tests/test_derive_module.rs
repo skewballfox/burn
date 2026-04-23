@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use burn::module::Initializer;
 use burn::module::{Module, Param};
-use burn::tensor::backend::{Backend, BackendCore};
+use burn::tensor::backend::{Backend, BackendTypes};
 use burn::tensor::{Int, Tensor};
 use burn_core as burn;
 
@@ -167,7 +167,7 @@ mod state {
 
     #[test]
     fn should_load_from_record_basic() {
-        let device = <TestBackend as BackendCore>::Device::default();
+        let device = <TestBackend as BackendTypes>::Device::default();
         let module_1 = ModuleBasic::<TestBackend>::new(&device);
         let mut module_2 = ModuleBasic::<TestBackend>::new(&device);
 
@@ -191,7 +191,7 @@ mod state {
 
     #[test]
     fn should_load_from_record_compose() {
-        let device = <TestBackend as BackendCore>::Device::default();
+        let device = <TestBackend as BackendTypes>::Device::default();
         let module_1 = ModuleComposed::<TestBackend>::new(&device);
         let mut module_2 = ModuleComposed::<TestBackend>::new(&device);
         assert_ne!(module_1.weight.to_data(), module_2.weight.to_data());
@@ -212,7 +212,7 @@ mod state {
 
     #[test]
     fn should_load_from_record_enum() {
-        let device = <TestBackend as BackendCore>::Device::default();
+        let device = <TestBackend as BackendTypes>::Device::default();
         let module_1 = ModuleEnum::Basic(ModuleBasic::<TestBackend>::new(&device));
         let mut module_2 = ModuleEnum::Basic(ModuleBasic::<TestBackend>::new(&device));
 
@@ -243,7 +243,7 @@ mod state {
 
     #[test]
     fn should_load_from_record_based_on_attributes() {
-        let device = <TestBackend as BackendCore>::Device::default();
+        let device = <TestBackend as BackendTypes>::Device::default();
         let mut module_1 = ModuleWithAttributes::<TestBackend, _, _>::new(&device);
         let mut module_2 = ModuleWithAttributes::new(&device);
 
@@ -311,7 +311,7 @@ mod state {
 
     #[test]
     fn should_load_from_record_const_generic() {
-        let device = <TestBackend as BackendCore>::Device::default();
+        let device = <TestBackend as BackendTypes>::Device::default();
         let module_1 = ModuleWithConstGeneric {
             modules: [
                 ModuleBasic::<TestBackend>::new(&device),
@@ -352,7 +352,7 @@ mod state {
     #[test]
     #[should_panic(expected = "Can't parse record from a different variant")]
     fn should_panic_load_from_incorrect_enum_variant() {
-        let device = <TestBackend as BackendCore>::Device::default();
+        let device = <TestBackend as BackendTypes>::Device::default();
         let module_1 = ModuleEnum::Basic(ModuleBasic::<TestBackend>::new(&device));
         let module_2 = ModuleEnum::Composed(ModuleComposed::<TestBackend>::new(&device));
         let state_1 = module_1.clone().into_record();
@@ -366,7 +366,7 @@ mod lazy_clone {
 
     #[test]
     fn clone_uninitialized_param_should_not_trigger_init() {
-        let device = <TestBackend as BackendCore>::Device::default();
+        let device = <TestBackend as BackendTypes>::Device::default();
         let module = ModuleBasic::<TestBackend>::new(&device);
 
         // Module starts uninitialized (lazy).
@@ -380,7 +380,7 @@ mod lazy_clone {
 
     #[test]
     fn clone_initialized_param_should_share_values() {
-        let device = <TestBackend as BackendCore>::Device::default();
+        let device = <TestBackend as BackendTypes>::Device::default();
         let module = ModuleBasic::<TestBackend>::new(&device);
 
         // Force initialization by accessing the tensor.
@@ -394,7 +394,7 @@ mod lazy_clone {
 
     #[test]
     fn lazy_clone_should_produce_valid_tensor_on_access() {
-        let device = <TestBackend as BackendCore>::Device::default();
+        let device = <TestBackend as BackendTypes>::Device::default();
         let module = ModuleBasic::<TestBackend>::new(&device);
         let cloned = module.clone();
 
@@ -412,7 +412,7 @@ mod lazy_clone {
 
     #[test]
     fn lazy_clone_and_original_produce_independent_values() {
-        let device = <TestBackend as BackendCore>::Device::default();
+        let device = <TestBackend as BackendTypes>::Device::default();
         let module = ModuleBasic::<TestBackend>::new(&device);
         let cloned = module.clone();
 
@@ -428,7 +428,7 @@ mod lazy_clone {
 
     #[test]
     fn lazy_clone_deref_should_trigger_init() {
-        let device = <TestBackend as BackendCore>::Device::default();
+        let device = <TestBackend as BackendTypes>::Device::default();
         let module = ModuleBasic::<TestBackend>::new(&device);
         let cloned = module.clone();
 
@@ -444,7 +444,7 @@ mod lazy_clone {
         use burn::module::ParamId;
         use burn::tensor::Shape;
 
-        let device = <TestBackend as BackendCore>::Device::default();
+        let device = <TestBackend as BackendTypes>::Device::default();
 
         // Create two uninitialized params from the same init function.
         let param: Param<Tensor<TestBackend, 2>> = Param::uninitialized(
@@ -470,7 +470,7 @@ mod lazy_clone {
 
     #[test]
     fn load_record_into_uninitialized_module_should_work() {
-        let device = <TestBackend as BackendCore>::Device::default();
+        let device = <TestBackend as BackendTypes>::Device::default();
         let module_1 = ModuleBasic::<TestBackend>::new(&device);
 
         // Initialize module_1 so we have a record to load.
@@ -496,21 +496,21 @@ mod num_params {
 
     #[test]
     fn should_calculate_num_params_basic() {
-        let device = <TestBackend as BackendCore>::Device::default();
+        let device = <TestBackend as BackendTypes>::Device::default();
         let module = ModuleBasic::<TestBackend>::new(&device);
         assert_eq!(20 * 20, module.num_params());
     }
 
     #[test]
     fn should_output_state_composed() {
-        let device = <TestBackend as BackendCore>::Device::default();
+        let device = <TestBackend as BackendTypes>::Device::default();
         let module = ModuleComposed::<TestBackend>::new(&device);
         assert_eq!(4 * 20 * 20, module.num_params());
     }
 
     #[test]
     fn should_calculate_num_params_enum() {
-        let device = <TestBackend as BackendCore>::Device::default();
+        let device = <TestBackend as BackendTypes>::Device::default();
         let module = ModuleEnum::Basic(ModuleBasic::<TestBackend>::new(&device));
         assert_eq!(20 * 20, module.num_params());
 
@@ -520,7 +520,7 @@ mod num_params {
 
     #[test]
     fn should_calculate_num_params_based_on_attributes() {
-        let device = <TestBackend as BackendCore>::Device::default();
+        let device = <TestBackend as BackendTypes>::Device::default();
         let module = ModuleWithAttributes::<TestBackend, _, _>::new(&device);
         assert_eq!(20 * 20 * 2, module.num_params());
     }
@@ -538,7 +538,7 @@ mod require_grad {
 
     #[test]
     fn should_have_grad_by_default() {
-        let device = <TestBackend as BackendCore>::Device::default();
+        let device = <TestBackend as BackendTypes>::Device::default();
         let module = ModuleBasic::<TestAutodiffBackend>::new(&device);
         let grad_x = calculate_grads(&module, |weights, x| weights.matmul(x));
 
@@ -547,7 +547,7 @@ mod require_grad {
 
     #[test]
     fn should_have_no_grad_after_no_grad() {
-        let device = <TestAutodiffBackend as BackendCore>::Device::default();
+        let device = <TestAutodiffBackend as BackendTypes>::Device::default();
         let module = ModuleBasic::<TestAutodiffBackend>::new(&device).no_grad();
         let grad_x = calculate_grads(&module, |weights, x| weights.matmul(x));
 
@@ -556,7 +556,7 @@ mod require_grad {
 
     #[test]
     fn should_have_grad_when_from_record() {
-        let device = <TestAutodiffBackend as BackendCore>::Device::default();
+        let device = <TestAutodiffBackend as BackendTypes>::Device::default();
         let module = ModuleBasic::<TestAutodiffBackend>::new(&device);
         let record = ModuleBasicRecord {
             weight_basic: module.weight_basic.clone(), // Even when param is no_grad,
@@ -685,7 +685,7 @@ mod grad_distributed {
         const NUM_ITERATIONS: usize = 100;
         let type_id = 0u16;
 
-        let device_count = <B as BackendCore>::Device_count(type_id);
+        let device_count = <B as BackendTypes>::Device_count(type_id);
         let devices = create_devices::<B::Device>(type_id, device_count);
         let module = ModuleBasic::<B>::new(&devices[0]);
         let (synced_senders, synced_receivers): (
@@ -746,7 +746,7 @@ mod grad_distributed {
 
     fn spawn_peer_threads<B: AutodiffBackend>(
         module: &ModuleBasic<B>,
-        devices: &[<B as BackendCore>::Device],
+        devices: &[<B as BackendTypes>::Device],
         synced_senders: Vec<Sender<TensorData>>,
         original_senders: Vec<Sender<TensorData>>,
         transformation: fn(Tensor<B, 2>, Tensor<B, 2>) -> Tensor<B, 2>,

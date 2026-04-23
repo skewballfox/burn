@@ -486,7 +486,7 @@ mod tests {
     use super::*;
     use burn_tensor::{
         Tensor,
-        backend::{Backend, BackendCore},
+        backend::{Backend, BackendTypes},
     };
 
     // Param<T> should be Sync so that models can be shared across threads
@@ -512,7 +512,7 @@ mod tests {
         use alloc::vec::Vec;
 
         type B = burn_flex::Flex;
-        let device = <B as BackendCore>::Device::default();
+        let device = <B as BackendTypes>::Device::default();
 
         let param: Param<Tensor<B, 2>> = Param::uninitialized(
             ParamId::new(),

@@ -1,13 +1,13 @@
 //! # Common Tensor Map for Local Collective Operations
-use burn_backend::{Backend, BackendCore, TensorMetadata};
+use burn_backend::{Backend, BackendTypes, TensorMetadata};
 use burn_std::Shape;
 use std::collections::HashMap;
 
 use crate::PeerId;
 
-pub type CollectiveTensorMap<B> = HashMap<PeerId, <B as BackendCore>::FloatTensorPrimitive>;
+pub type CollectiveTensorMap<B> = HashMap<PeerId, <B as BackendTypes>::FloatTensorPrimitive>;
 
-pub type PeerDeviceMap<B> = HashMap<PeerId, <B as BackendCore>::Device>;
+pub type PeerDeviceMap<B> = HashMap<PeerId, <B as BackendTypes>::Device>;
 
 /// Get the shape of the tensors. They should all have the same shape, otherwise None is returned.
 pub fn get_common_shape<B: Backend>(tensors: &CollectiveTensorMap<B>) -> Option<Shape> {

@@ -1,7 +1,7 @@
 use super::tree::all_reduce_sum_tree;
 use crate::local::tensor_map::CollectiveTensorMap;
 use crate::{PeerId, local::tensor_map};
-use burn_backend::{Backend, BackendCore, Shape, Slice, TensorMetadata};
+use burn_backend::{Backend, BackendTypes, Shape, Slice, TensorMetadata};
 use std::{collections::HashMap, ops::Range};
 
 /// Ring implementation of All-Reduce (Ring-Reduce)
@@ -138,7 +138,7 @@ fn slice_tensors<B: Backend>(
     mut tensors: HashMap<PeerId, B::FloatTensorPrimitive>,
     shape: Shape,
     slice_dim: usize,
-) -> Vec<(PeerId, Vec<<B as BackendCore>::FloatTensorPrimitive>)> {
+) -> Vec<(PeerId, Vec<<B as BackendTypes>::FloatTensorPrimitive>)> {
     // Get slice index ranges
     let ranges = get_ring_reduce_slice_ranges(shape[slice_dim], tensors.len());
 

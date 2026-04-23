@@ -64,13 +64,13 @@ mod tests {
     use super::*;
     use crate::TestBackend;
     use burn::tensor::TensorData;
-    use burn::tensor::backend::BackendCore;
+    use burn::tensor::backend::BackendTypes;
     use burn::tensor::{Tolerance, ops::FloatElem};
     type FT = FloatElem<TestBackend>;
 
     #[test]
     fn test_leaky_relu_forward() {
-        let device = <TestBackend as BackendCore>::Device::default();
+        let device = <TestBackend as BackendTypes>::Device::default();
         let model: LeakyRelu = LeakyReluConfig::new().init();
         let input =
             Tensor::<TestBackend, 2>::from_data(TensorData::from([[0.4410, -0.2507]]), &device);
@@ -105,7 +105,7 @@ mod tests {
             ],
         ]);
 
-        let device = <TestBackend as BackendCore>::Device::default();
+        let device = <TestBackend as BackendTypes>::Device::default();
         let model: LeakyRelu = LeakyReluConfig::new().init();
         let input_data = Tensor::<TestBackend, 3>::from_data(TensorData::from(input), &device);
         let actual_output = model.forward(input_data);

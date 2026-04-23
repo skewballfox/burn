@@ -4,7 +4,7 @@ use crate::{
     stream::{Context, OrderedExecution},
 };
 use burn_backend::{
-    Backend, BackendCore, DType, DeviceOps, ExecutionError,
+    Backend, BackendTypes, DType, DeviceOps, ExecutionError,
     tensor::{BoolTensor, Device, FloatTensor, IntTensor, QuantizedTensor},
 };
 use burn_ir::{BackendIr, OperationIr, TensorHandle};
@@ -21,7 +21,7 @@ pub fn get_client<B: FusionBackend>(device: &Device<B>) -> Client<B::FusionRunti
 pub struct Fusion<B: FusionBackend> {
     _backend: PhantomData<B>,
 }
-impl<B: FusionBackend> BackendCore for Fusion<B> {
+impl<B: FusionBackend> BackendTypes for Fusion<B> {
     type Device = B::Device;
 
     type FloatTensorPrimitive = FusionTensor<B::FusionRuntime>;

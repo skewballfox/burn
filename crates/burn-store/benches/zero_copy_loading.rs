@@ -378,7 +378,7 @@ mod verification {
     #[divan::bench]
     fn verify_copy_vs_zero_copy_equality() {
         let static_bytes = get_static_model_bytes();
-        let device: <B as BackendCore>::Device = Default::default();
+        let device: <B as BackendTypes>::Device = Default::default();
 
         // Load with zero-copy
         let mut model_zc = LargeModel::<B>::new(&device);

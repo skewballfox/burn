@@ -10,7 +10,7 @@ use crate::{
 };
 use burn_core::module::{AutodiffModule, Module};
 use burn_core::tensor::Device;
-use burn_core::tensor::backend::{AutodiffBackend, BackendCore};
+use burn_core::tensor::backend::{AutodiffBackend, BackendTypes};
 use burn_optim::lr_scheduler::LrScheduler;
 use burn_optim::{GradientsParams, MultiGradientsParams, Optimizer};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -68,7 +68,7 @@ where
 
 impl<LC: LearningComponentsTypes> Learner<LC> {
     /// Fork the learner's model to the given device.
-    pub fn fork(&mut self, device: &<TrainingBackend<LC> as BackendCore>::Device) {
+    pub fn fork(&mut self, device: &<TrainingBackend<LC> as BackendTypes>::Device) {
         self.model = self.model().fork(device);
     }
 

@@ -7,7 +7,7 @@ use crate::{
 use alloc::string::String;
 use burn_backend::quantization::{QuantLevel, QuantMode, QuantScheme, QuantStore, QuantValue};
 use burn_backend::tensor::{BoolTensor, FloatTensor, IntTensor, QuantizedTensor};
-use burn_backend::{Backend, BackendCore, DType, DeviceId, DeviceOps};
+use burn_backend::{Backend, BackendTypes, DType, DeviceId, DeviceOps};
 use burn_ir::{BackendIr, HandleKind, TensorHandle};
 use burn_std::BoolStore;
 use burn_std::stub::Mutex;
@@ -53,7 +53,8 @@ where
     _i: PhantomData<I>,
     _q: PhantomData<Q>,
 }
-impl<E: FloatNdArrayElement, I: IntNdArrayElement, Q: QuantElement> BackendCore for NdArray<E, I, Q>
+impl<E: FloatNdArrayElement, I: IntNdArrayElement, Q: QuantElement> BackendTypes
+    for NdArray<E, I, Q>
 where
     NdArrayTensor: From<SharedArray<E>>,
     NdArrayTensor: From<SharedArray<I>>,

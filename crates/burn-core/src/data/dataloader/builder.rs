@@ -160,7 +160,7 @@ mod tests {
     use super::*;
     use crate::TestBackend;
     use crate::data::dataset::FakeDataset;
-    use burn_tensor::backend::BackendCore;
+    use burn_tensor::backend::BackendTypes;
 
     #[derive(new, Clone)]
     struct TestBatcherDevice;
@@ -172,11 +172,11 @@ mod tests {
         }
     }
 
-    type TestDevice = <TestBackend as BackendCore>::Device;
+    type TestDevice = <TestBackend as BackendTypes>::Device;
 
     #[test]
     fn test_dataloader_no_workers() {
-        type TestDevice = <TestBackend as BackendCore>::Device;
+        type TestDevice = <TestBackend as BackendTypes>::Device;
 
         let default_device = TestDevice::default();
         let dataloader = DataLoaderBuilder::new(TestBatcherDevice::new())

@@ -11,7 +11,7 @@ use common::{BencherExt, TestBackend};
 
 use burn_tensor::{
     Tensor, TensorData,
-    backend::{Backend, BackendCore},
+    backend::{Backend, BackendTypes},
     quantization::QTensorPrimitive,
 };
 use divan::{AllocProfiler, Bencher};
@@ -49,14 +49,14 @@ fn make_matrix<B: Backend>(rows: usize, cols: usize) -> Tensor<B, 2> {
 fn make_qtensor<B: Backend>(size: usize) -> Option<Tensor<B, 1>> {
     common::try_setup(|| {
         make_tensor::<B>(size)
-            .quantize_dynamic(&<B as BackendCore>::QuantizedTensorPrimitive::default_scheme())
+            .quantize_dynamic(&<B as BackendTypes>::QuantizedTensorPrimitive::default_scheme())
     })
 }
 
 fn make_qmatrix<B: Backend>(rows: usize, cols: usize) -> Option<Tensor<B, 2>> {
     common::try_setup(|| {
         make_matrix::<B>(rows, cols)
-            .quantize_dynamic(&<B as BackendCore>::QuantizedTensorPrimitive::default_scheme())
+            .quantize_dynamic(&<B as BackendTypes>::QuantizedTensorPrimitive::default_scheme())
     })
 }
 

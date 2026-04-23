@@ -2,7 +2,7 @@ use alloc::vec::Vec;
 use burn_std::{DType, Shape, Slice};
 
 use crate::{
-    Backend, BackendCore, ExecutionError, Scalar, TensorData, TensorMetadata,
+    Backend, BackendTypes, ExecutionError, Scalar, TensorData, TensorMetadata,
     element::Element,
     ops::TransactionPrimitive,
     tensor::{IndexingUpdateOp, IntTensor, TensorKind},
@@ -31,7 +31,7 @@ pub trait TransactionOp<B: Backend>: TensorKind<B> {
 #[cfg_attr(doc, doc = crate::doc_tensor!())]
 #[cfg_attr(not(doc), doc = "`Tensor`")]
 /// struct.
-pub trait BasicOps<B: BackendCore>: TensorKind<B> {
+pub trait BasicOps<B: BackendTypes>: TensorKind<B> {
     /// The type of the tensor elements.
     type Elem: Element;
 

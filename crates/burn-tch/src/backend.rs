@@ -4,7 +4,7 @@ use crate::IntoKind;
 
 use super::TchTensor;
 use super::element::TchElement;
-use burn_backend::backend::{Backend, BackendCore, DeviceId, DeviceOps, ExecutionError};
+use burn_backend::backend::{Backend, BackendTypes, DeviceId, DeviceOps, ExecutionError};
 use burn_backend::ops::IntTensorOps;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -106,7 +106,7 @@ pub struct LibTorch<E = f32> {
     _e: PhantomData<E>,
 }
 
-impl<E: TchElement> BackendCore for LibTorch<E> {
+impl<E: TchElement> BackendTypes for LibTorch<E> {
     type Device = LibTorchDevice;
 
     type FloatTensorPrimitive = TchTensor;

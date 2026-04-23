@@ -1,10 +1,10 @@
 use super::*;
 use burn_tensor::TensorData;
-use burn_tensor::backend::BackendCore;
+use burn_tensor::backend::BackendTypes;
 
 #[test]
 fn test_cartesian_grid() {
-    let device = <TestBackend as BackendCore>::Device::default();
+    let device = <TestBackend as BackendTypes>::Device::default();
 
     // Test a single element tensor
     let tensor: TestTensorInt<2> = TestTensorInt::<1>::cartesian_grid([1], &device);

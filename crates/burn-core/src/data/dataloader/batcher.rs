@@ -1,6 +1,6 @@
 use burn_tensor::backend::Backend;
 #[cfg(test)]
-use burn_tensor::backend::BackendCore;
+use burn_tensor::backend::BackendTypes;
 
 #[cfg(test)]
 use crate::TestBackend;
@@ -27,7 +27,7 @@ pub struct TestBatcher;
 
 #[cfg(test)]
 impl<I> Batcher<TestBackend, I, Vec<I>> for TestBatcher {
-    fn batch(&self, items: Vec<I>, _device: &<TestBackend as BackendCore>::Device) -> Vec<I> {
+    fn batch(&self, items: Vec<I>, _device: &<TestBackend as BackendTypes>::Device) -> Vec<I> {
         items
     }
 }

@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use burn_backend::{
-    BackTrace, Backend, BackendCore, DType, DTypeUsage, DeviceId, DeviceOps, ExecutionError,
+    BackTrace, Backend, BackendTypes, DType, DTypeUsage, DeviceId, DeviceOps, ExecutionError,
     QTensorPrimitive, tensor::Device,
 };
 use burn_std::{
@@ -192,7 +192,7 @@ impl burn_backend::Device for CandleDevice {
 }
 impl DeviceOps for CandleDevice {}
 
-impl<F: FloatCandleElement, I: IntCandleElement> BackendCore for Candle<F, I> {
+impl<F: FloatCandleElement, I: IntCandleElement> BackendTypes for Candle<F, I> {
     type Device = CandleDevice;
 
     type FloatTensorPrimitive = CandleTensor;

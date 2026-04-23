@@ -4,13 +4,13 @@ use super::repeat_dim::repeat_with_slice_assign;
 use super::sort::{argsort, sort, sort_with_indices};
 use crate::ops::GridSampleOptions;
 use crate::tensor::{BoolTensor, Device, Float, FloatTensor, IntTensor};
-use crate::{Backend, BackendCore, Distribution, TensorData, get_device_settings};
+use crate::{Backend, BackendTypes, Distribution, TensorData, get_device_settings};
 use crate::{ExecutionError, Scalar, TensorMetadata, TensorPrimitive};
 use alloc::vec::Vec;
 use burn_std::{BoolDType, FloatDType, IntDType, Shape, Slice};
 
 /// Operations on float tensors.
-pub trait FloatTensorOps<B: Backend + BackendCore> {
+pub trait FloatTensorOps<B: Backend + BackendTypes> {
     /// Creates a new tensor from the data structure.
     ///
     /// # Arguments

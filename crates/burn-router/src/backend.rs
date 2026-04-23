@@ -1,7 +1,7 @@
 use super::{RouterTensor, RunnerChannel, RunnerClient, get_client};
 use alloc::{format, string::String};
 use burn_backend::{
-    Backend, BackendCore, DType, ExecutionError, QTensorPrimitive, quantization::QuantScheme,
+    Backend, BackendTypes, DType, ExecutionError, QTensorPrimitive, quantization::QuantScheme,
 };
 use core::marker::PhantomData;
 
@@ -38,7 +38,7 @@ impl<R: RunnerClient> QTensorPrimitive for RouterTensor<R> {
         }
     }
 }
-impl<R: RunnerChannel> BackendCore for BackendRouter<R> {
+impl<R: RunnerChannel> BackendTypes for BackendRouter<R> {
     type Device = R::Device;
 
     type FloatTensorPrimitive = RouterTensor<R::Client>;

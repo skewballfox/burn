@@ -17,7 +17,7 @@ use crate::distributed::{DistributedParamId, DistributedParams};
 use super::DeviceOps;
 
 /// The mapping of types used by Backend and traits like Numeric, BasicOps
-pub trait BackendCore {
+pub trait BackendTypes {
     /// Device type.
     type Device: DeviceOps;
 
@@ -103,7 +103,7 @@ pub trait Backend:
     + Send
     + Sync
     + core::fmt::Debug
-    + BackendCore
+    + BackendTypes
     + 'static
 {
     /// If autodiff is enabled.

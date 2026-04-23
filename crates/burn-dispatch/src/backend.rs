@@ -3,7 +3,7 @@ use alloc::format;
 use alloc::string::String;
 
 use burn_backend::quantization::QuantScheme;
-use burn_backend::{Backend, BackendCore, DType, ExecutionError, QTensorPrimitive};
+use burn_backend::{Backend, BackendTypes, DType, ExecutionError, QTensorPrimitive};
 
 #[cfg(feature = "autodiff")]
 use burn_autodiff::grads::Gradients;
@@ -42,7 +42,7 @@ use crate::{DispatchDevice, DispatchTensor};
 /// ```
 #[derive(Debug, Default, Clone)]
 pub struct Dispatch;
-impl BackendCore for Dispatch {
+impl BackendTypes for Dispatch {
     type Device = DispatchDevice;
 
     type FloatTensorPrimitive = DispatchTensor;
@@ -535,43 +535,43 @@ impl Dispatch {
     /// Returns the default tensor quantization scheme for the device.
     // TODO: replace this + QTensorPrimitive trait method with better API.
     // This is temporary, for test purposes.
-    pub fn default_quant_scheme(device: &<Self as BackendCore>::Device) -> QuantScheme {
+    pub fn default_quant_scheme(device: &<Self as BackendTypes>::Device) -> QuantScheme {
         match device {
             #[cfg(feature = "cpu")]
             DispatchDevice::Cpu(_) => {
-                <<Cpu as BackendCore>::QuantizedTensorPrimitive as QTensorPrimitive>::default_scheme()
+                <<Cpu as BackendTypes>::QuantizedTensorPrimitive as QTensorPrimitive>::default_scheme()
             }
             #[cfg(feature = "cuda")]
             DispatchDevice::Cuda(_) => {
-                <<Cuda as BackendCore>::QuantizedTensorPrimitive as QTensorPrimitive>::default_scheme()
+                <<Cuda as BackendTypes>::QuantizedTensorPrimitive as QTensorPrimitive>::default_scheme()
             }
             #[cfg(wgpu_metal)]
             DispatchDevice::Metal(_) => {
-                <<Metal as BackendCore>::QuantizedTensorPrimitive as QTensorPrimitive>::default_scheme()
+                <<Metal as BackendTypes>::QuantizedTensorPrimitive as QTensorPrimitive>::default_scheme()
             }
             #[cfg(feature = "rocm")]
             DispatchDevice::Rocm(_) => {
-                <<Rocm as BackendCore>::QuantizedTensorPrimitive as QTensorPrimitive>::default_scheme()
+                <<Rocm as BackendTypes>::QuantizedTensorPrimitive as QTensorPrimitive>::default_scheme()
             }
             #[cfg(wgpu_vulkan)]
             DispatchDevice::Vulkan(_) => {
-                <<Vulkan as BackendCore>::QuantizedTensorPrimitive as QTensorPrimitive>::default_scheme()
+                <<Vulkan as BackendTypes>::QuantizedTensorPrimitive as QTensorPrimitive>::default_scheme()
             }
             #[cfg(wgpu_webgpu)]
             DispatchDevice::Wgpu(_) => {
-                <<Wgpu as BackendCore>::QuantizedTensorPrimitive as QTensorPrimitive>::default_scheme()
+                <<Wgpu as BackendTypes>::QuantizedTensorPrimitive as QTensorPrimitive>::default_scheme()
             }
             #[cfg(feature = "flex")]
             DispatchDevice::Flex(_) => {
-                <<Flex as BackendCore>::QuantizedTensorPrimitive as QTensorPrimitive>::default_scheme()
+                <<Flex as BackendTypes>::QuantizedTensorPrimitive as QTensorPrimitive>::default_scheme()
             }
             #[cfg(feature = "ndarray")]
             DispatchDevice::NdArray(_) => {
-                <<NdArray as BackendCore>::QuantizedTensorPrimitive as QTensorPrimitive>::default_scheme()
+                <<NdArray as BackendTypes>::QuantizedTensorPrimitive as QTensorPrimitive>::default_scheme()
             }
             #[cfg(feature = "tch")]
             DispatchDevice::LibTorch(_) => {
-                <<LibTorch as BackendCore>::QuantizedTensorPrimitive as QTensorPrimitive>::default_scheme()
+                <<LibTorch as BackendTypes>::QuantizedTensorPrimitive as QTensorPrimitive>::default_scheme()
             }
             #[cfg(feature = "autodiff")]
             DispatchDevice::Autodiff(ad_device) => Self::default_quant_scheme(&ad_device.inner),

@@ -7,7 +7,7 @@ use alloc::{format, string::String};
 use core::marker::PhantomData;
 
 use burn_backend::{
-    backend::{AutodiffBackend, Backend, BackendCore, ExecutionError},
+    backend::{AutodiffBackend, Backend, BackendTypes, ExecutionError},
     tensor::{BoolTensor, IntTensor, QuantizedTensor},
 };
 
@@ -24,7 +24,7 @@ pub struct Autodiff<B, C = NoCheckpointing> {
     _checkpoint_strategy: PhantomData<C>,
 }
 
-impl<B: Backend, C: CheckpointStrategy> BackendCore for Autodiff<B, C> {
+impl<B: Backend, C: CheckpointStrategy> BackendTypes for Autodiff<B, C> {
     type Device = B::Device;
 
     type FloatTensorPrimitive = AutodiffTensor<B>;

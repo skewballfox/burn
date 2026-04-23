@@ -1,7 +1,7 @@
 mod tests {
     use std::sync::mpsc::SyncSender;
 
-    use burn_backend::BackendCore;
+    use burn_backend::BackendTypes;
     use burn_std::rand::get_seeded_rng;
     use burn_tensor::{Tensor, TensorData, TensorPrimitive, Tolerance, backend::Backend};
 
@@ -67,7 +67,7 @@ mod tests {
             })
             .collect();
 
-        let device = <TestBackend as BackendCore>::Device::default();
+        let device = <TestBackend as BackendTypes>::Device::default();
 
         let mut expected_tensor = Tensor::<TestBackend, 1>::zeros(shape, &device);
         for item in input.iter().take(thread_count) {

@@ -1,7 +1,7 @@
 use alloc::string::String;
 use core::marker::PhantomData;
 
-use burn_backend::{Backend, BackendCore, DType, DTypeUsage, DTypeUsageSet, DeviceId, DeviceOps};
+use burn_backend::{Backend, BackendTypes, DType, DTypeUsage, DTypeUsageSet, DeviceId, DeviceOps};
 use burn_ir::{BackendIr, HandleKind, TensorHandle};
 use burn_std::device::Device;
 use burn_std::rand::{SeedableRng, StdRng};
@@ -99,7 +99,7 @@ pub struct Flex<E = f32, I = i32> {
     _e: PhantomData<E>,
     _i: PhantomData<I>,
 }
-impl BackendCore for Flex {
+impl BackendTypes for Flex {
     type Device = FlexDevice;
 
     type FloatTensorPrimitive = FlexTensor;
