@@ -8,6 +8,11 @@ use crate::{
     tensor::{IndexingUpdateOp, IntTensor, TensorKind},
 };
 
+/// Trait for the one basic op that still requires Backend
+///
+/// # Warnings
+///
+/// This is an internal trait, use the public API provided by the
 pub trait TransactionOp<B: Backend>: TensorKind<B> {
     /// Read the data from the tensor using a transaction.
     ///
