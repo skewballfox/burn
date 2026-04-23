@@ -16,6 +16,31 @@ use crate::distributed::{DistributedParamId, DistributedParams};
 
 use super::DeviceOps;
 
+
+
+
+pub trait BackendCore {
+    /// Device type.
+    type Device: DeviceOps;
+
+    /// Tensor primitive to be used for all float operations.
+    type FloatTensorPrimitive: TensorMetadata + 'static;
+    /// Default float element type.
+    type FloatElem: Element;
+
+    /// Tensor primitive to be used for all int operations.
+    type IntTensorPrimitive: TensorMetadata + 'static;
+    /// Int element type.
+    type IntElem: Element;
+
+    /// Tensor primitive to be used for all bool operations.
+    type BoolTensorPrimitive: TensorMetadata + 'static;
+    /// Tensor primitive to be used for all bool operations.
+    type BoolElem: Element;
+
+    /// Tensor primitive to be used for all quantized operations.
+    type QuantizedTensorPrimitive: TensorMetadata + QTensorPrimitive + 'static;
+}
 /// This trait defines all types and functions needed for a backend to be used with burn.
 ///
 /// ## Design
@@ -79,28 +104,10 @@ pub trait Backend:
     + Send
     + Sync
     + core::fmt::Debug
+    + BackendCore
     + 'static
 {
-    /// Device type.
-    type Device: DeviceOps;
-
-    /// Tensor primitive to be used for all float operations.
-    type FloatTensorPrimitive: TensorMetadata + 'static;
-    /// Default float element type.
-    type FloatElem: Element;
-
-    /// Tensor primitive to be used for all int operations.
-    type IntTensorPrimitive: TensorMetadata + 'static;
-    /// Int element type.
-    type IntElem: Element;
-
-    /// Tensor primitive to be used for all bool operations.
-    type BoolTensorPrimitive: TensorMetadata + 'static;
-    /// Tensor primitive to be used for all bool operations.
-    type BoolElem: Element;
-
-    /// Tensor primitive to be used for all quantized operations.
-    type QuantizedTensorPrimitive: TensorMetadata + QTensorPrimitive + 'static;
+    
 
     /// If autodiff is enabled.
     fn ad_enabled(_device: &Self::Device) -> bool {
