@@ -146,7 +146,7 @@ impl<H: Clone> HandleContainer<H> {
         B::bool_tensor(self.get_tensor_handle(tensor))
     }
 
-    /// Get the [quantized tensor](burn_backend::backend::Backend::QuantizedTensorPrimitive) corresponding to the
+    /// Get the [quantized tensor](burn_backend::backend::BackendCore::QuantizedTensorPrimitive) corresponding to the
     /// given [tensor intermediate representation](TensorIr).
     pub fn get_quantized_tensor<B>(&mut self, tensor: &TensorIr) -> B::QuantizedTensorPrimitive
     where
@@ -164,7 +164,7 @@ impl<H: Clone> HandleContainer<H> {
         self.handles.insert(*id, Handle::Existing(handle));
     }
 
-    /// Register a new [quantized tensor](burn_backend::backend::Backend::QuantizedTensorPrimitive) with the corresponding [tensor ids](TensorId).
+    /// Register a new [quantized tensor](burn_backend::backend::BackendCore::QuantizedTensorPrimitive) with the corresponding [tensor ids](TensorId).
     pub fn register_quantized_tensor<B>(
         &mut self,
         id: &TensorId,
