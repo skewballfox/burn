@@ -563,16 +563,16 @@ impl<E: ElementRandom> ElementRandom for Complex<E> {
     }
 }
 
-impl<E: ElementLimits> ElementLimits for Complex<E> {
-    const MIN: Self = Complex::<E> {
-        real: E::MIN,
-        imag: E::MIN,
-    };
-    const MAX: Self = Complex::<E> {
-        real: E::MAX,
-        imag: E::MAX,
-    };
-}
+// impl<E: ElementLimits> ElementLimits for Complex<E> {
+//     const MIN: Self = Complex::<E> {
+//         real: E::MIN,
+//         imag: E::MIN,
+//     };
+//     const MAX: Self = Complex::<E> {
+//         real: E::MAX,
+//         imag: E::MAX,
+//     };
+// }
 
 impl<E: ToElement> ToComplexElement for Complex<E> {
     #[inline]

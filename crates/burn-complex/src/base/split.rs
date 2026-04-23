@@ -1,7 +1,6 @@
 use crate::{
     base::{
-        ComplexDevice, ComplexTensor, ComplexTensorBackend, ComplexTensorOps, Layout, SplitLayout,
-        element::Complex,
+        ComplexDevice, ComplexTensor, ComplexTensorBackend, ComplexTensorOps, Layout, SplitLayout, SplitTensorData, element::Complex
     },
     utils::real_to_complex_dtype,
 };
@@ -258,10 +257,15 @@ where
 
     async fn complex_into_split_data(
         tensor: ComplexTensor<SplitBackend<B>>,
-    ) -> Result<(TensorData, TensorData), burn_tensor::backend::ExecutionError> {
+    ) -> Result<SplitTensorData, burn_tensor::backend::ExecutionError> {
         let real_data = B::float_into_data(tensor.real).await?;
         let imag_data = B::float_into_data(tensor.imag).await?;
-        Ok((real_data, imag_data))
+        Ok(SplitTensorData {
+            real_bytes: real_data.bytes,
+            imag_bytes: imag_data.bytes,
+            shape: real_data.shape,
+            dtype: real_data.dtype,
+        })
     }
 
     fn complex_device(tensor: &ComplexTensor<SplitBackend<B>>) -> ComplexDevice<SplitBackend<B>> {

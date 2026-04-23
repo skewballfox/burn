@@ -879,8 +879,8 @@ impl From<DType> for FuseType {
                     other => panic!("{other:?} doesn't support native packing"),
                 },
             },
-            DType::Complex64 => todo!(),
-            DType::Complex32 => todo!(),
+            DType::Complex64 => unimplemented!("Fusion support for complex numbers not yet implemented"),
+            DType::Complex32 => unimplemented!("Fusion support for complex numbers not yet implemented"),
         }
     }
 }

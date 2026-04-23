@@ -12,6 +12,7 @@ use burn_tensor::{
     get_device_settings,
     ops::{FloatTensorOps, IntTensorOps},
 };
+use serde::{Deserialize, Serialize};
 
 use crate::base::{element::ComplexElement, split::SplitComplexTensor};
 
@@ -122,29 +123,41 @@ pub struct InterleavedLayout<E> {
     _marker: core::marker::PhantomData<E>,
 }
 
-pub struct InterleavedTensorData {
-    /// The values of the tensor (as bytes).
-    pub bytes: Bytes,
-
-    /// The shape of the tensor.
-    pub shape: Vec<usize>,
-
-    /// The data type of the tensor.
-    pub dtype: DType,
-}
-
+/// Data structure for tensors.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SplitTensorData {
     /// The real values of the tensor (as bytes).
     pub real_bytes: Bytes,
 
     /// The imaginary values of the tensor (as bytes).
     pub imag_bytes: Bytes,
-
+    
+    #[serde(with = "shape_inner")]
     /// The shape of the tensor.
-    pub shape: Vec<usize>,
+    pub shape: Shape,
 
     /// The data type of the tensor.
     pub dtype: DType,
+}
+
+mod shape_inner {
+    use burn_std::SmallVec;
+
+    use super::*;
+
+    pub fn serialize<S: serde::Serializer>(
+        shape: &Shape,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        shape.as_slice().serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Shape, D::Error> {
+        let dims = SmallVec::<[usize; _]>::deserialize(deserializer)?;
+        Ok(Shape::new_raw(dims))
+    }
 }
 
 impl<T: TensorMetadata + 'static> Layout for InterleavedLayout<T> {
@@ -153,6 +166,7 @@ impl<T: TensorMetadata + 'static> Layout for InterleavedLayout<T> {
 
 // The evolution of Laziness
 pub trait DefaultComplexOps<B: ComplexTensorBackend> {
+    type OutTensorData;
     fn ones(shape: Shape, device: &ComplexDevice<B>) -> ComplexTensor<B>;
     fn zeros(shape: Shape, device: &ComplexDevice<B>) -> ComplexTensor<B>;
     fn full(
@@ -162,7 +176,7 @@ pub trait DefaultComplexOps<B: ComplexTensorBackend> {
     ) -> ComplexTensor<B>;
     fn complex_into_data(
         tensor: ComplexTensor<B>,
-    ) -> impl Future<Output = Result<TensorData, ExecutionError>> + Send;
+    ) -> impl Future<Output = Result<Self::OutTensorData, ExecutionError>> + Send;
 }
 
 impl<T, B> DefaultComplexOps<B> for InterleavedLayout<T>
@@ -171,6 +185,8 @@ where
     B: ComplexTensorBackend<Layout = InterleavedLayout<T>>,
     ComplexElem<B>: Element,
 {
+    type OutTensorData = TensorData;
+
     fn ones(shape: Shape, device: &ComplexDevice<B>) -> ComplexTensor<B> {
         B::complex_from_real_data(TensorData::ones::<ComplexElem<B>, _>(shape), device)
     }
@@ -187,7 +203,7 @@ where
         B::complex_from_real_data(TensorData::full(shape, fill_value), device)
     }
 
-    async fn complex_into_data(tensor: ComplexTensor<B>) -> Result<TensorData, ExecutionError> {
+    async fn complex_into_data(tensor: ComplexTensor<B>) -> Result<Self::OutTensorData, ExecutionError> {
         B::complex_into_interleaved_data(tensor).await
     }
 }
@@ -203,6 +219,7 @@ where
     <B::InnerBackend as Backend>::FloatElem: Element,
     ComplexElem<B>: ComplexElement,
 {
+    type OutTensorData = SplitTensorData;
     fn zeros(shape: Shape, device: &ComplexDevice<B>) -> ComplexTensor<B> {
         let real = B::InnerBackend::float_from_data(
             TensorData::zeros::<<B::InnerBackend as Backend>::FloatElem, _>(&shape),
@@ -249,11 +266,11 @@ where
         }
     }
 
-    async fn complex_into_data(tensor: ComplexTensor<B>) -> Result<TensorData, ExecutionError> {
-        B::complex_into_interleaved_data(tensor).await
+    async fn complex_into_data(tensor: ComplexTensor<B>) -> Result<Self::OutTensorData, ExecutionError> {
+        B::complex_into_split_data(tensor).await
     }
 }
-
+type OutTensorData<B> = <<B as ComplexTensorBackend>::Layout as DefaultComplexOps<B>>::OutTensorData;
 /// Operations on complex tensors.
 pub trait ComplexTensorOps<B: ComplexTensorBackend> {
     /// Converts the tensor's real component to a data structure.
@@ -306,7 +323,7 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
     /// A tuple of data structures containing the real and imaginary parts of the tensor's data.
     fn complex_into_split_data(
         tensor: ComplexTensor<B>,
-    ) -> impl Future<Output = Result<(TensorData, TensorData), ExecutionError>> + Send;
+    ) -> impl Future<Output = Result<SplitTensorData, ExecutionError>> + Send;
 
     /// Converts a real float tensor to a complex tensor with zero imaginary part.
     ///
@@ -447,7 +464,7 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
     /// The data structure with the tensor's data.
     fn complex_into_data(
         tensor: ComplexTensor<B>,
-    ) -> impl Future<Output = Result<TensorData, ExecutionError>> + Send {
+    ) -> impl Future<Output = Result<OutTensorData<B>, ExecutionError>> + Send {
         <<B as ComplexTensorBackend>::Layout as DefaultComplexOps<B>>::complex_into_data(tensor)
     }
 
@@ -1311,7 +1328,7 @@ where
         C::complex_to_device(tensor, device)
     }
 
-    async fn into_data_async(tensor: Self::Primitive) -> Result<TensorData, ExecutionError> {
+    async fn into_data_async(tensor: Self::Primitive) -> Result<OutTensorData<C>, ExecutionError> {
         C::complex_into_data(tensor).await
     }
 

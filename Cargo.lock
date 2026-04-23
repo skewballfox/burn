@@ -816,6 +816,7 @@ dependencies = [
  "num-traits",
  "paste",
  "rand 0.10.1",
+ "serde",
  "tch",
 ]
 

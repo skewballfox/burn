@@ -41,6 +41,7 @@ rand = { workspace = true, default-features = false }
 num-traits = { workspace = true }
 num-complex = { version = "0.4.6", default-features = false}
 paste = { workspace = true }
+serde = { workspace = true }
 
 [dev-dependencies]
 burn-backend-tests = { path = "../burn-backend-tests", version = "=0.21.0-pre.3", default-features = false, features = [
