@@ -171,7 +171,7 @@ impl<B: Backend, SB: SliceAccess<B>, AB: SliceAccess<B>> TransitionBuffer<B, SB,
 
 #[cfg(test)]
 mod tests {
-    use burn_core::tensor::backend::BackendTypes;
+    use burn_core::tensor::Device;
 
     use super::*;
     use crate::TestBackend;
@@ -180,7 +180,7 @@ mod tests {
 
     fn push_transition(
         buffer: &mut TransitionBuffer<TestBackend, TB, TB>,
-        device: &<TestBackend as BackendTypes>::Device,
+        device: &Device<TestBackend>,
         val: f32,
     ) {
         let state = Tensor::<TestBackend, 2>::from_data([[val, val]], device);

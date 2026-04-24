@@ -60,13 +60,12 @@ mod tests {
     use super::*;
     use crate::TestBackend;
     use burn::tensor::TensorData;
-    use burn::tensor::backend::BackendTypes;
     use burn::tensor::{Tolerance, ops::FloatElem};
     type FT = FloatElem<TestBackend>;
 
     #[test]
     fn test_elu_forward() {
-        let device = <TestBackend as BackendTypes>::Device::default();
+        let device = Default::default();
         let model: Elu = EluConfig::new().init();
         let input =
             Tensor::<TestBackend, 2>::from_data(TensorData::from([[0.4410, -0.2507]]), &device);

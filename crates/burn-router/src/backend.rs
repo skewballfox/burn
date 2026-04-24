@@ -38,6 +38,7 @@ impl<R: RunnerClient> QTensorPrimitive for RouterTensor<R> {
         }
     }
 }
+
 impl<R: RunnerChannel> BackendTypes for BackendRouter<R> {
     type Device = R::Device;
 
@@ -55,6 +56,7 @@ impl<R: RunnerChannel> BackendTypes for BackendRouter<R> {
 
     type QuantizedTensorPrimitive = RouterTensor<R::Client>;
 }
+
 impl<R: RunnerChannel> Backend for BackendRouter<R> {
     fn name(device: &Self::Device) -> String {
         format!("router<{}>", R::name(device))

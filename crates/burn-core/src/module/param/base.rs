@@ -484,10 +484,7 @@ impl<T: Parameter> Deref for Param<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use burn_tensor::{
-        Tensor,
-        backend::{Backend, BackendTypes},
-    };
+    use burn_tensor::{Tensor, backend::Backend};
 
     // Param<T> should be Sync so that models can be shared across threads
     // (e.g. parallel inference with rayon).
@@ -512,7 +509,7 @@ mod tests {
         use alloc::vec::Vec;
 
         type B = burn_flex::Flex;
-        let device = <B as BackendTypes>::Device::default();
+        let device = Default::default();
 
         let param: Param<Tensor<B, 2>> = Param::uninitialized(
             ParamId::new(),

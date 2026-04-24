@@ -6,10 +6,10 @@ use crate::graph::NodeId;
 use crate::ops::{Backward, Ops, unary};
 use crate::tensor::AutodiffTensor;
 
+use burn_backend::Backend;
 use burn_backend::ops::attention::attention_fallback;
 use burn_backend::ops::*;
 use burn_backend::tensor::{FloatTensor, IntTensor};
-use burn_backend::{Backend, BackendTypes};
 
 use super::OpsKind;
 
@@ -1681,7 +1681,7 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
     fn adaptive_avg_pool2d_backward(
         _x: AutodiffTensor<B>,
         _grad: AutodiffTensor<B>,
-    ) -> <Autodiff<B> as BackendTypes>::FloatTensorPrimitive {
+    ) -> AutodiffTensor<B> {
         panic!("Can't differentiate adaptive avg pool2d backward.");
     }
 
@@ -1735,7 +1735,7 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
         _grad: FloatTensor<Autodiff<B, C>>,
         _output_size: [usize; 2],
         _options: InterpolateOptions,
-    ) -> <Autodiff<B> as BackendTypes>::FloatTensorPrimitive {
+    ) -> AutodiffTensor<B> {
         panic!("Can't differentiate interpolate backward.");
     }
 

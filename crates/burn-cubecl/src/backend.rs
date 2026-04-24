@@ -22,6 +22,7 @@ pub struct CubeBackend<R: CubeRuntime, F: FloatElement, I: IntElement, BT: BoolE
     _int_elem: PhantomData<I>,
     _bool_elem: PhantomData<BT>,
 }
+
 impl<R, F, I, BT> BackendTypes for CubeBackend<R, F, I, BT>
 where
     R: CubeRuntime,
@@ -42,6 +43,7 @@ where
     type BoolTensorPrimitive = CubeTensor<R>;
     type QuantizedTensorPrimitive = CubeTensor<R>;
 }
+
 impl<R, F, I, BT> Backend for CubeBackend<R, F, I, BT>
 where
     R: CubeRuntime,

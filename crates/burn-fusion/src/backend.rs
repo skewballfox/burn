@@ -21,6 +21,7 @@ pub fn get_client<B: FusionBackend>(device: &Device<B>) -> Client<B::FusionRunti
 pub struct Fusion<B: FusionBackend> {
     _backend: PhantomData<B>,
 }
+
 impl<B: FusionBackend> BackendTypes for Fusion<B> {
     type Device = B::Device;
 
@@ -38,6 +39,7 @@ impl<B: FusionBackend> BackendTypes for Fusion<B> {
 
     type QuantizedTensorPrimitive = FusionTensor<B::FusionRuntime>;
 }
+
 impl<B: FusionBackend> Backend for Fusion<B> {
     fn name(device: &Self::Device) -> String {
         format!("fusion<{}>", B::name(device))

@@ -34,6 +34,7 @@ pub fn split_dataloader<B: Backend, O>(
 
 #[cfg(test)]
 mod tests {
+    use burn_tensor::Device;
     use std::collections::HashSet;
 
     use super::*;
@@ -41,11 +42,10 @@ mod tests {
     use crate::data::dataloader::batcher::Batcher;
     use crate::data::dataloader::{BatchDataLoader, FixBatchStrategy};
     use crate::data::dataset::FakeDataset;
-    use burn_tensor::backend::BackendTypes;
 
     #[test]
     fn test_split_batch_dataloader() {
-        type TestDevice = <TestBackend as BackendTypes>::Device;
+        type TestDevice = Device<TestBackend>;
 
         #[derive(new, Clone)]
         pub struct TestBatcher;

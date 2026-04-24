@@ -2,7 +2,7 @@ use super::{
     argwhere::argwhere_data, cat::cat_with_slice_assign, repeat_dim::repeat_with_slice_assign,
 };
 use crate::tensor::{Bool, BoolTensor, Device, FloatTensor, IntTensor};
-use crate::{Backend, BackendTypes, TensorData, TensorMetadata, get_device_settings};
+use crate::{Backend, TensorData, TensorMetadata, get_device_settings};
 use crate::{ExecutionError, Scalar};
 use alloc::vec::Vec;
 use burn_std::{BoolDType, FloatDType, IntDType, Shape, Slice};
@@ -12,7 +12,7 @@ use core::future::Future;
 #[cfg_attr(doc, doc = crate::doc_tensor!())]
 #[cfg_attr(not(doc), doc = "`Tensor`")]
 /// for documentation on each function.
-pub trait BoolTensorOps<B: BackendTypes + Backend> {
+pub trait BoolTensorOps<B: Backend> {
     /// Creates a new bool tensor.
     ///
     /// # Arguments

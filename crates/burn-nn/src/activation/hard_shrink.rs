@@ -67,11 +67,10 @@ mod tests {
     use super::*;
     use crate::TestBackend;
     use burn::tensor::TensorData;
-    use burn::tensor::backend::BackendTypes;
 
     #[test]
     fn test_hard_shrink_forward() {
-        let device = <TestBackend as BackendTypes>::Device::default();
+        let device = Default::default();
         let model: HardShrink = HardShrinkConfig::new().init();
         let input =
             Tensor::<TestBackend, 2>::from_data([[0.5, -0.5, -1.0], [8.0, 0.3, 0.0]], &device);
@@ -82,7 +81,7 @@ mod tests {
 
     #[test]
     fn test_hard_shrink_with_lambda() {
-        let device = <TestBackend as BackendTypes>::Device::default();
+        let device = Default::default();
         let model: HardShrink = HardShrinkConfig::new().with_lambda(0.2).init();
         let input =
             Tensor::<TestBackend, 2>::from_data([[0.1, -0.1, -0.3], [0.5, 0.1, 0.0]], &device);

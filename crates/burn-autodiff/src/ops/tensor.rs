@@ -20,7 +20,7 @@ use crate::{
 };
 
 use burn_backend::{
-    Backend, BackendTypes, ExecutionError, TensorData, TensorMetadata, get_device_settings,
+    Backend, ExecutionError, TensorData, TensorMetadata, get_device_settings,
     ops::FloatTensorOps,
     tensor::{BoolTensor, Device, FloatTensor, IntTensor},
 };
@@ -3098,10 +3098,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
         }
     }
 
-    fn float_into_int(
-        tensor: FloatTensor<Self>,
-        out_dtype: IntDType,
-    ) -> <Autodiff<B> as BackendTypes>::IntTensorPrimitive {
+    fn float_into_int(tensor: FloatTensor<Self>, out_dtype: IntDType) -> IntTensor<B> {
         B::float_into_int(tensor.primitive, out_dtype)
     }
 

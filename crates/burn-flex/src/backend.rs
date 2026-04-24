@@ -99,6 +99,7 @@ pub struct Flex<E = f32, I = i32> {
     _e: PhantomData<E>,
     _i: PhantomData<I>,
 }
+
 impl BackendTypes for Flex {
     type Device = FlexDevice;
 
@@ -120,6 +121,7 @@ impl BackendTypes for Flex {
 
     type QuantizedTensorPrimitive = FlexQTensor;
 }
+
 impl Backend for Flex {
     fn name(_device: &Self::Device) -> String {
         "flex".into()

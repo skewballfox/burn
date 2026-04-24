@@ -90,7 +90,8 @@ pub trait BackendTypes {
 /// struct in the `burn-tensor` crate.
 /// For modules, public functions are often created, which can be used by `burn-core` modules.
 pub trait Backend:
-    FloatTensorOps<Self>
+    BackendTypes
+    + FloatTensorOps<Self>
     + BoolTensorOps<Self>
     + IntTensorOps<Self>
     + ModuleOps<Self>
@@ -103,7 +104,6 @@ pub trait Backend:
     + Send
     + Sync
     + core::fmt::Debug
-    + BackendTypes
     + 'static
 {
     /// If autodiff is enabled.
