@@ -7,6 +7,7 @@ use burn::{
         dataset::{transform::Mapper, vision::MnistItem},
     },
     prelude::*,
+    tensor::ops::IntElem,
     vision::Transform2D,
 };
 use rand::RngExt;
