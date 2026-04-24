@@ -13,6 +13,8 @@ use crate::{
 /// # Warnings
 ///
 /// This is an internal trait, use the public API provided by the
+#[cfg_attr(doc, doc = crate::doc_tensor!())]
+#[cfg_attr(not(doc), doc = "`Tensor`")]
 pub trait TransactionOp<B: Backend>: TensorKind<B> {
     /// Read the data from the tensor using a transaction.
     ///
