@@ -41,9 +41,6 @@ pub trait ToComplex<C> {
 }
 
 
-
-pub trait ToComplexElement: ToElement {}
-
 /// Trait to access the real and imaginary parts of a complex element
 pub trait ComplexElement: Element {
     /// The inner type of the complex number (e.g. f32 for Complex<f32>)
@@ -581,8 +578,6 @@ impl<E: ElementRandom> ElementRandom for Complex<E> {
     }
 }
 
-impl<E: ToElement> ToComplexElement for Complex<E> {}
-
 impl<E: ElementEq> ElementEq for Complex<E> {
     fn eq(&self, other: &Self) -> bool {
         self.real.eq(&other.real) && self.imag.eq(&other.imag)
@@ -590,29 +585,6 @@ impl<E: ElementEq> ElementEq for Complex<E> {
 }
 
 
-
-
-// impl Complex<f32>{
-//     /// Create Complex<f32> from any element
-//     #[inline]
-//     pub fn from_elem<E:ToElement>(el:E) -> Self {
-//         match E::dtype() { 
-            
-//          }
-//         Self {
-//             real:el.to_f32(),imag:f32::ZERO
-//         }
-//     }
-// }
-
-// impl Complex<f64> {    
-//     #[inline]
-//     pub fn from_elem<E:ToElement>(real:E) -> Self {
-//         Self {
-//             real:real.to_f64(),imag: f64::ZERO
-//         }
-//     }
-// }
 
 
 

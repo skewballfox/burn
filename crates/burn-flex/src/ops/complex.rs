@@ -1,6 +1,7 @@
 use burn_backend::{Complex, Distribution};
 use burn_backend::{Element, TensorData};
 use burn_complex::base::SplitTensorData;
+use burn_complex::utils::interleaved_data_to_imag_data;
 use burn_complex::{
     base::{
         ComplexDevice, ComplexTensor, ComplexTensorBackend, ComplexTensorOps, InterleavedLayout,
@@ -39,7 +40,7 @@ impl ComplexTensorBackend for Flex {
     ) -> ComplexTensor<Self> {
         let interleaved_data = interleaved_data_from_real_data(data);
 
-        FlexTensor::from_data(interleaved_data).into()
+        FlexTensor::from_data(interleaved_data)
     }
 
     fn complex_from_imag_data(
@@ -48,14 +49,14 @@ impl ComplexTensorBackend for Flex {
     ) -> ComplexTensor<Self> {
         let interleaved_data = interleaved_data_from_imag_data(data);
 
-        FlexTensor::from_data(interleaved_data).into()
+        FlexTensor::from_data(interleaved_data)
     }
 
     fn complex_from_interleaved_data(
         data: TensorData,
         _device: &Self::Device,
     ) -> ComplexTensor<Self> {
-        FlexTensor::from_data(data).into()
+        FlexTensor::from_data(data)
     }
 
     fn complex_from_parts_data(
@@ -64,7 +65,7 @@ impl ComplexTensorBackend for Flex {
         _device: &Self::Device,
     ) -> ComplexTensor<Self> {
         let interleaved_data = interleave_from_split_data(real_data, imag_data);
-        FlexTensor::from_data(interleaved_data).into()
+        FlexTensor::from_data(interleaved_data)
     }
 }
 
@@ -78,7 +79,7 @@ impl ComplexTensorOps<Flex> for Flex {
     async fn complex_into_imag_data(
         tensor: ComplexTensor<Flex>,
     ) -> Result<TensorData, burn_backend::ExecutionError> {
-        Ok(interleaved_data_to_real_data(tensor.into_data()))
+        Ok(interleaved_data_to_imag_data(tensor.into_data()))
     }
 
     async fn complex_into_interleaved_data(
@@ -95,7 +96,7 @@ impl ComplexTensorOps<Flex> for Flex {
 
     fn to_complex(tensor: burn_complex::base::FloatTensor<Flex>) -> ComplexTensor<Flex> {
         let interleaved_data = interleaved_data_from_real_data(tensor.into_data());
-        FlexTensor::from_data(interleaved_data).into()
+        FlexTensor::from_data(interleaved_data)
     }
 
     fn complex_squared_norm(tensor: ComplexTensor<Flex>) -> burn_complex::base::FloatTensor<Flex> {
@@ -650,9 +651,7 @@ impl ComplexTensorOps<Flex> for Flex {
                 let rhs = if rhs.dtype() == DType::F32 {
                     rhs
                 } else {
-                    //let shape = rhs.layout().shape().clone();
-                    //make_tensor(rhs.storage().into_iter().map(|x| f32::from(*x)).collect::<Vec<f32>>(),shape, DType::F32)
-                    todo!("workout how to convert rhs to f32 tensor if it's not already")
+                    FlexTensor::from_data(rhs.into_data().convert_dtype(DType::F32))
                 };
                 binary_op_typed_rhs::<Complex<f32>, f32, _>(lhs, &rhs, |a, b| a.powf(b))
             }
@@ -660,9 +659,7 @@ impl ComplexTensorOps<Flex> for Flex {
                 let rhs = if rhs.dtype() == DType::F64 {
                     rhs
                 } else {
-                    // let shape = rhs.layout().shape().clone();
-                    // make_tensor(rhs.storage().iter().map(|x| f64::from(*x)).collect::<Vec<f64>>(),shape, DType::F64)
-                    todo!("workout how to convert rhs to f64 tensor if it's not already")
+                    FlexTensor::from_data(rhs.into_data().convert_dtype(DType::F64))
                 };
                 binary_op_typed_rhs::<Complex<f64>, f64, _>(lhs, &rhs, |a, b| a.powf(b))
             }
