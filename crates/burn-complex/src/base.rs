@@ -7,8 +7,8 @@ definitions in one spot.
 */
 use burn_tensor::{
     BasicOps, Bytes, DType, Device, Distribution, Element, FloatDType, IndexingUpdateOp, Numeric,
-    Scalar, Shape, Slice, TensorData, TensorKind, TensorMetadata, TransactionPrimitive,
-    backend::{Backend, ExecutionError},
+    Scalar, Shape, Slice, TensorData, TensorKind, TensorMetadata,
+    backend::{Backend, BackendTypes, ExecutionError},
     get_device_settings,
     ops::{FloatTensorOps, IntTensorOps},
 };
@@ -29,16 +29,25 @@ pub type ComplexElem<B> = <B as ComplexTensorBackend>::ComplexScalar;
 
 /// Complex tensor primitive type used by the backend.
 pub type ComplexTensor<B> = <<B as ComplexTensorBackend>::Layout as Layout>::ComplexTensorPrimitive;
-pub type ComplexDevice<B> = <<B as ComplexTensorBackend>::InnerBackend as Backend>::Device;
-pub type FloatTensor<B> =
-    <<B as ComplexTensorBackend>::InnerBackend as Backend>::FloatTensorPrimitive;
-pub type IntTensor<B> = <<B as ComplexTensorBackend>::InnerBackend as Backend>::IntTensorPrimitive;
-pub type BoolTensor<B> =
-    <<B as ComplexTensorBackend>::InnerBackend as Backend>::BoolTensorPrimitive;
+pub type ComplexDevice<B> = <B as BackendTypes>::Device;
+pub type FloatTensor<B> = <B as BackendTypes>::FloatTensorPrimitive;
+pub type IntTensor<B> = <B as BackendTypes>::IntTensorPrimitive;
+pub type BoolTensor<B> = <B as BackendTypes>::BoolTensorPrimitive;
 
-pub trait ComplexTensorBackend: ComplexTensorOps<Self> + Sized {
+pub trait ComplexTensorBackend: ComplexTensorOps<Self> + Sized + BackendTypes {
     /// The inner backend type.
-    type InnerBackend: Backend;
+    ///
+    /// Must share all primitive types and device with `Self` so that operations
+    /// can delegate directly without any type-level conversion.
+    type InnerBackend: Backend<
+            Device = Self::Device,
+            FloatTensorPrimitive = Self::FloatTensorPrimitive,
+            FloatElem = Self::FloatElem,
+            IntTensorPrimitive = Self::IntTensorPrimitive,
+            IntElem = Self::IntElem,
+            BoolTensorPrimitive = Self::BoolTensorPrimitive,
+            BoolElem = Self::BoolElem,
+        >;
 
     ///// Tensor primitive to be used for all complex operations.
     //type ComplexTensorPrimitive: TensorMetadata + 'static;
@@ -91,7 +100,7 @@ pub trait ComplexTensorBackend: ComplexTensorOps<Self> + Sized {
     /// The tensor with the given data.
     fn complex_from_interleaved_data(
         data: TensorData,
-        device: &<Self::InnerBackend as Backend>::Device,
+        device: &<Self as BackendTypes>::Device,
     ) -> ComplexTensor<Self>;
 
     /// Creates a new complex tensor from the data structure.
@@ -104,12 +113,13 @@ pub trait ComplexTensorBackend: ComplexTensorOps<Self> + Sized {
     /// # Returns
     ///
     /// The tensor with the given data.
-    fn complex_from_split_data(
+    fn complex_from_parts_data(
         real_data: TensorData,
         imag_data: TensorData,
-        device: &<Self::InnerBackend as Backend>::Device,
+        device: &Self::Device,
     ) -> ComplexTensor<Self>;
 }
+
 //Note: changing to adopt terminology used in fftw doc
 
 /// Indicates that the underlying implementation has separate real and imaginary tensors.
@@ -131,7 +141,7 @@ pub struct SplitTensorData {
 
     /// The imaginary values of the tensor (as bytes).
     pub imag_bytes: Bytes,
-    
+
     #[serde(with = "shape_inner")]
     /// The shape of the tensor.
     pub shape: Shape,
@@ -167,13 +177,9 @@ impl<T: TensorMetadata + 'static> Layout for InterleavedLayout<T> {
 // The evolution of Laziness
 pub trait DefaultComplexOps<B: ComplexTensorBackend> {
     type OutTensorData;
-    fn ones(shape: Shape, device: &ComplexDevice<B>) -> ComplexTensor<B>;
-    fn zeros(shape: Shape, device: &ComplexDevice<B>) -> ComplexTensor<B>;
-    fn full(
-        shape: Shape,
-        fill_value: ComplexElem<B>,
-        device: &ComplexDevice<B>,
-    ) -> ComplexTensor<B>;
+    fn ones(shape: Shape, device: &Device<B>) -> ComplexTensor<B>;
+    fn zeros(shape: Shape, device: &Device<B>) -> ComplexTensor<B>;
+    fn full(shape: Shape, fill_value: ComplexElem<B>, device: &Device<B>) -> ComplexTensor<B>;
     fn complex_into_data(
         tensor: ComplexTensor<B>,
     ) -> impl Future<Output = Result<Self::OutTensorData, ExecutionError>> + Send;
@@ -187,23 +193,21 @@ where
 {
     type OutTensorData = TensorData;
 
-    fn ones(shape: Shape, device: &ComplexDevice<B>) -> ComplexTensor<B> {
+    fn ones(shape: Shape, device: &Device<B>) -> ComplexTensor<B> {
         B::complex_from_real_data(TensorData::ones::<ComplexElem<B>, _>(shape), device)
     }
 
-    fn zeros(shape: Shape, device: &ComplexDevice<B>) -> ComplexTensor<B> {
+    fn zeros(shape: Shape, device: &Device<B>) -> ComplexTensor<B> {
         B::complex_from_real_data(TensorData::zeros::<ComplexElem<B>, _>(shape), device)
     }
 
-    fn full(
-        shape: Shape,
-        fill_value: ComplexElem<B>,
-        device: &ComplexDevice<B>,
-    ) -> ComplexTensor<B> {
+    fn full(shape: Shape, fill_value: ComplexElem<B>, device: &Device<B>) -> ComplexTensor<B> {
         B::complex_from_real_data(TensorData::full(shape, fill_value), device)
     }
 
-    async fn complex_into_data(tensor: ComplexTensor<B>) -> Result<Self::OutTensorData, ExecutionError> {
+    async fn complex_into_data(
+        tensor: ComplexTensor<B>,
+    ) -> Result<Self::OutTensorData, ExecutionError> {
         B::complex_into_interleaved_data(tensor).await
     }
 }
@@ -216,17 +220,17 @@ where
     // T is the float primitive produced by InnerBackend
     T: From<FloatTensor<B>>,
     FloatTensor<B>: Into<T>,
-    <B::InnerBackend as Backend>::FloatElem: Element,
+    <B::InnerBackend as BackendTypes>::FloatElem: Element,
     ComplexElem<B>: ComplexElement,
 {
     type OutTensorData = SplitTensorData;
-    fn zeros(shape: Shape, device: &ComplexDevice<B>) -> ComplexTensor<B> {
+    fn zeros(shape: Shape, device: &Device<B>) -> ComplexTensor<B> {
         let real = B::InnerBackend::float_from_data(
-            TensorData::zeros::<<B::InnerBackend as Backend>::FloatElem, _>(&shape),
+            TensorData::zeros::<<B::InnerBackend as BackendTypes>::FloatElem, _>(&shape),
             device,
         );
         let imag = B::InnerBackend::float_from_data(
-            TensorData::zeros::<<B::InnerBackend as Backend>::FloatElem, _>(shape),
+            TensorData::zeros::<<B::InnerBackend as BackendTypes>::FloatElem, _>(shape),
             device,
         );
         // ComplexTensor<B> = Complex<T> via SplitLayout
@@ -236,13 +240,13 @@ where
         }
     }
 
-    fn ones(shape: Shape, device: &ComplexDevice<B>) -> ComplexTensor<B> {
+    fn ones(shape: Shape, device: &Device<B>) -> ComplexTensor<B> {
         let real = B::InnerBackend::float_from_data(
-            TensorData::ones::<<B::InnerBackend as Backend>::FloatElem, _>(&shape),
+            TensorData::ones::<<B::InnerBackend as BackendTypes>::FloatElem, _>(&shape),
             device,
         );
         let imag = B::InnerBackend::float_from_data(
-            TensorData::ones::<<B::InnerBackend as Backend>::FloatElem, _>(shape),
+            TensorData::ones::<<B::InnerBackend as BackendTypes>::FloatElem, _>(shape),
             device,
         );
         SplitComplexTensor {
@@ -251,11 +255,7 @@ where
         }
     }
 
-    fn full(
-        shape: Shape,
-        fill_value: ComplexElem<B>,
-        device: &ComplexDevice<B>,
-    ) -> ComplexTensor<B> {
+    fn full(shape: Shape, fill_value: ComplexElem<B>, device: &Device<B>) -> ComplexTensor<B> {
         let real =
             B::InnerBackend::float_from_data(TensorData::full(&shape, fill_value.real()), device);
         let imag =
@@ -266,11 +266,14 @@ where
         }
     }
 
-    async fn complex_into_data(tensor: ComplexTensor<B>) -> Result<Self::OutTensorData, ExecutionError> {
+    async fn complex_into_data(
+        tensor: ComplexTensor<B>,
+    ) -> Result<Self::OutTensorData, ExecutionError> {
         B::complex_into_split_data(tensor).await
     }
 }
-type OutTensorData<B> = <<B as ComplexTensorBackend>::Layout as DefaultComplexOps<B>>::OutTensorData;
+type OutTensorData<B> =
+    <<B as ComplexTensorBackend>::Layout as DefaultComplexOps<B>>::OutTensorData;
 /// Operations on complex tensors.
 pub trait ComplexTensorOps<B: ComplexTensorBackend> {
     /// Converts the tensor's real component to a data structure.
@@ -364,7 +367,7 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
     fn complex_random(
         shape: Shape,
         distribution: Distribution,
-        device: &ComplexDevice<B>,
+        device: &Device<B>,
         dtype: FloatDType,
     ) -> ComplexTensor<B>;
 
@@ -378,7 +381,7 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
     /// # Returns
     ///
     /// The tensor with the given shape and zeros.
-    fn complex_zeros(shape: Shape, device: &ComplexDevice<B>) -> ComplexTensor<B> {
+    fn complex_zeros(shape: Shape, device: &Device<B>) -> ComplexTensor<B> {
         <<B as ComplexTensorBackend>::Layout as DefaultComplexOps<B>>::zeros(shape, device)
     }
 
@@ -392,7 +395,7 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
     /// # Returns
     ///
     /// The tensor with the given shape and ones.
-    fn complex_ones(shape: Shape, device: &ComplexDevice<B>) -> ComplexTensor<B> {
+    fn complex_ones(shape: Shape, device: &Device<B>) -> ComplexTensor<B> {
         <<B as ComplexTensorBackend>::Layout as DefaultComplexOps<B>>::ones(shape, device)
     }
 
@@ -410,7 +413,7 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
     fn complex_full(
         shape: Shape,
         fill_value: ComplexElem<B>,
-        device: &ComplexDevice<B>,
+        device: &Device<B>,
     ) -> ComplexTensor<B> {
         <<B as ComplexTensorBackend>::Layout as DefaultComplexOps<B>>::full(
             shape, fill_value, device,
@@ -439,7 +442,7 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
     /// # Returns
     ///
     /// The device of the tensor.
-    fn complex_device(tensor: &ComplexTensor<B>) -> ComplexDevice<B>;
+    fn complex_device(tensor: &ComplexTensor<B>) -> Device<B>;
 
     /// Moves the tensor to the given device.
     ///
@@ -1287,20 +1290,12 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
 pub struct ComplexKind;
 
 #[allow(unused_variables)]
-impl<C: ComplexTensorBackend<InnerBackend = C> + Backend> BasicOps<C> for ComplexKind
-where
-    C:,
-{
+impl<C: ComplexTensorBackend> BasicOps<C> for ComplexKind {
     type Elem = C::ComplexScalar;
 
     fn empty(shape: Shape, device: &C::Device, dtype: DType) -> Self::Primitive {
         // should I check then pass the dtype?
         C::complex_zeros(shape, device)
-    }
-
-    fn register_transaction(tr: &mut TransactionPrimitive<C>, tensor: Self::Primitive) {
-        // Complex tensors don't support transactions yet
-        // TODO: Implement complex tensor transaction support
     }
 
     fn reshape(tensor: Self::Primitive, shape: Shape) -> Self::Primitive {
@@ -1328,8 +1323,8 @@ where
         C::complex_to_device(tensor, device)
     }
 
-    async fn into_data_async(tensor: Self::Primitive) -> Result<OutTensorData<C>, ExecutionError> {
-        C::complex_into_data(tensor).await
+    async fn into_data_async(tensor: Self::Primitive) -> Result<TensorData, ExecutionError> {
+        C::complex_into_interleaved_data(tensor).await
     }
 
     fn from_data(data: TensorData, device: &C::Device, dtype: DType) -> Self::Primitive {
@@ -1339,15 +1334,12 @@ where
     fn repeat_dim(tensor: Self::Primitive, dim: usize, times: usize) -> Self::Primitive {
         C::complex_repeat_dim(tensor, dim, times)
     }
-    fn equal(lhs: Self::Primitive, rhs: Self::Primitive) -> <C as Backend>::BoolTensorPrimitive {
+    fn equal(lhs: Self::Primitive, rhs: Self::Primitive) -> C::BoolTensorPrimitive {
         let out_dtype = get_device_settings::<C>(&C::complex_device(&lhs)).bool_dtype;
         C::complex_equal(lhs, rhs, out_dtype)
     }
 
-    fn not_equal(
-        lhs: Self::Primitive,
-        rhs: Self::Primitive,
-    ) -> <C as Backend>::BoolTensorPrimitive {
+    fn not_equal(lhs: Self::Primitive, rhs: Self::Primitive) -> C::BoolTensorPrimitive {
         let out_dtype = get_device_settings::<C>(&C::complex_device(&lhs)).bool_dtype;
         C::complex_not_equal(lhs, rhs, out_dtype)
     }
@@ -1356,22 +1348,22 @@ where
         C::complex_cat(tensors, dim)
     }
 
-    fn any(tensor: Self::Primitive) -> <C as Backend>::BoolTensorPrimitive {
+    fn any(tensor: Self::Primitive) -> C::BoolTensorPrimitive {
         let out_dtype = get_device_settings::<C>(&C::complex_device(&tensor)).bool_dtype;
         C::complex_any(tensor, out_dtype)
     }
 
-    fn any_dim(tensor: Self::Primitive, dim: usize) -> <C as Backend>::BoolTensorPrimitive {
+    fn any_dim(tensor: Self::Primitive, dim: usize) -> C::BoolTensorPrimitive {
         let out_dtype = get_device_settings::<C>(&C::complex_device(&tensor)).bool_dtype;
         C::complex_any_dim(tensor, dim, out_dtype)
     }
 
-    fn all(tensor: Self::Primitive) -> <C as Backend>::BoolTensorPrimitive {
+    fn all(tensor: Self::Primitive) -> C::BoolTensorPrimitive {
         let out_dtype = get_device_settings::<C>(&C::complex_device(&tensor)).bool_dtype;
         C::complex_all(tensor, out_dtype)
     }
 
-    fn all_dim(tensor: Self::Primitive, dim: usize) -> <C as Backend>::BoolTensorPrimitive {
+    fn all_dim(tensor: Self::Primitive, dim: usize) -> C::BoolTensorPrimitive {
         let out_dtype = get_device_settings::<C>(&C::complex_device(&tensor)).bool_dtype;
         C::complex_all_dim(tensor, dim, out_dtype)
     }
@@ -1403,7 +1395,7 @@ where
     fn select(
         tensor: Self::Primitive,
         dim: usize,
-        indices: <C as Backend>::IntTensorPrimitive,
+        indices: <C as BackendTypes>::IntTensorPrimitive,
     ) -> Self::Primitive {
         // Uses your existing `select` name.
         C::complex_select(tensor, dim, indices)
@@ -1412,7 +1404,7 @@ where
     fn select_assign(
         tensor: Self::Primitive,
         dim: usize,
-        indices: <C as Backend>::IntTensorPrimitive,
+        indices: <C as BackendTypes>::IntTensorPrimitive,
         values: Self::Primitive,
         update: IndexingUpdateOp,
     ) -> Self::Primitive {
@@ -1421,14 +1413,14 @@ where
         }
     }
 
-    fn zeros(shape: Shape, device: &<C as Backend>::Device, dtype: DType) -> Self::Primitive {
+    fn zeros(shape: Shape, device: &<C as BackendTypes>::Device, dtype: DType) -> Self::Primitive {
         match dtype {
             DType::Complex32 | DType::Complex64 => C::complex_zeros(shape, device),
             _ => panic!("Unsupported complex dtype"),
         }
     }
 
-    fn ones(shape: Shape, device: &<C as Backend>::Device, dtype: DType) -> Self::Primitive {
+    fn ones(shape: Shape, device: &<C as BackendTypes>::Device, dtype: DType) -> Self::Primitive {
         match dtype {
             DType::Complex32 | DType::Complex64 => C::complex_ones(shape, device),
             _ => panic!("Unsupported complex dtype"),
@@ -1437,7 +1429,7 @@ where
 
     fn mask_where(
         tensor: Self::Primitive,
-        mask: <C as Backend>::BoolTensorPrimitive,
+        mask: C::BoolTensorPrimitive,
         source: Self::Primitive,
     ) -> Self::Primitive {
         C::complex_mask_where(tensor, mask, source)
@@ -1445,7 +1437,7 @@ where
 
     fn mask_fill(
         tensor: Self::Primitive,
-        mask: <C as Backend>::BoolTensorPrimitive,
+        mask: C::BoolTensorPrimitive,
         value: burn_tensor::Scalar,
     ) -> Self::Primitive {
         C::complex_mask_fill(tensor, mask, value.elem())
@@ -1470,7 +1462,7 @@ where
     fn equal_elem(
         lhs: Self::Primitive,
         rhs: burn_tensor::Scalar,
-    ) -> <C as Backend>::BoolTensorPrimitive {
+    ) -> <C as BackendTypes>::BoolTensorPrimitive {
         let out_dtype = get_device_settings::<C>(&C::complex_device(&lhs)).bool_dtype;
         C::complex_equal_elem(lhs, rhs.elem(), out_dtype)
     }
@@ -1478,7 +1470,7 @@ where
     fn not_equal_elem(
         lhs: Self::Primitive,
         rhs: burn_tensor::Scalar,
-    ) -> <C as Backend>::BoolTensorPrimitive {
+    ) -> <C as BackendTypes>::BoolTensorPrimitive {
         let out_dtype = get_device_settings::<C>(&C::complex_device(&lhs)).bool_dtype;
         C::complex_not_equal_elem(lhs, rhs.elem(), out_dtype)
     }
@@ -1486,7 +1478,7 @@ where
     fn full(
         shape: Shape,
         fill_value: burn_tensor::Scalar,
-        device: &<C as Backend>::Device,
+        device: &<C as BackendTypes>::Device,
         dtype: DType,
     ) -> Self::Primitive {
         // Enforce complex dtype for clarity (mirrors from_data_dtype below).
@@ -1653,7 +1645,7 @@ where
     }
 }
 
-impl<B: ComplexTensorBackend<InnerBackend = B> + Backend> TensorKind<B> for ComplexKind {
+impl<B: ComplexTensorBackend> TensorKind<B> for ComplexKind {
     type Primitive = ComplexTensor<B>;
     fn name() -> &'static str {
         "Complex"

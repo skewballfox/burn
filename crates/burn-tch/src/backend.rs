@@ -119,6 +119,22 @@ impl<E: TchElement> BackendTypes for LibTorch<E> {
     type BoolElem = bool;
 
     type QuantizedTensorPrimitive = TchTensor;
+
+    fn dtype_usage(
+        _device: &Self::Device,
+        dtype: burn_backend::DType,
+    ) -> burn_backend::DTypeUsageSet {
+        if dtype.try_into_kind().is_ok() {
+            burn_backend::DTypeUsage::general()
+        } else {
+            burn_backend::DTypeUsageSet::empty()
+        }
+    }
+
+    fn device_count(_: u16) -> usize {
+        // tch only supports one device for each backend
+        1
+    }
 }
 
 impl<E: TchElement> Backend for LibTorch<E> {
@@ -158,21 +174,5 @@ impl<E: TchElement> Backend for LibTorch<E> {
         };
 
         Ok(())
-    }
-
-    fn dtype_usage(
-        _device: &Self::Device,
-        dtype: burn_backend::DType,
-    ) -> burn_backend::DTypeUsageSet {
-        if dtype.try_into_kind().is_ok() {
-            burn_backend::DTypeUsage::general()
-        } else {
-            burn_backend::DTypeUsageSet::empty()
-        }
-    }
-
-    fn device_count(_: u16) -> usize {
-        // tch only supports one device for each backend
-        1
     }
 }

@@ -820,7 +820,7 @@ mod tests {
         let expected = a.clone().into_data();
         let result = a.matmul(eye).into_data();
 
-        result.assert_approx_eq(&expected, 4);
+        result.assert_approx_eq(&expected, 4.into());
     }
 
     #[test]
@@ -866,7 +866,7 @@ mod tests {
             },
         ]]);
 
-        result.assert_approx_eq(&expected, 4);
+        result.assert_approx_eq(&expected, 4.into());
     }
 
     #[test]

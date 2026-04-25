@@ -112,7 +112,7 @@ pub type Metal<F = f32, I = i32, B = u8> = Wgpu<F, I, B>;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use burn_backend::{Backend, BoolStore, DType, QTensorPrimitive};
+    use burn_backend::{BackendTypes, BoolStore, DType, QTensorPrimitive};
 
     #[test]
     fn should_support_dtypes() {

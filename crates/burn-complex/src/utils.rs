@@ -159,7 +159,7 @@ pub fn interleaved_data_to_real_data(interleaved: TensorData) -> TensorData {
 pub fn interleaved_data_to_imag_data(interleaved: TensorData) -> TensorData {
     let real_dtype = complex_to_real_dtype(interleaved.dtype);
     let real_elem_size = real_dtype.size();
-    let complex_elem_size = interleaved.dtype.size(); 
+    let complex_elem_size = interleaved.dtype.size();
 
     let mut real_bytes = Vec::with_capacity(interleaved.bytes.len() / 2);
 

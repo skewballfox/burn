@@ -24,7 +24,7 @@ pub use hashbrown::HashMap;
 #[cfg(not(feature = "std"))]
 use spin::{Lazy as LazyLock, Once as OnceLock};
 
-use crate::Backend;
+use crate::{Backend, BackendTypes};
 
 /// Device trait for all burn backend devices.
 pub trait DeviceOps: Clone + Default + PartialEq + Send + Sync + core::fmt::Debug + Device {
@@ -171,7 +171,7 @@ thread_local! {
 }
 
 /// Get the [`device`'s settings](DeviceSettings).
-pub fn get_device_settings<B: Backend>(device: &B::Device) -> DeviceSettings {
+pub fn get_device_settings<B: BackendTypes>(device: &B::Device) -> DeviceSettings {
     let default_settings = || {
         DeviceSettings::new(
             default_float::<B>(),
@@ -182,7 +182,7 @@ pub fn get_device_settings<B: Backend>(device: &B::Device) -> DeviceSettings {
     DeviceSettingsRegistry::get_or_insert(device, default_settings)
 }
 
-fn default_bool<B: Backend>(device: &B::Device) -> BoolDType {
+fn default_bool<B: BackendTypes>(device: &B::Device) -> BoolDType {
     // NOTE: this fallback logic is mostly tied to the dispatch backend since we still have associated
     // element types. Once they're removed, we need to have some sort of `DeviceDefaults` trait that provides
     // per-device defaults instead.
@@ -209,11 +209,11 @@ fn default_bool<B: Backend>(device: &B::Device) -> BoolDType {
     }
 }
 
-fn default_float<B: Backend>() -> FloatDType {
+fn default_float<B: BackendTypes>() -> FloatDType {
     <B::FloatElem as crate::Element>::dtype().into()
 }
 
-fn default_int<B: Backend>() -> IntDType {
+fn default_int<B: BackendTypes>() -> IntDType {
     <B::IntElem as crate::Element>::dtype().into()
 }
 

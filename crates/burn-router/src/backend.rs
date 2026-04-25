@@ -59,6 +59,16 @@ impl<R: RunnerChannel> BackendTypes for BackendRouter<R> {
     // type ComplexElem = R::ComplexElem;
 
     type QuantizedTensorPrimitive = RouterTensor<R::Client>;
+
+    fn dtype_usage(device: &Self::Device, dtype: DType) -> burn_backend::DTypeUsageSet {
+        let client = get_client::<R>(device);
+        client.dtype_usage(dtype)
+    }
+
+    fn device_count(_: u16) -> usize {
+        // This is what was there before, not sure if it's actually correct
+        1
+    }
 }
 
 impl<R: RunnerChannel> Backend for BackendRouter<R> {
@@ -74,15 +84,5 @@ impl<R: RunnerChannel> Backend for BackendRouter<R> {
     fn sync(device: &Self::Device) -> Result<(), ExecutionError> {
         let client = get_client::<R>(device);
         client.sync()
-    }
-
-    fn dtype_usage(device: &Self::Device, dtype: DType) -> burn_backend::DTypeUsageSet {
-        let client = get_client::<R>(device);
-        client.dtype_usage(dtype)
-    }
-
-    fn device_count(_: u16) -> usize {
-        // This is what was there before, not sure if it's actually correct
-        1
     }
 }

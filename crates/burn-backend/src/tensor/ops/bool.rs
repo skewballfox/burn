@@ -18,7 +18,6 @@ impl<B: Backend> TransactionOp<B> for Bool {
 
 impl<B: Backend> BasicOps<B> for Bool {
     type Elem = B::BoolElem;
-
     fn empty(shape: Shape, device: &Device<B>, dtype: DType) -> Self::Primitive {
         if !dtype.is_bool() {
             panic!("Expected bool data type, got {dtype:?}");

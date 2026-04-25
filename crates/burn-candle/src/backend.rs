@@ -205,6 +205,18 @@ impl<F: FloatCandleElement, I: IntCandleElement> BackendTypes for Candle<F, I> {
     type BoolElem = u8;
 
     type QuantizedTensorPrimitive = CandleTensor;
+
+    fn dtype_usage(device: &Self::Device, dtype: DType) -> burn_backend::DTypeUsageSet {
+        if dtype.try_into_dtype().is_ok() {
+            burn_backend::DTypeUsage::general()
+        } else {
+            burn_backend::DTypeUsageSet::empty()
+        }
+    }
+
+    fn device_count(_: u16) -> usize {
+        1
+    }
 }
 
 impl<F: FloatCandleElement, I: IntCandleElement> Backend for Candle<F, I> {
@@ -252,18 +264,6 @@ impl<F: FloatCandleElement, I: IntCandleElement> Backend for Candle<F, I> {
         }
 
         Ok(())
-    }
-
-    fn dtype_usage(device: &Self::Device, dtype: DType) -> burn_backend::DTypeUsageSet {
-        if dtype.try_into_dtype().is_ok() {
-            burn_backend::DTypeUsage::general()
-        } else {
-            burn_backend::DTypeUsageSet::empty()
-        }
-    }
-
-    fn device_count(_: u16) -> usize {
-        1
     }
 }
 

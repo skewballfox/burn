@@ -42,6 +42,18 @@ impl<B: FusionBackend> BackendTypes for Fusion<B> {
     // type ComplexElem = B::ComplexElem;
 
     type QuantizedTensorPrimitive = FusionTensor<B::FusionRuntime>;
+
+    fn supports_dtype(device: &Self::Device, dtype: DType) -> bool {
+        B::supports_dtype(device, dtype)
+    }
+
+    fn dtype_usage(device: &Self::Device, dtype: DType) -> burn_backend::DTypeUsageSet {
+        B::dtype_usage(device, dtype)
+    }
+
+    fn device_count(type_id: u16) -> usize {
+        B::device_count(type_id)
+    }
 }
 
 impl<B: FusionBackend> Backend for Fusion<B> {
@@ -86,18 +98,6 @@ impl<B: FusionBackend> Backend for Fusion<B> {
         Iter: Iterator<Item = &'a mut burn_backend::TensorData>,
     {
         B::staging(data, device);
-    }
-
-    fn supports_dtype(device: &Self::Device, dtype: DType) -> bool {
-        B::supports_dtype(device, dtype)
-    }
-
-    fn dtype_usage(device: &Self::Device, dtype: DType) -> burn_backend::DTypeUsageSet {
-        B::dtype_usage(device, dtype)
-    }
-
-    fn device_count(type_id: u16) -> usize {
-        B::device_count(type_id)
     }
 }
 

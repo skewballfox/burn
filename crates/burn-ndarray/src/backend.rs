@@ -71,25 +71,6 @@ where
     type BoolElem = bool;
 
     type QuantizedTensorPrimitive = NdArrayQTensor;
-}
-impl<E: FloatNdArrayElement, I: IntNdArrayElement, Q: QuantElement> Backend for NdArray<E, I, Q>
-where
-    NdArrayTensor: From<SharedArray<E>>,
-    NdArrayTensor: From<SharedArray<I>>,
-{
-    fn ad_enabled(_device: &Self::Device) -> bool {
-        false
-    }
-
-    fn name(_device: &Self::Device) -> String {
-        String::from("ndarray")
-    }
-
-    fn seed(_device: &Self::Device, seed: u64) {
-        let rng = NdArrayRng::seed_from_u64(seed);
-        let mut seed = SEED.lock().unwrap();
-        *seed = Some(rng);
-    }
 
     fn dtype_usage(_device: &Self::Device, dtype: DType) -> burn_backend::DTypeUsageSet {
         match dtype {
@@ -129,13 +110,33 @@ where
                     _scheme => burn_backend::DTypeUsageSet::empty(),
                 }
             }
-            DType::Complex32| DType::Complex64 => unimplemented!("interleaved complex elements not yet supported for ndarray"),
-             
+            DType::Complex32 | DType::Complex64 => {
+                unimplemented!("interleaved complex elements not yet supported for ndarray")
+            }
         }
     }
 
     fn device_count(_: u16) -> usize {
         1
+    }
+}
+impl<E: FloatNdArrayElement, I: IntNdArrayElement, Q: QuantElement> Backend for NdArray<E, I, Q>
+where
+    NdArrayTensor: From<SharedArray<E>>,
+    NdArrayTensor: From<SharedArray<I>>,
+{
+    fn ad_enabled(_device: &Self::Device) -> bool {
+        false
+    }
+
+    fn name(_device: &Self::Device) -> String {
+        String::from("ndarray")
+    }
+
+    fn seed(_device: &Self::Device, seed: u64) {
+        let rng = NdArrayRng::seed_from_u64(seed);
+        let mut seed = SEED.lock().unwrap();
+        *seed = Some(rng);
     }
 }
 

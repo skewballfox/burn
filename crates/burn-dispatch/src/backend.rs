@@ -61,32 +61,9 @@ impl BackendTypes for Dispatch {
     type BoolElem = u8;
 
     type QuantizedTensorPrimitive = DispatchTensor;
-}
-
-impl Backend for Dispatch {
-    fn name(device: &Self::Device) -> String {
-        let inner = dispatch_device!(device, |device| B::name(device));
-        format!("dispatch<{inner}>")
-    }
-
-    fn seed(device: &Self::Device, seed: u64) {
-        dispatch_device!(device, |device| B::seed(device, seed))
-    }
-
-    fn sync(device: &Self::Device) -> Result<(), ExecutionError> {
-        dispatch_device!(device, |device| B::sync(device))
-    }
 
     fn dtype_usage(device: &Self::Device, dtype: DType) -> burn_backend::DTypeUsageSet {
         dispatch_device!(device, |device| B::dtype_usage(device, dtype))
-    }
-
-    fn ad_enabled(device: &Self::Device) -> bool {
-        match device {
-            #[cfg(feature = "autodiff")]
-            DispatchDevice::Autodiff(_) => true,
-            _ => false,
-        }
     }
 
     fn device_count(type_id: u16) -> usize {
@@ -110,6 +87,29 @@ impl Backend for Dispatch {
             BackendId::NdArray => NdArray::<f32>::device_count(backend_type_id),
             #[cfg(feature = "tch")]
             BackendId::LibTorch => LibTorch::<f32>::device_count(backend_type_id),
+        }
+    }
+}
+
+impl Backend for Dispatch {
+    fn name(device: &Self::Device) -> String {
+        let inner = dispatch_device!(device, |device| B::name(device));
+        format!("dispatch<{inner}>")
+    }
+
+    fn seed(device: &Self::Device, seed: u64) {
+        dispatch_device!(device, |device| B::seed(device, seed))
+    }
+
+    fn sync(device: &Self::Device) -> Result<(), ExecutionError> {
+        dispatch_device!(device, |device| B::sync(device))
+    }
+
+    fn ad_enabled(device: &Self::Device) -> bool {
+        match device {
+            #[cfg(feature = "autodiff")]
+            DispatchDevice::Autodiff(_) => true,
+            _ => false,
         }
     }
 }

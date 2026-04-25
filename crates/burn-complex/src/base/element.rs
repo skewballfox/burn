@@ -2,8 +2,8 @@
 
 /// 32-bit complex number type (real and imaginary parts are f32).
 use burn_tensor::{
-    DType, Distribution, Element, ElementComparison, ElementConversion, ElementEq, ElementLimits,
-    ElementRandom, cast::ToElement,
+    DType, Distribution, Element, ElementComparison, ElementConversion, ElementEq, ElementRandom,
+    cast::ToElement,
 };
 use bytemuck::Zeroable;
 use core::ops::{AddAssign, Rem};

@@ -37,6 +37,18 @@ impl<B: Backend, C: CheckpointStrategy> BackendTypes for Autodiff<B, C> {
     type BoolElem = B::BoolElem;
 
     type QuantizedTensorPrimitive = B::QuantizedTensorPrimitive;
+
+    fn supports_dtype(device: &Self::Device, dtype: burn_std::DType) -> bool {
+        B::supports_dtype(device, dtype)
+    }
+
+    fn dtype_usage(device: &Self::Device, dtype: burn_std::DType) -> burn_backend::DTypeUsageSet {
+        B::dtype_usage(device, dtype)
+    }
+
+    fn device_count(type_id: u16) -> usize {
+        B::device_count(type_id)
+    }
 }
 
 impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
@@ -77,18 +89,6 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
         Iter: Iterator<Item = &'a mut burn_backend::TensorData>,
     {
         B::staging(data, device);
-    }
-
-    fn supports_dtype(device: &Self::Device, dtype: burn_std::DType) -> bool {
-        B::supports_dtype(device, dtype)
-    }
-
-    fn dtype_usage(device: &Self::Device, dtype: burn_std::DType) -> burn_backend::DTypeUsageSet {
-        B::dtype_usage(device, dtype)
-    }
-
-    fn device_count(type_id: u16) -> usize {
-        B::device_count(type_id)
     }
 }
 

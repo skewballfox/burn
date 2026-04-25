@@ -44,6 +44,53 @@ where
     // type ComplexTensorPrimitive = CubeTensor<R>;
     // type ComplexElem = burn_tensor::Complex32;
     type QuantizedTensorPrimitive = CubeTensor<R>;
+
+    fn supports_dtype(device: &Self::Device, dtype: DType) -> bool {
+        let client = R::client(device);
+
+        let type_usage = client.properties().type_usage(dtype.into());
+        // Same as `TypeUsage::all_scalar()`, but we make the usage explicit here
+        type_usage.is_superset(
+            TypeUsage::Buffer
+                | TypeUsage::Conversion
+                | TypeUsage::Arithmetic
+                | TypeUsage::DotProduct,
+        )
+    }
+
+    fn dtype_usage(device: &Self::Device, dtype: DType) -> DTypeUsageSet {
+        let client = R::client(device);
+
+        let props = client.properties();
+        let storage = dtype.into();
+        let usage = props.type_usage(storage);
+
+        let mut out = DTypeUsageSet::new();
+
+        if usage.is_superset(TypeUsage::Buffer | TypeUsage::Conversion) {
+            out |= DTypeUsage::Storage;
+        }
+
+        if usage.contains(TypeUsage::Arithmetic) {
+            out |= DTypeUsage::Arithmetic;
+        }
+
+        let has_mma = |cfg: &MmaConfig| {
+            cfg.a_type == storage || cfg.b_type == storage || cfg.cd_type == storage
+        };
+        if props.features.matmul.cmma.iter().any(has_mma)
+            || props.features.matmul.mma.iter().any(has_mma)
+        {
+            out |= DTypeUsage::Accelerated;
+        }
+
+        out
+    }
+
+    fn device_count(type_id: u16) -> usize {
+        let client = R::client(&Default::default());
+        client.device_count(type_id)
+    }
 }
 
 impl<R, F, I, BT> Backend for CubeBackend<R, F, I, BT>
@@ -99,53 +146,6 @@ where
     {
         let client = R::client(device);
         client.staging(data.map(|td| &mut td.bytes), false);
-    }
-
-    fn supports_dtype(device: &Self::Device, dtype: DType) -> bool {
-        let client = R::client(device);
-
-        let type_usage = client.properties().type_usage(dtype.into());
-        // Same as `TypeUsage::all_scalar()`, but we make the usage explicit here
-        type_usage.is_superset(
-            TypeUsage::Buffer
-                | TypeUsage::Conversion
-                | TypeUsage::Arithmetic
-                | TypeUsage::DotProduct,
-        )
-    }
-
-    fn dtype_usage(device: &Self::Device, dtype: DType) -> DTypeUsageSet {
-        let client = R::client(device);
-
-        let props = client.properties();
-        let storage = dtype.into();
-        let usage = props.type_usage(storage);
-
-        let mut out = DTypeUsageSet::new();
-
-        if usage.is_superset(TypeUsage::Buffer | TypeUsage::Conversion) {
-            out |= DTypeUsage::Storage;
-        }
-
-        if usage.contains(TypeUsage::Arithmetic) {
-            out |= DTypeUsage::Arithmetic;
-        }
-
-        let has_mma = |cfg: &MmaConfig| {
-            cfg.a_type == storage || cfg.b_type == storage || cfg.cd_type == storage
-        };
-        if props.features.matmul.cmma.iter().any(has_mma)
-            || props.features.matmul.mma.iter().any(has_mma)
-        {
-            out |= DTypeUsage::Accelerated;
-        }
-
-        out
-    }
-
-    fn device_count(type_id: u16) -> usize {
-        let client = R::client(&Default::default());
-        client.device_count(type_id)
     }
 }
 

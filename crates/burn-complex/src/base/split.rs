@@ -1,12 +1,15 @@
 use crate::{
     base::{
-        ComplexDevice, ComplexTensor, ComplexTensorBackend, ComplexTensorOps, Layout, SplitLayout, SplitTensorData, element::Complex
+        ComplexDevice, ComplexTensor, ComplexTensorBackend, ComplexTensorOps, Layout, SplitLayout,
+        SplitTensorData, element::Complex,
     },
     utils::real_to_complex_dtype,
 };
 use burn_std::FloatDType;
 use burn_tensor::{
-    ElementComparison, Scalar, TensorData, TensorMetadata, backend::Backend, cast::ToElement,
+    ElementComparison, Scalar, TensorData, TensorMetadata,
+    backend::{Backend, BackendTypes},
+    cast::ToElement,
     ops::FloatTensorOps,
 };
 use bytemuck::Pod;
@@ -16,9 +19,24 @@ impl<T: TensorMetadata + 'static> Layout for SplitLayout<T> {
 }
 
 #[derive(Debug, Clone)]
-pub struct SplitComplexTensor<P: TensorMetadata> {
-    pub real: P,
-    pub imag: P,
+pub struct SplitComplexTensor<T: TensorMetadata> {
+    pub(crate) real: T,
+    pub(crate) imag: T,
+}
+
+impl<T: TensorMetadata> SplitComplexTensor<T> {
+    pub fn real(&self) -> &T {
+        &self.real
+    }
+    pub fn imag(&self) -> &T {
+        &self.imag
+    }
+    pub fn real_owned(self) -> T {
+        self.real
+    }
+    pub fn imag_owned(self) -> T {
+        self.imag
+    }
 }
 
 impl<T: TensorMetadata + 'static> TensorMetadata for SplitComplexTensor<T> {
@@ -42,9 +60,39 @@ impl<T: TensorMetadata + 'static> TensorMetadata for SplitComplexTensor<T> {
 /// A newtype that wraps a real backend B and exposes a split-layout complex backend.
 pub struct SplitBackend<B: Backend>(core::marker::PhantomData<B>);
 
+impl<B: Backend> BackendTypes for SplitBackend<B> {
+    type Device = B::Device;
+
+    type FloatTensorPrimitive = B::FloatTensorPrimitive;
+
+    type FloatElem = B::FloatElem;
+
+    type IntTensorPrimitive = B::IntTensorPrimitive;
+
+    type IntElem = B::IntElem;
+
+    type BoolTensorPrimitive = B::BoolTensorPrimitive;
+
+    type BoolElem = B::BoolElem;
+
+    type QuantizedTensorPrimitive = B::QuantizedTensorPrimitive;
+
+    fn dtype_usage(
+        device: &Self::Device,
+        dtype: burn_std::DType,
+    ) -> burn_tensor::backend::DTypeUsageSet {
+        B::dtype_usage(device, dtype)
+    }
+
+    fn device_count(type_id: u16) -> usize {
+        B::device_count(type_id)
+    }
+    //type FloatTensorPrimitive = SplitComplexTensor<B::FloatTensorPrimitive>;
+}
+
 impl<B: Backend> ComplexTensorBackend for SplitBackend<B>
 where
-    <B as Backend>::FloatElem: ElementComparison + Pod,
+    B::FloatElem: ElementComparison + Pod,
     B::FloatTensorPrimitive: TensorMetadata + 'static,
 {
     type InnerBackend = B;
@@ -67,10 +115,7 @@ where
         SplitComplexTensor { real, imag }
     }
 
-    fn complex_from_imag_data(
-        data: TensorData,
-        device: &<Self::InnerBackend as Backend>::Device,
-    ) -> ComplexTensor<Self> {
+    fn complex_from_imag_data(data: TensorData, device: &Self::Device) -> ComplexTensor<Self> {
         let imag = B::float_from_data(data, device);
         // https://github.com/rust-lang/rust/issues/54628
         let real = B::float_from_data(
@@ -86,7 +131,7 @@ where
     // Should these be a result
     fn complex_from_interleaved_data(
         data: TensorData,
-        device: &<Self::InnerBackend as Backend>::Device,
+        device: &Self::Device,
     ) -> ComplexTensor<Self> {
         let mut real_bytes: Vec<u8> = Vec::with_capacity(data.bytes.len() / 2);
         let mut imag_bytes: Vec<u8> = Vec::with_capacity(data.bytes.len() / 2);
@@ -113,10 +158,10 @@ where
         }
     }
 
-    fn complex_from_split_data(
+    fn complex_from_parts_data(
         real_data: TensorData,
         imag_data: TensorData,
-        device: &<Self::InnerBackend as Backend>::Device,
+        device: &Self::Device,
     ) -> ComplexTensor<Self> {
         let real = B::float_from_data(real_data, device);
         let imag = B::float_from_data(imag_data, device);
@@ -137,7 +182,7 @@ type FlOps<B> = <SplitBackend<B> as ComplexTensorBackend>::InnerBackend;
 impl<B> ComplexTensorOps<SplitBackend<B>> for SplitBackend<B>
 where
     B: Backend,
-    <B as Backend>::FloatElem: ElementComparison + Pod,
+    B::FloatElem: ElementComparison + Pod,
 {
     fn to_complex(tensor: super::FloatTensor<SplitBackend<B>>) -> ComplexTensor<SplitBackend<B>> {
         SplitComplexTensor {

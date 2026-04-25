@@ -15,7 +15,7 @@ pub type Cpu<F = f32, I = i32> = burn_fusion::Fusion<CubeBackend<CpuRuntime, F, 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use burn_backend::{Backend, BoolStore, DType, QTensorPrimitive};
+    use burn_backend::{BackendTypes, BoolStore, DType, QTensorPrimitive};
     use burn_cubecl::tensor::CubeTensor;
 
     #[test]
