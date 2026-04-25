@@ -433,12 +433,7 @@ impl<B: Backend> Numeric<B> for Float {
         }
     }
 
-    fn abs(tensor: Self::Primitive) -> Self::Primitive {
-        match tensor {
-            TensorPrimitive::Float(tensor) => TensorPrimitive::Float(B::float_abs(tensor)),
-            TensorPrimitive::QFloat(tensor) => TensorPrimitive::QFloat(B::q_abs(tensor)),
-        }
-    }
+    
 
     fn powi(lhs: Self::Primitive, rhs: Self::Primitive) -> Self::Primitive {
         q_bin_ops!(lhs, rhs, float_powf, q_powf)
@@ -481,6 +476,12 @@ impl<B: Backend> Numeric<B> for Float {
     }
 }
 impl<B: Backend> Ordered<B> for Float {
+    fn abs(tensor: Self::Primitive) -> Self::Primitive {
+        match tensor {
+            TensorPrimitive::Float(tensor) => TensorPrimitive::Float(B::float_abs(tensor)),
+            TensorPrimitive::QFloat(tensor) => TensorPrimitive::QFloat(B::q_abs(tensor)),
+        }
+    }
     fn sort(tensor: Self::Primitive, dim: usize, descending: bool) -> Self::Primitive {
         match tensor {
             TensorPrimitive::Float(tensor) => {

@@ -138,7 +138,7 @@ impl ComplexTensorOps<Flex> for Flex {
         crate::c2r_unary_op!(tensor, |a| a.imag)
     }
 
-    fn complex_abs(tensor: ComplexTensor<Flex>) -> burn_complex::base::FloatTensor<Flex> {
+    fn abs(tensor: ComplexTensor<Flex>) -> burn_complex::base::FloatTensor<Flex> {
         crate::c2r_unary_op!(tensor, |a| a.norm())
     }
 

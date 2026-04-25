@@ -9,7 +9,7 @@ use burn_tensor::{
     IndexingUpdateOp, Numeric, Scalar, Shape, Slice, TensorData, TensorKind, TensorMetadata,
     backend::{Backend, BackendTypes, ExecutionError},
     get_device_settings,
-    ops::{FloatTensorOps, IntTensorOps},
+    ops::{FloatTensor, FloatTensorOps, IntTensorOps},
 };
 use serde::{Deserialize, Serialize};
 
@@ -28,10 +28,6 @@ pub type ComplexElem<B> = <B as ComplexTensorBackend>::ComplexScalar;
 
 /// Complex tensor primitive type used by the backend.
 pub type ComplexTensor<B> = <<B as ComplexTensorBackend>::Layout as Layout>::ComplexTensorPrimitive;
-pub type ComplexDevice<B> = <B as BackendTypes>::Device;
-pub type FloatTensor<B> = <B as BackendTypes>::FloatTensorPrimitive;
-pub type IntTensor<B> = <B as BackendTypes>::IntTensorPrimitive;
-pub type BoolTensor<B> = <B as BackendTypes>::BoolTensorPrimitive;
 
 pub trait ComplexTensorBackend: ComplexTensorOps<Self> + Sized + BackendTypes {
     /// The inner backend type.
@@ -69,10 +65,7 @@ pub trait ComplexTensorBackend: ComplexTensorOps<Self> + Sized + BackendTypes {
     /// # Returns
     ///
     /// A complex tensor with the given real values and a zero imaginary part.
-    fn complex_from_real_data(
-        data: TensorData,
-        device: &ComplexDevice<Self>,
-    ) -> ComplexTensor<Self>;
+    fn complex_from_real_data(data: TensorData, device: &Self::Device) -> ComplexTensor<Self>;
 
     /// Creates a complex tensor from imaginary-valued data, padding the real part with zeros.
     ///
@@ -86,10 +79,7 @@ pub trait ComplexTensorBackend: ComplexTensorOps<Self> + Sized + BackendTypes {
     /// # Returns
     ///
     /// A complex tensor with a zero real part and the given imaginary values.
-    fn complex_from_imag_data(
-        data: TensorData,
-        device: &ComplexDevice<Self>,
-    ) -> ComplexTensor<Self>;
+    fn complex_from_imag_data(data: TensorData, device: &Self::Device) -> ComplexTensor<Self>;
 
     /// Creates a complex tensor from interleaved complex data.
     ///
@@ -106,7 +96,7 @@ pub trait ComplexTensorBackend: ComplexTensorOps<Self> + Sized + BackendTypes {
     /// A complex tensor backed by the interleaved buffer.
     fn complex_from_interleaved_data(
         data: TensorData,
-        device: &<Self as BackendTypes>::Device,
+        device: &Self::Device,
     ) -> ComplexTensor<Self>;
 
     /// Creates a complex tensor from two separate real and imaginary data buffers.
@@ -452,7 +442,7 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
     /// # Returns
     ///
     /// The device of the tensor.
-    fn complex_device(tensor: &ComplexTensor<B>) -> Device<B>;
+    fn complex_device(tensor: &ComplexTensor<B>) -> B::Device;
 
     /// Moves the tensor to the given device.
     ///
@@ -464,7 +454,7 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
     /// # Returns
     ///
     /// The tensor on the given device.
-    fn complex_to_device(tensor: ComplexTensor<B>, device: &ComplexDevice<B>) -> ComplexTensor<B>;
+    fn complex_to_device(tensor: ComplexTensor<B>, device: &B::Device) -> ComplexTensor<B>;
 
     /// Converts the tensor to a data structure.
     ///
@@ -605,7 +595,7 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
     /// # Returns
     ///
     /// A float tensor containing the magnitudes.
-    fn complex_abs(tensor: ComplexTensor<B>) -> FloatTensor<B>;
+    fn abs(tensor: ComplexTensor<B>) -> FloatTensor<B>;
 
     /// Returns the phase (argument) of the complex tensor.
     ///
@@ -735,7 +725,7 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
     fn complex_select(
         tensor: ComplexTensor<B>,
         dim: usize,
-        indices: IntTensor<B>,
+        indices: B::IntTensorPrimitive,
     ) -> ComplexTensor<B>;
 
     /// Select tensor elements corresponding to the given slices.
@@ -807,7 +797,7 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
         lhs: ComplexTensor<B>,
         rhs: ComplexTensor<B>,
         out_dtype: burn_std::BoolDType,
-    ) -> BoolTensor<B>;
+    ) -> B::BoolTensorPrimitive;
 
     /// Element-wise non-equality comparison.
     ///
@@ -823,7 +813,7 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
         lhs: ComplexTensor<B>,
         rhs: ComplexTensor<B>,
         out_dtype: burn_std::BoolDType,
-    ) -> BoolTensor<B>;
+    ) -> B::BoolTensorPrimitive;
 
     /// Concatenates tensors along a dimension.
     ///
@@ -846,7 +836,10 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
     /// # Returns
     ///
     /// A boolean tensor with a single element, True if any element in the tensor is True, False otherwise.
-    fn complex_any(tensor: ComplexTensor<B>, out_dtype: burn_std::BoolDType) -> BoolTensor<B>;
+    fn complex_any(
+        tensor: ComplexTensor<B>,
+        out_dtype: burn_std::BoolDType,
+    ) -> B::BoolTensorPrimitive;
 
     /// Tests if any element in the float `tensor` evaluates to True along a given dimension `dim`.
     ///
@@ -864,7 +857,7 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
         tensor: ComplexTensor<B>,
         dim: usize,
         out_dtype: burn_std::BoolDType,
-    ) -> BoolTensor<B>;
+    ) -> B::BoolTensorPrimitive;
 
     /// Tests if all elements in the float `tensor` evaluate to True.
     ///
@@ -876,7 +869,10 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
     ///
     /// A boolean tensor `Tensor<B, 1, Bool>` with a single element, True if all elements in the input tensor
     /// evaluate to True, False otherwise.
-    fn complex_all(tensor: ComplexTensor<B>, out_dtype: burn_std::BoolDType) -> BoolTensor<B>;
+    fn complex_all(
+        tensor: ComplexTensor<B>,
+        out_dtype: burn_std::BoolDType,
+    ) -> B::BoolTensorPrimitive;
 
     /// Tests if all elements in the float `tensor` evaluate to True along a given dimension `dim`.
     ///
@@ -894,7 +890,7 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
         tensor: ComplexTensor<B>,
         dim: usize,
         out_dtype: burn_std::BoolDType,
-    ) -> BoolTensor<B>;
+    ) -> B::BoolTensorPrimitive;
 
     /// Permutes the dimensions of a tensor.
     ///
@@ -970,7 +966,7 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
     fn complex_select_add(
         tensor: ComplexTensor<B>,
         dim: usize,
-        indices: IntTensor<B>,
+        indices: B::IntTensorPrimitive,
         values: ComplexTensor<B>,
     ) -> ComplexTensor<B>;
 
@@ -1082,7 +1078,7 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
         lhs: ComplexTensor<B>,
         rhs: B::ComplexScalar,
         out_dtype: burn_std::BoolDType,
-    ) -> BoolTensor<B>;
+    ) -> B::BoolTensorPrimitive;
 
     /// Element-wise non-equality comparison of a complex tensor and a scalar.
     ///
@@ -1099,7 +1095,7 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
         lhs: ComplexTensor<B>,
         rhs: B::ComplexScalar,
         out_dtype: burn_std::BoolDType,
-    ) -> BoolTensor<B>;
+    ) -> B::BoolTensorPrimitive;
 
     /// Update the given tensor with the source tensor where the mask is true.
     ///
@@ -1114,7 +1110,7 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
     /// The tensor with the selected elements assigned to the corresponding values in `source`.
     fn complex_mask_where(
         tensor: ComplexTensor<B>,
-        mask: BoolTensor<B>,
+        mask: B::BoolTensorPrimitive,
         source: ComplexTensor<B>,
     ) -> ComplexTensor<B>;
 
@@ -1131,7 +1127,7 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
     /// The tensor with the selected elements assigned to `value`.
     fn complex_mask_fill(
         tensor: ComplexTensor<B>,
-        mask: BoolTensor<B>,
+        mask: B::BoolTensorPrimitive,
         value: B::ComplexScalar,
     ) -> ComplexTensor<B>;
 
@@ -1149,7 +1145,7 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
     fn complex_gather(
         dim: usize,
         tensor: ComplexTensor<B>,
-        indices: IntTensor<B>,
+        indices: B::IntTensorPrimitive,
     ) -> ComplexTensor<B>;
 
     /// Scatter elements into a complex tensor using sum reduction.
@@ -1167,7 +1163,7 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
     fn complex_scatter_add(
         dim: usize,
         tensor: ComplexTensor<B>,
-        indices: IntTensor<B>,
+        indices: B::IntTensorPrimitive,
         values: ComplexTensor<B>,
     ) -> ComplexTensor<B>;
 
@@ -1220,7 +1216,7 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
     /// # Returns
     ///
     /// The elements of `lhs` raised to the power of the corresponding elements of `rhs`.
-    fn complex_powi(lhs: ComplexTensor<B>, rhs: IntTensor<B>) -> ComplexTensor<B> {
+    fn complex_powi(lhs: ComplexTensor<B>, rhs: B::IntTensorPrimitive) -> ComplexTensor<B> {
         //TODO: add a method to get inner dtype
         let dtype = lhs.dtype();
 
@@ -1329,7 +1325,7 @@ impl<C: ComplexTensorBackend> BasicOps<C> for ComplexKind {
         C::complex_device(tensor)
     }
 
-    fn to_device(tensor: Self::Primitive, device: &ComplexDevice<C>) -> Self::Primitive {
+    fn to_device(tensor: Self::Primitive, device: &C::Device) -> Self::Primitive {
         C::complex_to_device(tensor, device)
     }
 
@@ -1453,14 +1449,18 @@ impl<C: ComplexTensorBackend> BasicOps<C> for ComplexKind {
         C::complex_mask_fill(tensor, mask, value.elem())
     }
 
-    fn gather(dim: usize, tensor: Self::Primitive, indices: IntTensor<C>) -> Self::Primitive {
+    fn gather(
+        dim: usize,
+        tensor: Self::Primitive,
+        indices: C::IntTensorPrimitive,
+    ) -> Self::Primitive {
         C::complex_gather(dim, tensor, indices)
     }
 
     fn scatter(
         dim: usize,
         tensor: Self::Primitive,
-        indices: IntTensor<C>,
+        indices: C::IntTensorPrimitive,
         values: Self::Primitive,
         update: burn_tensor::IndexingUpdateOp,
     ) -> Self::Primitive {
@@ -1501,7 +1501,7 @@ impl<C: ComplexTensorBackend> BasicOps<C> for ComplexKind {
 }
 
 #[allow(unused_variables)]
-impl<C: ComplexTensorBackend<InnerBackend = C> + Backend> Numeric<C> for ComplexKind
+impl<C: ComplexTensorBackend> Numeric<C> for ComplexKind
 where
     C::ComplexScalar: Element,
 {
@@ -1548,25 +1548,25 @@ where
         C::complex_div(lhs, scalar_tensor)
     }
 
-    fn abs(tensor: Self::Primitive) -> Self::Primitive {
-        // For complex numbers, abs returns the magnitude as a complex number (real part = magnitude, imag = 0)
-        let magnitude = C::complex_abs(tensor.clone());
-        let zeros = C::float_zeros(
-            C::complex_shape(&tensor),
-            &C::complex_device(&tensor),
-            match tensor.dtype() {
-                DType::Complex32 => FloatDType::F32,
-                DType::Complex64 => FloatDType::F64,
-                _ => panic!("Unsupported complex dtype"),
-            },
-        );
-        C::complex_from_parts(magnitude, zeros)
-    }
+    // fn abs(tensor: Self::Primitive) -> Self::Primitive {
+    //     // For complex numbers, abs returns the magnitude as a complex number (real part = magnitude, imag = 0)
+    //     let magnitude = C::complex_abs(tensor.clone());
+    //     let zeros = C::float_zeros(
+    //         C::complex_shape(&tensor),
+    //         &C::complex_device(&tensor),
+    //         match tensor.dtype() {
+    //             DType::Complex32 => FloatDType::F32,
+    //             DType::Complex64 => FloatDType::F64,
+    //             _ => panic!("Unsupported complex dtype"),
+    //         },
+    //     );
+    //     C::complex_from_parts(magnitude, zeros)
+    // }
 
     fn random(
         shape: Shape,
         distribution: Distribution,
-        device: &ComplexDevice<C>,
+        device: &C::Device,
         dtype: DType,
     ) -> Self::Primitive {
         C::complex_random(shape, distribution, device, FloatDType::from(dtype))
@@ -1614,10 +1614,7 @@ where
     // }
 
     fn powi(lhs: Self::Primitive, rhs: Self::Primitive) -> Self::Primitive {
-        //C::complex_powi(lhs, rhs)
-        panic!(
-            "powi is not implemented yet; use complex_powi, or call powf with float exponent instead"
-        )
+        C::complex_powi(lhs, rhs)
     }
 
     fn powi_scalar(lhs: Self::Primitive, rhs: Scalar) -> Self::Primitive {

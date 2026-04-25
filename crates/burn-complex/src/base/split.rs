@@ -1,13 +1,12 @@
 use crate::{
     base::{
-        ComplexDevice, ComplexTensor, ComplexTensorBackend, ComplexTensorOps, Layout, SplitLayout,
-        SplitTensorData,
+        ComplexTensor, ComplexTensorBackend, ComplexTensorOps, Layout, SplitLayout, SplitTensorData,
     },
     utils::real_to_complex_dtype,
 };
 use burn_std::FloatDType;
 use burn_tensor::{
-    Complex, ElementComparison, Scalar, TensorData, TensorMetadata,
+    Complex, Device, ElementComparison, Scalar, TensorData, TensorMetadata,
     backend::{Backend, BackendTypes},
     cast::ToElement,
     ops::FloatTensorOps,
@@ -25,6 +24,19 @@ pub struct SplitComplexTensor<T: TensorMetadata> {
 }
 
 impl<T: TensorMetadata> SplitComplexTensor<T> {
+    pub fn new(real: T, imag: T) -> Self {
+        assert_eq!(
+            real.shape(),
+            imag.shape(),
+            "Real and imaginary parts must have the same shape"
+        );
+        assert_eq!(
+            real.dtype(),
+            imag.dtype(),
+            "Real and imaginary parts must have the same dtype"
+        );
+        Self { real, imag }
+    }
     pub fn real(&self) -> &T {
         &self.real
     }
@@ -206,7 +218,7 @@ where
         lhs: ComplexTensor<SplitBackend<B>>,
         rhs: <SplitBackend<B> as ComplexTensorBackend>::ComplexScalar,
         out_dtype: burn_std::BoolDType,
-    ) -> super::BoolTensor<SplitBackend<B>> {
+    ) -> B::BoolTensorPrimitive {
         let (lhs_real, lhs_imag) = (lhs.real, lhs.imag);
         let rhs_real = rhs.real();
         let rhs_imag = rhs.imag();
@@ -228,7 +240,7 @@ where
         lhs: ComplexTensor<SplitBackend<B>>,
         rhs: <SplitBackend<B> as ComplexTensorBackend>::ComplexScalar,
         out_dtype: burn_std::BoolDType,
-    ) -> super::BoolTensor<SplitBackend<B>> {
+    ) -> B::BoolTensorPrimitive {
         let (lhs_real, lhs_imag) = (lhs.real, lhs.imag);
         let rhs_real = rhs.real();
         let rhs_imag = rhs.imag();
@@ -250,7 +262,7 @@ where
         lhs: ComplexTensor<SplitBackend<B>>,
         rhs: ComplexTensor<SplitBackend<B>>,
         out_dtype: burn_std::BoolDType,
-    ) -> super::BoolTensor<SplitBackend<B>> {
+    ) -> B::BoolTensorPrimitive {
         let real_cmp = B::float_equal(lhs.real, rhs.real, out_dtype);
         let imag_cmp = B::float_equal(lhs.imag, rhs.imag, out_dtype);
         B::bool_and(real_cmp, imag_cmp)
@@ -260,7 +272,7 @@ where
         lhs: ComplexTensor<SplitBackend<B>>,
         rhs: ComplexTensor<SplitBackend<B>>,
         out_dtype: burn_std::BoolDType,
-    ) -> super::BoolTensor<SplitBackend<B>> {
+    ) -> B::BoolTensorPrimitive {
         let real_cmp = B::float_not_equal(lhs.real, rhs.real, out_dtype);
         let imag_cmp = B::float_not_equal(lhs.imag, rhs.imag, out_dtype);
         B::bool_or(real_cmp, imag_cmp)
@@ -313,10 +325,8 @@ where
         })
     }
 
-    fn complex_device(tensor: &ComplexTensor<SplitBackend<B>>) -> ComplexDevice<SplitBackend<B>> {
-        <<SplitBackend<B> as ComplexTensorBackend>::InnerBackend as FloatTensorOps<
-            <SplitBackend<B> as ComplexTensorBackend>::InnerBackend,
-        >>::float_device(&tensor.real)
+    fn complex_device(tensor: &ComplexTensor<SplitBackend<B>>) -> B::Device {
+        B::float_device(&tensor.real)
     }
 
     fn complex_add(
@@ -381,7 +391,7 @@ where
             ),
         }
     }
-    fn complex_abs(tensor: ComplexTensor<SplitBackend<B>>) -> super::FloatTensor<SplitBackend<B>> {
+    fn abs(tensor: ComplexTensor<SplitBackend<B>>) -> super::FloatTensor<SplitBackend<B>> {
         //todo! https://github.com/tracel-ai/burn/issues/4836
         // |z| = sqrt(real^2 + imag^2)
         let real_sq = FlOps::<B>::float_mul(tensor.real.clone(), tensor.real.clone());
@@ -451,7 +461,7 @@ where
     fn complex_gather(
         dim: usize,
         tensor: ComplexTensor<SplitBackend<B>>,
-        indices: super::IntTensor<SplitBackend<B>>,
+        indices: B::IntTensorPrimitive,
     ) -> ComplexTensor<SplitBackend<B>> {
         SplitComplexTensor {
             real: B::float_gather(dim, tensor.real, indices.clone()),
@@ -462,7 +472,7 @@ where
     fn complex_scatter_add(
         dim: usize,
         tensor: ComplexTensor<SplitBackend<B>>,
-        indices: super::IntTensor<SplitBackend<B>>,
+        indices: B::IntTensorPrimitive,
         values: ComplexTensor<SplitBackend<B>>,
     ) -> ComplexTensor<SplitBackend<B>> {
         SplitComplexTensor {
@@ -474,7 +484,7 @@ where
     fn complex_random(
         shape: burn_std::Shape,
         distribution: burn_tensor::Distribution,
-        device: &ComplexDevice<SplitBackend<B>>,
+        device: &Device<B>,
         dtype: FloatDType,
     ) -> ComplexTensor<SplitBackend<B>> {
         SplitComplexTensor {
@@ -485,7 +495,7 @@ where
 
     fn complex_to_device(
         tensor: ComplexTensor<SplitBackend<B>>,
-        device: &ComplexDevice<SplitBackend<B>>,
+        device: &Device<B>,
     ) -> ComplexTensor<SplitBackend<B>> {
         SplitComplexTensor {
             real: B::float_to_device(tensor.real, device),
@@ -542,7 +552,7 @@ where
 
     fn complex_sqrt(tensor: ComplexTensor<SplitBackend<B>>) -> ComplexTensor<SplitBackend<B>> {
         // sqrt(z) = from_polar(sqrt(|z|), arg(z) / 2)
-        let abs = SplitBackend::<B>::complex_abs(tensor.clone());
+        let abs = SplitBackend::<B>::abs(tensor.clone());
         let sqrt_abs = FlOps::<B>::float_sqrt(abs);
         let arg = FlOps::<B>::float_atan2(tensor.imag, tensor.real);
         let half_arg = FlOps::<B>::float_div_scalar(arg, burn_tensor::Scalar::Float(2.0));
@@ -642,7 +652,7 @@ where
     fn complex_any(
         tensor: ComplexTensor<SplitBackend<B>>,
         out_dtype: burn_std::BoolDType,
-    ) -> super::BoolTensor<SplitBackend<B>> {
+    ) -> B::BoolTensorPrimitive {
         let real_any = B::float_any(tensor.real, out_dtype);
         let imag_any = B::float_any(tensor.imag, out_dtype);
         B::bool_or(real_any, imag_any)
@@ -652,7 +662,7 @@ where
         tensor: ComplexTensor<SplitBackend<B>>,
         dim: usize,
         out_dtype: burn_std::BoolDType,
-    ) -> super::BoolTensor<SplitBackend<B>> {
+    ) -> B::BoolTensorPrimitive {
         let real_any = B::float_any_dim(tensor.real, dim, out_dtype);
         let imag_any = B::float_any_dim(tensor.imag, dim, out_dtype);
         B::bool_or(real_any, imag_any)
@@ -661,7 +671,7 @@ where
     fn complex_all(
         tensor: ComplexTensor<SplitBackend<B>>,
         out_dtype: burn_std::BoolDType,
-    ) -> super::BoolTensor<SplitBackend<B>> {
+    ) -> B::BoolTensorPrimitive {
         // A complex element is nonzero if either real or imag is nonzero.
         // all(z != 0) = all(real != 0 || imag != 0)
         let real_nonzero =
@@ -676,7 +686,7 @@ where
         tensor: ComplexTensor<SplitBackend<B>>,
         dim: usize,
         out_dtype: burn_std::BoolDType,
-    ) -> super::BoolTensor<SplitBackend<B>> {
+    ) -> B::BoolTensorPrimitive {
         let real_nonzero =
             B::float_not_equal_elem(tensor.real, burn_tensor::Scalar::Float(0.0), out_dtype);
         let imag_nonzero =
@@ -730,7 +740,7 @@ where
     fn complex_select(
         tensor: ComplexTensor<SplitBackend<B>>,
         dim: usize,
-        indices: super::IntTensor<SplitBackend<B>>,
+        indices: B::IntTensorPrimitive,
     ) -> ComplexTensor<SplitBackend<B>> {
         SplitComplexTensor {
             real: B::float_select(tensor.real, dim, indices.clone()),
@@ -819,7 +829,7 @@ where
 
     fn complex_mask_where(
         tensor: ComplexTensor<SplitBackend<B>>,
-        mask: super::BoolTensor<SplitBackend<B>>,
+        mask: B::BoolTensorPrimitive,
         source: ComplexTensor<SplitBackend<B>>,
     ) -> ComplexTensor<SplitBackend<B>> {
         SplitComplexTensor {
@@ -830,7 +840,7 @@ where
 
     fn complex_mask_fill(
         tensor: ComplexTensor<SplitBackend<B>>,
-        mask: super::BoolTensor<SplitBackend<B>>,
+        mask: B::BoolTensorPrimitive,
         value: <SplitBackend<B> as ComplexTensorBackend>::ComplexScalar,
     ) -> ComplexTensor<SplitBackend<B>> {
         use burn_tensor::cast::ToElement;
@@ -850,7 +860,7 @@ where
 
     fn complex_sign(tensor: ComplexTensor<SplitBackend<B>>) -> ComplexTensor<SplitBackend<B>> {
         // sign(z) = z / |z| = from_polar(1, arg(z))
-        let abs = SplitBackend::<B>::complex_abs(tensor.clone());
+        let abs = SplitBackend::<B>::abs(tensor.clone());
         SplitComplexTensor {
             real: FlOps::<B>::float_div(tensor.real, abs.clone()),
             imag: FlOps::<B>::float_div(tensor.imag, abs),
@@ -898,7 +908,7 @@ where
     fn complex_select_add(
         tensor: ComplexTensor<SplitBackend<B>>,
         dim: usize,
-        indices: super::IntTensor<SplitBackend<B>>,
+        indices: B::IntTensorPrimitive,
         values: ComplexTensor<SplitBackend<B>>,
     ) -> ComplexTensor<SplitBackend<B>> {
         SplitComplexTensor {

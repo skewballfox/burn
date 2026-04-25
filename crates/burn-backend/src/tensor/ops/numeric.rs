@@ -473,28 +473,6 @@ where
     /// function, which is more high-level and designed for public use.
     fn cumprod(tensor: Self::Primitive, dim: usize) -> Self::Primitive;
 
-    /// Calculate absolute value on all elements of a tensor
-    ///
-    /// # Arguments
-    ///
-    /// * `tensor` - The tensor to apply abs to.
-    ///
-    /// # Returns
-    ///
-    /// A tensor with absolute values.
-    ///
-    /// # Remarks
-    ///
-    /// This is a low-level function used internally by the library to call different backend functions
-    /// with static dispatch. It is not designed for direct usage by users, and not recommended to import
-    /// or use this function directly.
-    ///
-    /// For calculating abs of the elements of a tensor, users should prefer the
-    #[cfg_attr(doc, doc = crate::doc_tensor!("abs"))]
-    #[cfg_attr(not(doc), doc = "`Tensor::abs`")]
-    /// function, which is more high-level and designed for public use.
-    fn abs(tensor: Self::Primitive) -> Self::Primitive;
-
     /// Element-wise power of a tensor
     ///
     /// # Arguments

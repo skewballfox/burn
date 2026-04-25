@@ -1,10 +1,10 @@
-use crate::{Backend, get_device_settings};
+use crate::{Backend, BackendTypes, get_device_settings};
 use burn_std::quantization::{QuantAcc, QuantPropagation, QuantScheme};
 use burn_std::{DType, Shape};
 
 #[derive(Debug, Clone)]
 /// A primitive tensor representation.
-pub enum TensorPrimitive<B: Backend> {
+pub enum TensorPrimitive<B: BackendTypes> {
     /// Float tensor primitive.
     Float(B::FloatTensorPrimitive),
     /// Quantized float tensor primitive.
@@ -32,7 +32,7 @@ impl<B: Backend> TensorPrimitive<B> {
     }
 }
 
-impl<B: Backend> TensorMetadata for TensorPrimitive<B> {
+impl<B: BackendTypes + Clone + std::fmt::Debug> TensorMetadata for TensorPrimitive<B> {
     fn dtype(&self) -> DType {
         match self {
             TensorPrimitive::Float(tensor) => tensor.dtype(),

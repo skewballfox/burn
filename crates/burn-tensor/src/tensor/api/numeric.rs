@@ -665,31 +665,6 @@ where
         Self::new(K::cumprod(self.primitive, dim))
     }
 
-    /// Apply element wise absolute value operation.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use burn_tensor::backend::Backend;
-    /// use burn_tensor::{Int, Tensor};
-    ///
-    /// fn example<B: Backend>() {
-    ///   let device = Default::default();
-    ///   let tensor = Tensor::<B, 2, Int>::from_ints([[1, -2, 3], [4, -5, 6], [7, -8, 9]], &device);
-    ///   let tensor = tensor.abs();
-    ///   println!("{tensor}");
-    ///   // [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
-    /// }
-    /// ```
-    ///
-    /// # Notes
-    ///
-    /// For signed integer dtypes, this operation uses two's-complement wraparound semantics, similar to
-    /// `x.wrapping_abs()`. For example, `abs(i64::MIN) == i64::MIN`.
-    pub fn abs(self) -> Self {
-        Self::new(K::abs(self.primitive))
-    }
-
     /// Returns the upper triangular part of a matrix (2-D tensor) or batch of matrices input,
     /// the other elements of the result tensor out are set to 0.
     ///

@@ -255,10 +255,6 @@ impl<B: Backend> Numeric<B> for Int {
         B::int_cumprod(tensor, dim)
     }
 
-    fn abs(tensor: Self::Primitive) -> Self::Primitive {
-        B::int_abs(tensor)
-    }
-
     fn powi(lhs: Self::Primitive, rhs: Self::Primitive) -> Self::Primitive {
         B::int_powi(lhs, rhs)
     }
@@ -293,6 +289,9 @@ impl<B: Backend> Numeric<B> for Int {
 }
 
 impl<B: Backend> Ordered<B> for Int {
+    fn abs(tensor: Self::Primitive) -> Self::Primitive {
+        B::int_abs(tensor)
+    }
     fn sort(tensor: Self::Primitive, dim: usize, descending: bool) -> Self::Primitive {
         B::int_sort(tensor, dim, descending)
     }
