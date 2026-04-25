@@ -974,6 +974,7 @@ version = "0.21.0-pre.3"
 dependencies = [
  "burn-autodiff",
  "burn-backend",
+ "burn-complex",
  "burn-cpu",
  "burn-cuda",
  "burn-flex",

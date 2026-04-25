@@ -40,7 +40,6 @@ pub trait ToComplex<C> {
     fn to_complex(&self) -> C;
 }
 
-
 /// Trait to access the real and imaginary parts of a complex element
 pub trait ComplexElement: Element {
     /// The inner type of the complex number (e.g. f32 for Complex<f32>)
@@ -62,7 +61,7 @@ impl<E: Element + ElementComparison + bytemuck::Pod> ComplexElement for Complex<
         self.imag
     }
 }
-/// Complex Element Type, essentially a copy of num_complex::Complex, 
+/// Complex Element Type, essentially a copy of num_complex::Complex,
 /// but with some burn specific modifications
 #[derive(Clone, PartialEq)]
 #[repr(C)]
@@ -583,10 +582,6 @@ impl<E: ElementEq> ElementEq for Complex<E> {
         self.real.eq(&other.real) && self.imag.eq(&other.imag)
     }
 }
-
-
-
-
 
 macro_rules! to_complex {
     (

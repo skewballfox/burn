@@ -134,11 +134,11 @@ pub trait ToElement {
         ToElement::to_bool(&self.to_u64())
     }
 
-    /// Converts the value of `self` to an `Complex<f32>`. If the element is itself not complex, the 
+    /// Converts the value of `self` to an `Complex<f32>`. If the element is itself not complex, the
     /// imaginary component will be initialized to zero. Overflows may map to positive
     /// or negative infinity.
     fn to_complex32(&self) -> Complex<f32>;
-    /// Converts the value of `self` to an `Complex<f64>`. If the element is itself not complex, the 
+    /// Converts the value of `self` to an `Complex<f64>`. If the element is itself not complex, the
     /// imaginary component will be initialized to zero. Overflows may map to positive
     /// or negative infinity.
     fn to_complex64(&self) -> Complex<f64>;

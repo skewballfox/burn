@@ -1,8 +1,8 @@
 //#[burn_tensor_testgen::testgen(complex)]
 mod tests {
-    use crate::base::{ComplexKind};
-    
-    use super::*;
+    use crate::base::ComplexKind;
+
+    use crate::base::ComplexTensorBackend;
     use burn_tensor::{Complex, Tensor, TensorData};
     type TestBackend = burn_flex::Flex;
     #[test]
