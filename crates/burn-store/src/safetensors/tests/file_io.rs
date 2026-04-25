@@ -8,7 +8,7 @@ use burn_tensor::backend::Backend;
 
 use tempfile::tempdir;
 
-type TestBackend = burn_ndarray::NdArray;
+type TestBackend = burn_flex::Flex;
 
 // Define a test model with forward pass
 #[derive(Module, Debug)]
@@ -262,7 +262,7 @@ fn test_forward_pass_preservation_after_save_load() {
 
 #[test]
 fn should_save_load_compose() {
-    let device = <TestBackend as Backend>::Device::default();
+    let device = Default::default();
     let module_1 = ModuleComposed::<TestBackend>::new(&device);
     let mut module_2 = ModuleComposed::<TestBackend>::new(&device);
     assert_ne!(module_1.weight.to_data(), module_2.weight.to_data());

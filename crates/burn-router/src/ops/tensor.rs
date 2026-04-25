@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
-use burn_backend::Scalar;
-use burn_backend::backend::{Backend, ExecutionError};
+use burn_backend::backend::ExecutionError;
+use burn_backend::{Scalar, tensor::FloatElem};
 use burn_std::{BoolDType, IntDType};
 
 use crate::{BackendRouter, RunnerChannel, RunnerClient, get_client};
@@ -86,7 +86,7 @@ impl<R: RunnerChannel> FloatTensorOps<Self> for BackendRouter<R> {
             .into_data()
             .await?
             // Since underlying backends can have different data types, we convert to the current elem
-            .convert::<<Self as Backend>::FloatElem>())
+            .convert::<FloatElem<Self>>())
     }
 
     fn float_device(tensor: &FloatTensor<Self>) -> Device<Self> {

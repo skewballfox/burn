@@ -495,7 +495,7 @@ mod tests {
         fn check<B: Backend>() {
             _assert_sync::<Param<Tensor<B, 2>>>();
         }
-        check::<burn_ndarray::NdArray>();
+        check::<burn_flex::Flex>();
     }
 
     /// Concurrent lazy initialization must not panic.
@@ -508,8 +508,8 @@ mod tests {
     fn param_concurrent_lazy_init() {
         use alloc::vec::Vec;
 
-        type B = burn_ndarray::NdArray;
-        let device = <B as Backend>::Device::default();
+        type B = burn_flex::Flex;
+        let device = Default::default();
 
         let param: Param<Tensor<B, 2>> = Param::uninitialized(
             ParamId::new(),

@@ -26,7 +26,7 @@ pub fn launch_multi<B: AutodiffBackend>() {
     let num_devices = B::device_count(type_id);
 
     let devices = (0..num_devices)
-        .map(|i| B::Device::from_id(DeviceId::new(type_id, i as u32)))
+        .map(|i| B::Device::from_id(DeviceId::new(type_id, i as u16)))
         .collect();
 
     launch::<B>(ExecutionStrategy::MultiDevice(
@@ -41,7 +41,7 @@ pub fn launch_multi<B: AutodiffBackend + DistributedBackend>() {
     let num_devices = B::device_count(type_id);
 
     let devices = (0..num_devices)
-        .map(|i| B::Device::from_id(DeviceId::new(type_id, i as u32)))
+        .map(|i| B::Device::from_id(DeviceId::new(type_id, i as u16)))
         .collect();
 
     launch::<B>(ExecutionStrategy::ddp(
@@ -67,26 +67,6 @@ pub fn launch<B: AutodiffBackend>(strategy: ExecutionStrategy<B>) {
         config,
         "/tmp/text-classification-ag-news",
     );
-}
-
-#[cfg(any(
-    feature = "ndarray",
-    feature = "ndarray-blas-netlib",
-    feature = "ndarray-blas-openblas",
-    feature = "ndarray-blas-accelerate",
-))]
-mod ndarray {
-    use super::*;
-    use burn::backend::{
-        Autodiff,
-        ndarray::{NdArray, NdArrayDevice},
-    };
-
-    use crate::{ElemType, launch};
-
-    pub fn run() {
-        launch::<Autodiff<NdArray<ElemType>>>(ExecutionStrategy::SingleDevice(NdArrayDevice::Cpu));
-    }
 }
 
 #[cfg(feature = "tch-gpu")]
@@ -202,24 +182,17 @@ mod rocm {
 #[cfg(feature = "flex")]
 mod flex {
     use super::*;
-    use crate::{ElemType, launch};
+    use crate::launch;
     use burn::backend::{Autodiff, Flex, autodiff::checkpoint::strategy::BalancedCheckpointing};
 
     pub fn run() {
-        launch::<Autodiff<Flex<ElemType, i32>, BalancedCheckpointing>>(
-            ExecutionStrategy::SingleDevice(Default::default()),
-        );
+        launch::<Autodiff<Flex, BalancedCheckpointing>>(ExecutionStrategy::SingleDevice(
+            Default::default(),
+        ));
     }
 }
 
 fn main() {
-    #[cfg(any(
-        feature = "ndarray",
-        feature = "ndarray-blas-netlib",
-        feature = "ndarray-blas-openblas",
-        feature = "ndarray-blas-accelerate",
-    ))]
-    ndarray::run();
     #[cfg(feature = "tch-gpu")]
     tch_gpu::run();
     #[cfg(feature = "tch-cpu")]

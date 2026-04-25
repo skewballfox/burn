@@ -160,6 +160,7 @@ mod tests {
     use super::*;
     use crate::TestBackend;
     use crate::data::dataset::FakeDataset;
+    use burn_tensor::Device;
 
     #[derive(new, Clone)]
     struct TestBatcherDevice;
@@ -171,12 +172,10 @@ mod tests {
         }
     }
 
-    type TestDevice = <TestBackend as Backend>::Device;
+    type TestDevice = Device<TestBackend>;
 
     #[test]
     fn test_dataloader_no_workers() {
-        type TestDevice = <TestBackend as Backend>::Device;
-
         let default_device = TestDevice::default();
         let dataloader = DataLoaderBuilder::new(TestBatcherDevice::new())
             .batch_size(1)
@@ -218,10 +217,7 @@ mod tests {
             not(feature = "test-cuda")
         ))]
         // Only one device exists...
-        let (device1, device2) = (
-            burn_ndarray::NdArrayDevice::Cpu,
-            burn_ndarray::NdArrayDevice::Cpu,
-        );
+        let (device1, device2) = (burn_flex::FlexDevice, burn_flex::FlexDevice);
 
         #[cfg(all(test, feature = "test-tch"))]
         let (device1, device2) = (

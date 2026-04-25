@@ -3098,10 +3098,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
         }
     }
 
-    fn float_into_int(
-        tensor: FloatTensor<Self>,
-        out_dtype: IntDType,
-    ) -> <Autodiff<B> as Backend>::IntTensorPrimitive {
+    fn float_into_int(tensor: FloatTensor<Self>, out_dtype: IntDType) -> IntTensor<B> {
         B::float_into_int(tensor.primitive, out_dtype)
     }
 

@@ -626,12 +626,30 @@ impl ModuleOps<Self> for Dispatch {
         )
     }
 
-    fn rfft(signal: FloatTensor<Self>, dim: usize) -> (FloatTensor<Self>, FloatTensor<Self>) {
+    fn layer_norm(
+        tensor: FloatTensor<Self>,
+        gamma: FloatTensor<Self>,
+        beta: Option<FloatTensor<Self>>,
+        epsilon: f64,
+    ) -> FloatTensor<Self> {
+        multi_op!(
+            inputs[(tensor, float), (gamma, float)],
+            opt_inputs[(beta, float)],
+            => Float,
+            B::layer_norm(tensor, gamma, beta, epsilon)
+        )
+    }
+
+    fn rfft(
+        signal: FloatTensor<Self>,
+        dim: usize,
+        n: Option<usize>,
+    ) -> (FloatTensor<Self>, FloatTensor<Self>) {
         let (real, imag) = multi_op!(
             inputs[(signal, float)],
             outputs[(real, Float), (imag, Float)],
             {
-                let res = B::rfft(signal, dim);
+                let res = B::rfft(signal, dim, n);
                 (res.0, res.1)
             }
         );
@@ -643,12 +661,13 @@ impl ModuleOps<Self> for Dispatch {
         spectrum_re: FloatTensor<Self>,
         spectrum_im: FloatTensor<Self>,
         dim: usize,
+        n: Option<usize>,
     ) -> FloatTensor<Self> {
         multi_op!(
             inputs[(spectrum_re, float), (spectrum_im, float)],
             => Float,
             {
-                B::irfft(spectrum_re, spectrum_im, dim)
+                B::irfft(spectrum_re, spectrum_im, dim, n)
             }
         )
     }

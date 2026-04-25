@@ -6,7 +6,7 @@ use burn::tensor::backend::Backend;
 use burn::tensor::{Int, Tensor};
 use burn_core as burn;
 
-pub type TestBackend = burn_ndarray::NdArray<f32>;
+pub type TestBackend = burn_flex::Flex;
 #[cfg(feature = "std")]
 pub type TestAutodiffBackend = burn_autodiff::Autodiff<TestBackend>;
 
@@ -167,7 +167,7 @@ mod state {
 
     #[test]
     fn should_load_from_record_basic() {
-        let device = <TestBackend as Backend>::Device::default();
+        let device = Default::default();
         let module_1 = ModuleBasic::<TestBackend>::new(&device);
         let mut module_2 = ModuleBasic::<TestBackend>::new(&device);
 
@@ -191,7 +191,7 @@ mod state {
 
     #[test]
     fn should_load_from_record_compose() {
-        let device = <TestBackend as Backend>::Device::default();
+        let device = Default::default();
         let module_1 = ModuleComposed::<TestBackend>::new(&device);
         let mut module_2 = ModuleComposed::<TestBackend>::new(&device);
         assert_ne!(module_1.weight.to_data(), module_2.weight.to_data());
@@ -212,7 +212,7 @@ mod state {
 
     #[test]
     fn should_load_from_record_enum() {
-        let device = <TestBackend as Backend>::Device::default();
+        let device = Default::default();
         let module_1 = ModuleEnum::Basic(ModuleBasic::<TestBackend>::new(&device));
         let mut module_2 = ModuleEnum::Basic(ModuleBasic::<TestBackend>::new(&device));
 
@@ -243,7 +243,7 @@ mod state {
 
     #[test]
     fn should_load_from_record_based_on_attributes() {
-        let device = <TestBackend as Backend>::Device::default();
+        let device = Default::default();
         let mut module_1 = ModuleWithAttributes::<TestBackend, _, _>::new(&device);
         let mut module_2 = ModuleWithAttributes::new(&device);
 
@@ -311,7 +311,7 @@ mod state {
 
     #[test]
     fn should_load_from_record_const_generic() {
-        let device = <TestBackend as Backend>::Device::default();
+        let device = Default::default();
         let module_1 = ModuleWithConstGeneric {
             modules: [
                 ModuleBasic::<TestBackend>::new(&device),
@@ -352,7 +352,7 @@ mod state {
     #[test]
     #[should_panic(expected = "Can't parse record from a different variant")]
     fn should_panic_load_from_incorrect_enum_variant() {
-        let device = <TestBackend as Backend>::Device::default();
+        let device = Default::default();
         let module_1 = ModuleEnum::Basic(ModuleBasic::<TestBackend>::new(&device));
         let module_2 = ModuleEnum::Composed(ModuleComposed::<TestBackend>::new(&device));
         let state_1 = module_1.clone().into_record();
@@ -362,11 +362,13 @@ mod state {
 }
 
 mod lazy_clone {
+    use burn_tensor::Device;
+
     use super::*;
 
     #[test]
     fn clone_uninitialized_param_should_not_trigger_init() {
-        let device = <TestBackend as Backend>::Device::default();
+        let device = Default::default();
         let module = ModuleBasic::<TestBackend>::new(&device);
 
         // Module starts uninitialized (lazy).
@@ -380,7 +382,7 @@ mod lazy_clone {
 
     #[test]
     fn clone_initialized_param_should_share_values() {
-        let device = <TestBackend as Backend>::Device::default();
+        let device = Default::default();
         let module = ModuleBasic::<TestBackend>::new(&device);
 
         // Force initialization by accessing the tensor.
@@ -394,7 +396,7 @@ mod lazy_clone {
 
     #[test]
     fn lazy_clone_should_produce_valid_tensor_on_access() {
-        let device = <TestBackend as Backend>::Device::default();
+        let device = Default::default();
         let module = ModuleBasic::<TestBackend>::new(&device);
         let cloned = module.clone();
 
@@ -412,7 +414,7 @@ mod lazy_clone {
 
     #[test]
     fn lazy_clone_and_original_produce_independent_values() {
-        let device = <TestBackend as Backend>::Device::default();
+        let device = Default::default();
         let module = ModuleBasic::<TestBackend>::new(&device);
         let cloned = module.clone();
 
@@ -428,7 +430,7 @@ mod lazy_clone {
 
     #[test]
     fn lazy_clone_deref_should_trigger_init() {
-        let device = <TestBackend as Backend>::Device::default();
+        let device = Default::default();
         let module = ModuleBasic::<TestBackend>::new(&device);
         let cloned = module.clone();
 
@@ -444,7 +446,7 @@ mod lazy_clone {
         use burn::module::ParamId;
         use burn::tensor::Shape;
 
-        let device = <TestBackend as Backend>::Device::default();
+        let device: Device<TestBackend> = Default::default();
 
         // Create two uninitialized params from the same init function.
         let param: Param<Tensor<TestBackend, 2>> = Param::uninitialized(
@@ -470,7 +472,7 @@ mod lazy_clone {
 
     #[test]
     fn load_record_into_uninitialized_module_should_work() {
-        let device = <TestBackend as Backend>::Device::default();
+        let device = Default::default();
         let module_1 = ModuleBasic::<TestBackend>::new(&device);
 
         // Initialize module_1 so we have a record to load.
@@ -496,21 +498,21 @@ mod num_params {
 
     #[test]
     fn should_calculate_num_params_basic() {
-        let device = <TestBackend as Backend>::Device::default();
+        let device = Default::default();
         let module = ModuleBasic::<TestBackend>::new(&device);
         assert_eq!(20 * 20, module.num_params());
     }
 
     #[test]
     fn should_output_state_composed() {
-        let device = <TestBackend as Backend>::Device::default();
+        let device = Default::default();
         let module = ModuleComposed::<TestBackend>::new(&device);
         assert_eq!(4 * 20 * 20, module.num_params());
     }
 
     #[test]
     fn should_calculate_num_params_enum() {
-        let device = <TestBackend as Backend>::Device::default();
+        let device = Default::default();
         let module = ModuleEnum::Basic(ModuleBasic::<TestBackend>::new(&device));
         assert_eq!(20 * 20, module.num_params());
 
@@ -520,7 +522,7 @@ mod num_params {
 
     #[test]
     fn should_calculate_num_params_based_on_attributes() {
-        let device = <TestBackend as Backend>::Device::default();
+        let device = Default::default();
         let module = ModuleWithAttributes::<TestBackend, _, _>::new(&device);
         assert_eq!(20 * 20 * 2, module.num_params());
     }
@@ -538,7 +540,7 @@ mod require_grad {
 
     #[test]
     fn should_have_grad_by_default() {
-        let device = <TestBackend as Backend>::Device::default();
+        let device = Default::default();
         let module = ModuleBasic::<TestAutodiffBackend>::new(&device);
         let grad_x = calculate_grads(&module, |weights, x| weights.matmul(x));
 
@@ -547,7 +549,7 @@ mod require_grad {
 
     #[test]
     fn should_have_no_grad_after_no_grad() {
-        let device = <TestAutodiffBackend as Backend>::Device::default();
+        let device = Default::default();
         let module = ModuleBasic::<TestAutodiffBackend>::new(&device).no_grad();
         let grad_x = calculate_grads(&module, |weights, x| weights.matmul(x));
 
@@ -556,7 +558,7 @@ mod require_grad {
 
     #[test]
     fn should_have_grad_when_from_record() {
-        let device = <TestAutodiffBackend as Backend>::Device::default();
+        let device = Default::default();
         let module = ModuleBasic::<TestAutodiffBackend>::new(&device);
         let record = ModuleBasicRecord {
             weight_basic: module.weight_basic.clone(), // Even when param is no_grad,
@@ -591,6 +593,7 @@ mod grad_distributed {
     use burn_std::device::{Device, DeviceId};
     use burn_tensor::backend::distributed::DistributedBackend;
     use burn_tensor::backend::distributed::{DistributedParamId, ReduceOperation};
+    use burn_tensor::{Device, Tolerance};
     use burn_tensor::{TensorData, backend::AutodiffBackend};
     use rand::{
         SeedableRng,
@@ -675,7 +678,6 @@ mod grad_distributed {
         });
     }
 
-    #[cfg(feature = "std")]
     fn compare_sync_gradients<B: AutodiffBackend + DistributedBackend>(
         op: ReduceOperation,
         transformation: fn(Tensor<B, 2>, Tensor<B, 2>) -> Tensor<B, 2>,
@@ -686,21 +688,50 @@ mod grad_distributed {
         let type_id = 0u16;
 
         let device_count = <B as Backend>::device_count(type_id);
-        let devices = create_devices::<B::Device>(type_id, device_count);
+        let devices = create_devices::<Device<B>>(type_id, device_count);
         let module = ModuleBasic::<B>::new(&devices[0]);
-        let (senders, receivers) = create_channels(device_count);
+        let (synced_senders, synced_receivers): (
+            Vec<Sender<TensorData>>,
+            Vec<Receiver<TensorData>>,
+        ) = (0..device_count)
+            .map(|_| std::sync::mpsc::channel())
+            .unzip();
+        let (original_senders, original_receivers): (
+            Vec<Sender<TensorData>>,
+            Vec<Receiver<TensorData>>,
+        ) = (0..device_count)
+            .map(|_| std::sync::mpsc::channel())
+            .unzip();
 
         let config = DistributedConfig { all_reduce_op: op };
-        B::start_communication_server(devices.clone(), config);
+        B::start_communication_server(devices.as_slice(), config);
 
         let join_handles = spawn_peer_threads(
             &module,
             &devices,
-            senders,
-            receivers,
+            synced_senders,
+            original_senders,
             transformation,
             NUM_ITERATIONS,
         );
+
+        for _ in 0..NUM_ITERATIONS {
+            let device = devices.first().unwrap();
+            let mut expected: Tensor<B::InnerBackend, 2> =
+                Tensor::from_data(original_receivers.first().unwrap().recv().unwrap(), device);
+            for r in original_receivers[1..].iter().by_ref() {
+                let data = r.recv().unwrap();
+                expected = expected.add(Tensor::from_data(data, device));
+            }
+            if op == ReduceOperation::Mean {
+                expected = expected.div_scalar(original_receivers.len() as f32);
+            }
+
+            for r in synced_receivers.iter().by_ref() {
+                let data = r.recv().unwrap();
+                data.assert_approx_eq::<f32>(&expected.to_data(), Tolerance::default());
+            }
+        }
 
         for handle in join_handles {
             handle.join().unwrap();
@@ -709,62 +740,35 @@ mod grad_distributed {
         B::close_communication_server(&devices[0]);
     }
 
-    #[cfg(feature = "distributed")]
     fn create_devices<D: Device>(type_id: u16, count: usize) -> Vec<D> {
         (0..count)
-            .map(|i| D::from_id(DeviceId::new(type_id, i as u32)))
+            .map(|i| D::from_id(DeviceId::new(type_id, i as u16)))
             .collect()
     }
 
-    #[cfg(feature = "distributed")]
-    fn create_channels(
-        device_count: usize,
-    ) -> (Vec<Sender<TensorData>>, Vec<Receiver<TensorData>>) {
-        (1..device_count)
-            .map(|_| std::sync::mpsc::channel())
-            .unzip()
-    }
-
-    #[cfg(feature = "distributed")]
     fn spawn_peer_threads<B: AutodiffBackend>(
         module: &ModuleBasic<B>,
-        devices: &[<B as Backend>::Device],
-        senders: Vec<Sender<TensorData>>,
-        receivers: Vec<Receiver<TensorData>>,
+        devices: &[Device<B>],
+        synced_senders: Vec<Sender<TensorData>>,
+        original_senders: Vec<Sender<TensorData>>,
         transformation: fn(Tensor<B, 2>, Tensor<B, 2>) -> Tensor<B, 2>,
         num_iter: usize,
     ) -> Vec<std::thread::JoinHandle<()>> {
         let mut handles = vec![];
 
-        // Spawn main peer thread (id=0)
-        let module_clone = module.clone();
-        let device = devices[0].clone();
-        handles.push(std::thread::spawn(move || {
-            run_peer_sharded(
-                &module_clone,
-                None,
-                transformation,
-                device,
-                num_iter,
-                true,
-                receivers,
-            )
-        }));
-
-        // Spawn worker peer threads (id > 0)
-        for i in 1..devices.len() {
+        for i in 0..devices.len() {
             let module_clone = module.clone();
             let device = devices[i].clone();
-            let sender = Some(senders[i - 1].clone());
+            let synced_sender = synced_senders[i].clone();
+            let original_sender = original_senders[i].clone();
             handles.push(std::thread::spawn(move || {
                 run_peer_sharded(
                     &module_clone,
-                    sender,
+                    synced_sender,
+                    original_sender,
                     transformation,
                     device,
                     num_iter,
-                    false,
-                    vec![],
                 )
             }));
         }
@@ -772,34 +776,28 @@ mod grad_distributed {
         handles
     }
 
-    #[cfg(feature = "distributed")]
     pub fn run_peer_sharded<B: AutodiffBackend>(
         module: &ModuleBasic<B>,
-        output: Option<Sender<TensorData>>,
+        synced_sender: Sender<TensorData>,
+        original_sender: Sender<TensorData>,
         transformation: fn(Tensor<B, 2>, Tensor<B, 2>) -> Tensor<B, 2>,
         device: B::Device,
         num_iter: usize,
-        is_main: bool,
-        recvs: Vec<Receiver<TensorData>>,
     ) {
         let mut module = module.clone().fork(&device);
 
         for _ in 0..num_iter {
             module = set_distributed(&module, &device);
-            let grads_x = calculate_grads(&module, transformation);
-            let data = grads_x.unwrap().to_data();
-            if !is_main {
-                output.clone().unwrap().send(data).unwrap();
-            } else {
-                for r in recvs.iter().by_ref() {
-                    let t = r.recv().unwrap();
-                    assert_eq!(data, t);
-                }
-            }
+            let (grads_synced, grads_original) = calculate_grads(&module, transformation);
+
+            let data = grads_original.unwrap().to_data();
+            original_sender.clone().send(data).unwrap();
+
+            let data = grads_synced.unwrap().to_data();
+            synced_sender.clone().send(data).unwrap();
         }
     }
 
-    #[cfg(feature = "distributed")]
     fn set_distributed<B: AutodiffBackend>(
         module: &ModuleBasic<B>,
         device: &B::Device,
@@ -814,18 +812,30 @@ mod grad_distributed {
     fn calculate_grads<B: AutodiffBackend>(
         module: &ModuleBasic<B>,
         transformation: fn(Tensor<B, 2>, Tensor<B, 2>) -> Tensor<B, 2>,
-    ) -> Option<Tensor<B::InnerBackend, 2>> {
+    ) -> (
+        Option<Tensor<B::InnerBackend, 2>>,
+        Option<Tensor<B::InnerBackend, 2>>,
+    ) {
         let device = module.weight_basic.device();
         let data = TensorData::random::<f32, _, _>(
             module.weight_basic.shape(),
             burn_tensor::Distribution::Default,
             &mut StdRng::try_from_rng(&mut SysRng).unwrap(),
         );
-        let x = Tensor::from_data(data, &device).require_grad();
+        let x = Tensor::from_data(data.clone(), &device).require_grad();
         let t = module.weight_basic.val();
         let y = transformation(t, x);
 
         let mut grads = y.backward();
-        module.weight_basic.grad_remove(&mut grads)
+        let grads_synced = module.weight_basic.grad_remove(&mut grads);
+
+        // Kind of hacky, but running the backward pass again without marking the tensor as distributed will not sync gradients.
+        // We can use this to compute the expected sum.
+        let x = Tensor::from_data(data, &device).require_grad();
+        let t = module.weight_basic.val();
+        let y = transformation(t, x);
+        let mut grads = y.backward();
+        let grads_original = module.weight_basic.grad_remove(&mut grads);
+        (grads_synced, grads_original)
     }
 }

@@ -7,10 +7,15 @@ use crate::{
     ops::TransactionPrimitive,
     tensor::{
         BasicAutodiffOps, BasicOps, BoolTensor, Device, IndexingUpdateOp, Int, IntTensor, Numeric,
-        Ordered, TensorKind,
+        Ordered, TensorKind, TransactionOp,
     },
 };
 
+impl<B: Backend> TransactionOp<B> for Int {
+    fn register_transaction(tr: &mut TransactionPrimitive<B>, tensor: Self::Primitive) {
+        tr.register_int(tensor);
+    }
+}
 impl<B: Backend> BasicOps<B> for Int {
     type Elem = B::IntElem;
 
@@ -27,10 +32,6 @@ impl<B: Backend> BasicOps<B> for Int {
 
     fn full(shape: Shape, fill_value: Scalar, device: &Device<B>, dtype: DType) -> Self::Primitive {
         B::int_full(shape, fill_value, device, dtype.into())
-    }
-
-    fn register_transaction(tr: &mut TransactionPrimitive<B>, tensor: Self::Primitive) {
-        tr.register_int(tensor);
     }
 
     fn reshape(tensor: Self::Primitive, shape: Shape) -> Self::Primitive {

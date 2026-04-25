@@ -34,6 +34,7 @@ pub fn split_dataloader<B: Backend, O>(
 
 #[cfg(test)]
 mod tests {
+    use burn_tensor::Device;
     use std::collections::HashSet;
 
     use super::*;
@@ -44,7 +45,7 @@ mod tests {
 
     #[test]
     fn test_split_batch_dataloader() {
-        type TestDevice = <TestBackend as Backend>::Device;
+        type TestDevice = Device<TestBackend>;
 
         #[derive(new, Clone)]
         pub struct TestBatcher;
@@ -75,10 +76,7 @@ mod tests {
             not(feature = "test-cuda")
         ))]
         // Only one device exists...
-        let (device1, device2) = (
-            burn_ndarray::NdArrayDevice::Cpu,
-            burn_ndarray::NdArrayDevice::Cpu,
-        );
+        let (device1, device2) = (burn_flex::FlexDevice, burn_flex::FlexDevice);
 
         #[cfg(all(test, feature = "test-tch"))]
         let (device1, device2) = (
