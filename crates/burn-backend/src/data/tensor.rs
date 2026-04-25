@@ -522,8 +522,8 @@ impl TensorData {
                 DType::Bool(BoolStore::U32) => self.convert_clone_dtype::<u32>(dtype),
                 // DType::Complex32 => self.convert_clone_dtype::<Complex32>(dtype),
                 // DType::Complex64 => self.convert_clone_dtype::<Complex64>(dtype),
-                DType::Complex32 => unimplemented!("TensorData isn't used for Dtype Complex32"),
-                DType::Complex64 => unimplemented!("TensorData isn't used for Dtype Complex64"),
+                DType::Complex32 => self.convert_clone_dtype::<Complex<f32>>(dtype),
+                DType::Complex64 => self.convert_clone_dtype::<Complex<f64>>(dtype),
                 DType::QFloat(_) => unreachable!(),
             }
         }
@@ -586,8 +586,8 @@ impl TensorData {
             DType::Bool(BoolStore::U32) => self.convert_clone::<Current, u32>().into_bool_u32(),
             // DType::Complex32 => self.convert_clone::<Current, Complex32>(),
             // DType::Complex64 => self.convert_clone::<Current, Complex64>(),
-            DType::Complex32 => unimplemented!("TensorData isn't used for Dtype Complex32"),
-            DType::Complex64 => unimplemented!("TensorData isn't used for Dtype Complex64"),
+            DType::Complex32 => self.convert_clone::<Current, Complex<f32>>(),
+            DType::Complex64 => self.convert_clone::<Current, Complex<f64>>(),
             DType::QFloat(_) => unreachable!(),
         }
     }

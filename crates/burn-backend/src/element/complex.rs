@@ -12,7 +12,6 @@ use num_traits::FromPrimitive;
 use num_traits::Num;
 use num_traits::One;
 use num_traits::Zero;
-use num_traits::identities::ConstZero;
 use rand::Rng;
 use std::ops::Add;
 use std::ops::Mul;
@@ -33,17 +32,25 @@ mod tch {
 }
 
 use std::ops::Div;
+
+/// trait to convert an element to a complex number when the conversion needs to be generic over
+/// the target complex type (e.g. Complex<f32> or Complex<f64>)
 pub trait ToComplex<C> {
+    /// Convert self to a complex number of type C
     fn to_complex(&self) -> C;
 }
 
-use paste::paste;
+
 
 pub trait ToComplexElement: ToElement {}
 
+/// Trait to access the real and imaginary parts of a complex element
 pub trait ComplexElement: Element {
+    /// The inner type of the complex number (e.g. f32 for Complex<f32>)
     type InnerType: Element;
+    /// Get the real part of the complex number
     fn real(&self) -> Self::InnerType;
+    /// Get the imaginary part of the complex number
     fn imag(&self) -> Self::InnerType;
 }
 
@@ -58,11 +65,14 @@ impl<E: Element + ElementComparison + bytemuck::Pod> ComplexElement for Complex<
         self.imag
     }
 }
-
+/// Complex Element Type, essentially a copy of num_complex::Complex, 
+/// but with some burn specific modifications
 #[derive(Clone, PartialEq)]
 #[repr(C)]
 pub struct Complex<E> {
+    /// Real part of a complex number
     pub real: E,
+    /// Imag part of a complex number
     pub imag: E,
 }
 
@@ -317,10 +327,12 @@ impl<E> Complex<E> {
     pub fn new(real: E, imag: E) -> Self {
         Self { real, imag }
     }
+    /// Get the real part of the complex number
     #[inline]
     pub fn real(self) -> E {
         self.real
     }
+    /// Get the imaginary part of the complex number
     #[inline]
     pub fn imag(self) -> E {
         self.imag
@@ -510,7 +522,7 @@ where
             Self::from_polar(r.sqrt(), theta / two)
         }
     }
-
+    /// Computes the principal value of the sine of `self`.
     pub fn sin(self) -> Self {
         // formula: sin(a + bi) = sin(a) cosh(b) + i cos(a) sinh(b)
         Self::new(
@@ -518,12 +530,12 @@ where
             self.real.cos() * self.imag.sinh(),
         )
     }
-
+    /// Computes the principal value of the tangent of `self`.
     pub fn tan(self) -> Self {
         // formula: tan(z) = sin(z) / cos(z)
         self.sin() / self.cos()
     }
-
+    /// Computes the principal value of the cosine of `self`.
     pub fn cos(self) -> Self {
         // formula: cos(a + bi) = cos(a) cosh(b) - i sin(a) sinh(b)
         Self::new(
@@ -577,44 +589,32 @@ impl<E: ElementEq> ElementEq for Complex<E> {
     }
 }
 
-/// Macro to implement the element trait for a type.
-#[macro_export]
-macro_rules! make_complex {
-    (
-        ty $inner:ident $precision:expr,
-        dtype $dtype:expr
-    ) => {
-        make_complex!(ty $inner $precision, dtype $dtype);
-    };
-    (
-        ty $inner:ident $precision:expr,
-        dtype $dtype:expr,
-    ) => {
-        impl Complex<$inner> {
 
-            /// Create a complex number from any element primitive
-            #[inline]
-            pub fn from_elem<E: ToElement>(real: E) -> Self {
-                paste! {
-                    Self { real: real.[<to_ $inner>](), imag: $inner::ZERO }
-                }
-            }
-        }
 
-    };
-}
 
-make_complex!(
-    ty f32 Precision::Full,
-    dtype DType::Complex32,
-);
+// impl Complex<f32>{
+//     /// Create Complex<f32> from any element
+//     #[inline]
+//     pub fn from_elem<E:ToElement>(el:E) -> Self {
+//         match E::dtype() { 
+            
+//          }
+//         Self {
+//             real:el.to_f32(),imag:f32::ZERO
+//         }
+//     }
+// }
 
-//to_complex!(bool);
+// impl Complex<f64> {    
+//     #[inline]
+//     pub fn from_elem<E:ToElement>(real:E) -> Self {
+//         Self {
+//             real:real.to_f64(),imag: f64::ZERO
+//         }
+//     }
+// }
 
-make_complex!(
-    ty f64 Precision::Double,
-    dtype DType::Complex64,
-);
+
 
 macro_rules! to_complex {
     (
@@ -623,13 +623,13 @@ macro_rules! to_complex {
         impl ToComplex<Complex<f32>> for $type {
             #[inline]
             fn to_complex(&self) -> Complex<f32> {
-                Complex::<f32>::new(*self as f32, 0.0)
+                Complex::<f32>::new(self.to_f32(), 0.0)
             }
         }
         impl ToComplex<Complex<f64>> for $type {
             #[inline]
             fn to_complex(&self) -> Complex<f64> {
-                Complex::<f64>::new(*self as f64, 0.0)
+                Complex::<f64>::new(self.to_f64(), 0.0)
             }
         }
     };
@@ -639,6 +639,11 @@ to_complex!(i64);
 to_complex!(i32);
 to_complex!(f32);
 to_complex!(f64);
+to_complex!(u64);
+to_complex!(u32);
+to_complex!(u16);
+to_complex!(u8);
+to_complex!(bool);
 
 impl ToComplex<Complex<f32>> for Complex<f64> {
     #[inline]

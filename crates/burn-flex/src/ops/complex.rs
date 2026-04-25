@@ -1,9 +1,9 @@
-use burn_backend::Distribution;
+use burn_backend::{Complex, Distribution};
 use burn_backend::{Element, TensorData};
+use burn_complex::base::SplitTensorData;
 use burn_complex::{
     base::{
         ComplexDevice, ComplexTensor, ComplexTensorBackend, ComplexTensorOps, InterleavedLayout,
-        element::Complex,
     },
     utils::{
         interleave_from_split_data, interleaved_data_from_imag_data,
@@ -53,15 +53,15 @@ impl ComplexTensorBackend for Flex {
 
     fn complex_from_interleaved_data(
         data: TensorData,
-        _device: &<Self::InnerBackend as burn_backend::Backend>::Device,
+        _device: &Self::Device,
     ) -> ComplexTensor<Self> {
         FlexTensor::from_data(data).into()
     }
 
-    fn complex_from_split_data(
+    fn complex_from_parts_data(
         real_data: TensorData,
         imag_data: TensorData,
-        _device: &<Self::InnerBackend as burn_backend::Backend>::Device,
+        _device: &Self::Device,
     ) -> ComplexTensor<Self> {
         let interleaved_data = interleave_from_split_data(real_data, imag_data);
         FlexTensor::from_data(interleaved_data).into()
@@ -89,7 +89,7 @@ impl ComplexTensorOps<Flex> for Flex {
 
     async fn complex_into_split_data(
         tensor: ComplexTensor<Flex>,
-    ) -> Result<(TensorData, TensorData), burn_backend::ExecutionError> {
+    ) -> Result<SplitTensorData, burn_backend::ExecutionError> {
         Ok(interleaved_data_to_split_data(tensor.into_data()))
     }
 
@@ -145,7 +145,7 @@ impl ComplexTensorOps<Flex> for Flex {
         real: burn_complex::base::FloatTensor<Flex>,
         imag: burn_complex::base::FloatTensor<Flex>,
     ) -> ComplexTensor<Flex> {
-        <Flex as ComplexTensorBackend>::complex_from_split_data(
+        <Flex as ComplexTensorBackend>::complex_from_parts_data(
             real.into_data(),
             imag.into_data(),
             &FlexDevice,

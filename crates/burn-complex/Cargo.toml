@@ -7,15 +7,9 @@ version.workspace = true
 
 
 [features]
-#candle = ["burn-candle"]
-#cubecl-backend = ["cubecl", "burn-cubecl"]
-#default = ["ndarray"]
-#export-tests = ["burn-tensor-testgen"]
-#fusion = ["burn-fusion", "burn-cuda/fusion", "burn-wgpu/fusion"]
-ndarray = ["dep:ndarray"]
-tch = ["dep:tch"]
-std = ["burn-tensor/std", "num-complex/std", "num-traits/std"]
-#tch = ["burn-tch"]
+#no_std is a problem for later
+#std = ["burn-tensor/std", "num-complex/std", "num-traits/std"]
+
 
 
 [dependencies]
@@ -38,6 +32,7 @@ paste = { workspace = true }
 serde = { workspace = true }
 
 [dev-dependencies]
+burn-flex = { path = "../burn-flex",  features = ["complex"] }#, version = "=0.21.0-pre.3",    }
 burn-tensor-testgen = { path = "../burn-tensor-testgen", version = "=0.21.0-pre.3", default-features = false }
 burn-backend-tests = { path = "../burn-backend-tests", version = "=0.21.0-pre.3", default-features = false, features = [
     "std",
