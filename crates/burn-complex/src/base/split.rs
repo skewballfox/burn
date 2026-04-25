@@ -1,13 +1,13 @@
 use crate::{
     base::{
         ComplexDevice, ComplexTensor, ComplexTensorBackend, ComplexTensorOps, Layout, SplitLayout,
-        SplitTensorData, element::Complex,
+        SplitTensorData,
     },
     utils::real_to_complex_dtype,
 };
 use burn_std::FloatDType;
 use burn_tensor::{
-    ElementComparison, Scalar, TensorData, TensorMetadata,
+    Complex, ElementComparison, Scalar, TensorData, TensorMetadata,
     backend::{Backend, BackendTypes},
     cast::ToElement,
     ops::FloatTensorOps,

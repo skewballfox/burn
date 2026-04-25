@@ -1,7 +1,7 @@
 //use num_complex::Complex as NumComplex;
 
 /// 32-bit complex number type (real and imaginary parts are f32).
-use burn_tensor::{
+use crate::{
     DType, Distribution, Element, ElementComparison, ElementConversion, ElementEq, ElementRandom,
     cast::ToElement,
 };
@@ -39,10 +39,7 @@ pub trait ToComplex<C> {
 
 use paste::paste;
 
-pub trait ToComplexElement: ToElement {
-    fn to_complex32(&self) -> Complex<f32>;
-    fn to_complex64(&self) -> Complex<f64>;
-}
+pub trait ToComplexElement: ToElement {}
 
 pub trait ComplexElement: Element {
     type InnerType: Element;
@@ -238,6 +235,15 @@ where
     fn to_bool(&self) -> bool {
         self.real.to_bool() || self.imag.to_bool()
     }
+
+    #[inline]
+    fn to_complex32(&self) -> Complex<f32> {
+        Complex::<f32>::new(self.real.to_f32(), self.imag.to_f32())
+    }
+    #[inline]
+    fn to_complex64(&self) -> Complex<f64> {
+        Complex::<f64>::new(self.real.to_f64(), self.imag.to_f64())
+    }
 }
 
 impl<E: Neg<Output = E>> Complex<E> {
@@ -426,7 +432,7 @@ where
 
     /// Returns the imaginary unit.
     ///
-    /// See also \[`Complex::I`\].
+    /// See also \[`Complex::i`\].
     #[inline]
     pub fn i() -> Self {
         Self::new(E::zero(), E::one())
@@ -563,27 +569,7 @@ impl<E: ElementRandom> ElementRandom for Complex<E> {
     }
 }
 
-// impl<E: ElementLimits> ElementLimits for Complex<E> {
-//     const MIN: Self = Complex::<E> {
-//         real: E::MIN,
-//         imag: E::MIN,
-//     };
-//     const MAX: Self = Complex::<E> {
-//         real: E::MAX,
-//         imag: E::MAX,
-//     };
-// }
-
-impl<E: ToElement> ToComplexElement for Complex<E> {
-    #[inline]
-    fn to_complex32(&self) -> Complex<f32> {
-        Complex::<f32>::new(self.real.to_f32(), self.imag.to_f32())
-    }
-    #[inline]
-    fn to_complex64(&self) -> Complex<f64> {
-        Complex::<f64>::new(self.real.to_f64(), self.imag.to_f64())
-    }
-}
+impl<E: ToElement> ToComplexElement for Complex<E> {}
 
 impl<E: ElementEq> ElementEq for Complex<E> {
     fn eq(&self, other: &Self) -> bool {
@@ -646,16 +632,6 @@ macro_rules! to_complex {
                 Complex::<f64>::new(*self as f64, 0.0)
             }
         }
-        impl ToComplexElement for $type {
-            #[inline]
-            fn to_complex32(&self) -> Complex<f32> {
-                self.to_complex()
-            }
-            #[inline]
-            fn to_complex64(&self) -> Complex<f64> {
-                self.to_complex()
-            }
-        }
     };
 }
 
@@ -693,7 +669,6 @@ impl ToComplex<Complex<f64>> for Complex<f64> {
 }
 #[cfg(test)]
 pub(crate) mod tests {
-    use burn_tensor::DType;
 
     use super::*;
 

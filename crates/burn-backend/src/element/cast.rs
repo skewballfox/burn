@@ -2,6 +2,8 @@ use core::mem::size_of;
 
 use burn_std::{bf16, f16};
 
+use crate::Complex;
+
 /// A generic trait for converting a value to a number.
 /// Adapted from num_traits::ToPrimitive to support [bool].
 ///
@@ -131,6 +133,9 @@ pub trait ToElement {
     fn to_bool(&self) -> bool {
         ToElement::to_bool(&self.to_u64())
     }
+
+    fn to_complex32(&self) -> Complex<f32>;
+    fn to_complex64(&self) -> Complex<f64>;
 }
 
 macro_rules! impl_to_element_int_to_int {
@@ -206,6 +211,14 @@ macro_rules! impl_to_element_int {
             #[inline]
             fn to_bool(&self) -> bool {
                 *self != 0
+            }
+            #[inline]
+            fn to_complex32(&self) -> Complex<f32> {
+                Complex::<f32>::new(self.to_f32(), 0.0)
+            }
+            #[inline]
+            fn to_complex64(&self) -> Complex<f64> {
+                Complex::<f64>::new(self.to_f64(), 0.0)
             }
         }
     };
@@ -290,6 +303,14 @@ macro_rules! impl_to_element_uint {
             #[inline]
             fn to_bool(&self) -> bool {
                 *self != 0
+            }
+            #[inline]
+            fn to_complex32(&self) -> Complex<f32> {
+                Complex::<f32>::new(self.to_f32(), 0.0)
+            }
+            #[inline]
+            fn to_complex64(&self) -> Complex<f64> {
+                Complex::<f64>::new(self.to_f64(), 0.0)
             }
         }
     };
@@ -408,6 +429,14 @@ macro_rules! impl_to_element_float {
             fn to_bool(&self) -> bool {
                 *self != 0.0
             }
+            #[inline]
+            fn to_complex32(&self) -> Complex<f32> {
+                Complex::<f32>::new(self.to_f32(), 0.0)
+            }
+            #[inline]
+            fn to_complex64(&self) -> Complex<f64> {
+                Complex::<f64>::new(self.to_f64(), 0.0)
+            }
         }
     };
 }
@@ -464,6 +493,15 @@ impl ToElement for f16 {
     fn to_bool(&self) -> bool {
         *self != f16::from_f32_const(0.0)
     }
+
+    #[inline]
+    fn to_complex32(&self) -> Complex<f32> {
+        Complex::<f32>::new(self.to_f32(), 0.0)
+    }
+    #[inline]
+    fn to_complex64(&self) -> Complex<f64> {
+        Complex::<f64>::new(self.to_f64(), 0.0)
+    }
 }
 
 impl ToElement for bf16 {
@@ -515,6 +553,15 @@ impl ToElement for bf16 {
     fn to_bool(&self) -> bool {
         *self != bf16::from_f32_const(0.0)
     }
+
+    #[inline]
+    fn to_complex32(&self) -> Complex<f32> {
+        Complex::<f32>::new(self.to_f32(), 0.0)
+    }
+    #[inline]
+    fn to_complex64(&self) -> Complex<f64> {
+        Complex::<f64>::new(self.to_f64(), 0.0)
+    }
 }
 
 #[cfg(feature = "cubecl")]
@@ -563,6 +610,14 @@ impl ToElement for burn_std::flex32 {
     fn to_bool(&self) -> bool {
         *self != burn_std::flex32::from_f32(0.0)
     }
+    #[inline]
+    fn to_complex32(&self) -> Complex<f32> {
+        Complex::<f32>::new(self.to_f32(), 0.0)
+    }
+    #[inline]
+    fn to_complex64(&self) -> Complex<f64> {
+        Complex::<f64>::new(self.to_f64(), 0.0)
+    }
 }
 
 impl ToElement for bool {
@@ -609,6 +664,14 @@ impl ToElement for bool {
     #[inline]
     fn to_bool(&self) -> bool {
         *self
+    }
+    #[inline]
+    fn to_complex32(&self) -> Complex<f32> {
+        Complex::<f32>::new(self.to_f32(), 0.0)
+    }
+    #[inline]
+    fn to_complex64(&self) -> Complex<f64> {
+        Complex::<f64>::new(self.to_f64(), 0.0)
     }
 }
 

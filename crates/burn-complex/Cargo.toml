@@ -17,12 +17,6 @@ tch = ["dep:tch"]
 std = ["burn-tensor/std", "num-complex/std", "num-traits/std"]
 #tch = ["burn-tch"]
 
-# Test features
-# test-cpu = ["export-tests"]
-# test-cuda = ["cubecl-backend", "export-tests"]
-# test-wgpu = ["cubecl-backend", "export-tests"]
-# test-vulkan = ["burn-wgpu/vulkan", "test-wgpu"]
-# test-metal = ["burn-wgpu/metal", "test-wgpu"]
 
 [dependencies]
 bon = { workspace = true }
@@ -44,6 +38,7 @@ paste = { workspace = true }
 serde = { workspace = true }
 
 [dev-dependencies]
+burn-tensor-testgen = { path = "../burn-tensor-testgen", version = "=0.21.0-pre.3", default-features = false }
 burn-backend-tests = { path = "../burn-backend-tests", version = "=0.21.0-pre.3", default-features = false, features = [
     "std",
 ] }

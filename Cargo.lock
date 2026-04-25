@@ -697,6 +697,8 @@ dependencies = [
  "derive-new",
  "enumset",
  "hashbrown 0.16.1",
+ "ndarray 0.17.2",
+ "num-complex",
  "num-traits",
  "oneshot",
  "paste",
@@ -707,6 +709,7 @@ dependencies = [
  "serde_json",
  "serial_test",
  "spin",
+ "tch",
  "thiserror 2.0.18",
 ]
 
@@ -810,6 +813,7 @@ dependencies = [
  "burn-backend-tests",
  "burn-std",
  "burn-tensor",
+ "burn-tensor-testgen",
  "bytemuck",
  "cubecl",
  "derive-new",

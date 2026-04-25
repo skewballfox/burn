@@ -8,9 +8,9 @@ use bytemuck::{AnyBitPattern, CheckedBitPattern, Zeroable, cast_mut, checked::Ch
 use rand::Rng;
 use thiserror::Error;
 
-use crate::Scalar;
 use crate::distribution::Distribution;
 use crate::element::{Element, ElementConversion};
+use crate::{Complex, Scalar};
 use burn_std::tensor::DType;
 use burn_std::{
     BoolStore, Bytes, QuantLevel, QuantMode, QuantScheme, QuantValue, QuantizedBytes, Shape, bf16,
@@ -496,10 +496,9 @@ impl TensorData {
                 DType::U32 => self.convert_inplace_dtype::<u32>(dtype),
                 DType::U16 => self.convert_inplace_dtype::<u16>(dtype),
                 DType::U8 => self.convert_inplace_dtype::<u8>(dtype),
-                // DType::Complex32 => self.convert_inplace_dtype::<Complex32>(dtype),
-                // DType::Complex64 => self.convert_inplace_dtype::<Complex64>(dtype),
-                DType::Complex32 => unimplemented!("TensorData isn't used for Dtype Complex32"),
-                DType::Complex64 => unimplemented!("TensorData isn't used for Dtype Complex64"),
+                DType::Complex32 => self.convert_inplace_dtype::<Complex<f32>>(dtype),
+                DType::Complex64 => self.convert_inplace_dtype::<Complex<f64>>(dtype),
+
                 DType::Bool(BoolStore::U8) => self.convert_inplace_dtype::<u8>(dtype),
                 DType::Bool(BoolStore::U32) => self.convert_inplace_dtype::<u32>(dtype),
                 DType::Bool(BoolStore::Native) | DType::QFloat(_) => unreachable!(),

@@ -1,7 +1,7 @@
-//#[burn_tensor_testgen::testgen(complex)]
+#[burn_tensor_testgen::testgen(complex)]
 mod tests {
     use crate::base::{ComplexKind, element::Complex};
-
+    
     use super::*;
     use burn_tensor::{Tensor, TensorData, backend::Backend};
 

@@ -4,7 +4,7 @@ use burn_std::{BoolStore, DType, bf16, f16};
 use num_traits::{Float, ToPrimitive};
 
 use super::TensorData;
-use crate::{Element, ElementOrdered};
+use crate::{Complex, Element, ElementOrdered};
 
 /// The tolerance used to compare to floating point numbers.
 ///
@@ -255,8 +255,8 @@ impl TensorData {
                 }
             }
             //what to do here?
-            DType::Complex64 => todo!(),
-            DType::Complex32 => todo!(),
+            DType::Complex64 => self.assert_eq_elem::<Complex<f64>>(other),
+            DType::Complex32 => self.assert_eq_elem::<Complex<f32>>(other),
         }
     }
 

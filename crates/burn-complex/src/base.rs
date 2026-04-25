@@ -1,4 +1,3 @@
-pub mod element;
 pub mod split;
 /*
 The base implementation for complex tensors, contains everything that would be in burn-tensor.
@@ -6,15 +5,15 @@ May get split into separate files at some point, but for now it's easier to keep
 definitions in one spot.
 */
 use burn_tensor::{
-    BasicOps, Bytes, DType, Device, Distribution, Element, FloatDType, IndexingUpdateOp, Numeric,
-    Scalar, Shape, Slice, TensorData, TensorKind, TensorMetadata,
+    BasicOps, Bytes, ComplexElement, DType, Device, Distribution, Element, FloatDType,
+    IndexingUpdateOp, Numeric, Scalar, Shape, Slice, TensorData, TensorKind, TensorMetadata,
     backend::{Backend, BackendTypes, ExecutionError},
     get_device_settings,
     ops::{FloatTensorOps, IntTensorOps},
 };
 use serde::{Deserialize, Serialize};
 
-use crate::base::{element::ComplexElement, split::SplitComplexTensor};
+use crate::base::split::SplitComplexTensor;
 
 /// The layout of the complex tensor. Used to define shared behavior only meant
 /// to be used for a specific layout (such as butterfly operations).
