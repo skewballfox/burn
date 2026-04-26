@@ -192,6 +192,7 @@ impl<B: Backend> BasicOps<B> for Int {
 }
 
 impl<B: Backend> Numeric<B> for Int {
+    type IntTensor = Self;
     fn add(lhs: Self::Primitive, rhs: Self::Primitive) -> Self::Primitive {
         B::int_add(lhs, rhs)
     }
@@ -255,7 +256,10 @@ impl<B: Backend> Numeric<B> for Int {
         B::int_cumprod(tensor, dim)
     }
 
-    fn powi(lhs: Self::Primitive, rhs: Self::Primitive) -> Self::Primitive {
+    fn powi(
+        lhs: Self::Primitive,
+        rhs: <Self::IntTensor as TensorKind<B>>::Primitive,
+    ) -> Self::Primitive {
         B::int_powi(lhs, rhs)
     }
 

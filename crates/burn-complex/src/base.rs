@@ -6,7 +6,7 @@ definitions in one spot.
 */
 use burn_tensor::{
     BasicOps, Bytes, ComplexElement, DType, Device, Distribution, Element, FloatDType,
-    IndexingUpdateOp, Numeric, Scalar, Shape, Slice, TensorData, TensorKind, TensorMetadata,
+    IndexingUpdateOp, Int, Numeric, Scalar, Shape, Slice, TensorData, TensorKind, TensorMetadata,
     backend::{Backend, BackendTypes, ExecutionError},
     get_device_settings,
     ops::{FloatTensor, FloatTensorOps, IntTensorOps},
@@ -22,9 +22,9 @@ pub trait CBT: BackendTypes {
 /// The layout of the complex tensor. Used to define shared behavior only meant
 /// to be used for a specific layout (such as butterfly operations).
 pub trait Layout {
-    /// The complex Tensor primitive type for this layout. For interleaved, this will be
-    /// a tensor of Complex\<E\>,for split this will be a tuple tensor Complex\<FloatTensorPrimitive\<E\>, FloatTensorPrimitive\<E\>\>.
-    type ComplexTensorPrimitive: TensorMetadata + 'static;
+    // /// The complex Tensor primitive type for this layout. For interleaved, this will be
+    // /// a tensor of Complex\<E\>,for split this will be a tuple tensor Complex\<FloatTensorPrimitive\<E\>, FloatTensorPrimitive\<E\>\>.
+    // type ComplexTensorPrimitive: TensorMetadata + 'static;
 }
 
 /// Complex tensor primitive type used by the backend.
@@ -124,14 +124,14 @@ pub trait ComplexTensorBackend: ComplexTensorOps<Self> + Sized + CBT {
 //Note: changing to adopt terminology used in fftw doc
 
 /// Indicates that the underlying implementation has separate real and imaginary tensors.
-pub struct SplitLayout<T> {
-    _marker: core::marker::PhantomData<T>,
+pub struct SplitLayout {
+    //_marker: core::marker::PhantomData<T>,
 }
 
 /// Indicates that the underlying implementation uses a complex primitive type \[float,float\] like that found in the
 /// num_complex trait.
-pub struct InterleavedLayout<E> {
-    _marker: core::marker::PhantomData<E>,
+pub struct InterleavedLayout {
+    //_marker: core::marker::PhantomData<E>,
 }
 
 /// Data structure for tensors.
@@ -171,9 +171,11 @@ mod shape_inner {
     }
 }
 
-impl<T: TensorMetadata + 'static> Layout for InterleavedLayout<T> {
-    type ComplexTensorPrimitive = T;
-}
+// impl<T: TensorMetadata + 'static> Layout for InterleavedLayout<T> {
+//     type ComplexTensorPrimitive = T;
+// }
+
+impl Layout for InterleavedLayout {}
 
 // The evolution of Laziness
 pub trait DefaultComplexOps<B: ComplexTensorBackend> {
@@ -186,10 +188,9 @@ pub trait DefaultComplexOps<B: ComplexTensorBackend> {
     ) -> impl Future<Output = Result<Self::OutTensorData, ExecutionError>> + Send;
 }
 
-impl<T, B> DefaultComplexOps<B> for InterleavedLayout<T>
+impl<B> DefaultComplexOps<B> for InterleavedLayout
 where
-    T: TensorMetadata + 'static,
-    B: ComplexTensorBackend<Layout = InterleavedLayout<T>>,
+    B: ComplexTensorBackend<Layout = InterleavedLayout>,
 {
     type OutTensorData = TensorData;
 
@@ -212,12 +213,12 @@ where
     }
 }
 
-impl<T, B> DefaultComplexOps<B> for SplitLayout<T>
+impl<B, F> DefaultComplexOps<B> for SplitLayout
 where
-    T: TensorMetadata + 'static,
-    B: ComplexTensorBackend<Layout = SplitLayout<T>>,
-    B: CBT<ComplexTensorPrimitive = SplitComplexTensor<T>>,
-    FloatTensor<B>: Into<T>,
+    B: ComplexTensorBackend<Layout = SplitLayout>,
+    B: BackendTypes<FloatTensorPrimitive = F>,
+    B: CBT<ComplexTensorPrimitive = SplitComplexTensor<F>>,
+    F: TensorMetadata + 'static,
 {
     type OutTensorData = SplitTensorData;
     fn zeros(shape: Shape, device: &Device<B>) -> ComplexTensor<B> {
@@ -231,8 +232,8 @@ where
         );
         // ComplexTensor<B> = Complex<T> via SplitLayout
         SplitComplexTensor {
-            real: real.into(),
-            imag: imag.into(),
+            real: real,
+            imag: imag,
         }
     }
 
@@ -246,8 +247,8 @@ where
             device,
         );
         SplitComplexTensor {
-            real: real.into(),
-            imag: imag.into(),
+            real: real,
+            imag: imag,
         }
     }
 
@@ -1210,7 +1211,12 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
     /// # Returns
     ///
     /// The elements of `lhs` raised to the power of the corresponding elements of `rhs`.
-    fn complex_powi(lhs: ComplexTensor<B>, rhs: B::IntTensorPrimitive) -> ComplexTensor<B> {
+    fn complex_powi(lhs: ComplexTensor<B>, rhs: B::IntTensorPrimitive) -> ComplexTensor<B>
+    where
+        B::InnerBackend: IntTensorOps<B::InnerBackend>,
+        // make the equality explicit at the use site
+        <B::InnerBackend as BackendTypes>::IntTensorPrimitive: From<B::IntTensorPrimitive>,
+    {
         //TODO: add a method to get inner dtype
         let dtype = lhs.dtype();
 
@@ -1497,8 +1503,9 @@ impl<C: ComplexTensorBackend> BasicOps<C> for ComplexKind {
 #[allow(unused_variables)]
 impl<C: ComplexTensorBackend> Numeric<C> for ComplexKind
 where
-    C: CBT,
+    C: CBT + std::fmt::Debug + Clone,
 {
+    type IntTensor = Int;
     fn add(lhs: Self::Primitive, rhs: Self::Primitive) -> Self::Primitive {
         C::complex_add(lhs, rhs)
     }
@@ -1592,7 +1599,7 @@ where
     //     B::complex_not_equal_elem(lhs, rhs)
     // }
 
-    fn powi(lhs: Self::Primitive, rhs: Self::Primitive) -> Self::Primitive {
+    fn powi(lhs: Self::Primitive, rhs: C::IntTensorPrimitive) -> Self::Primitive {
         C::complex_powi(lhs, rhs)
     }
 

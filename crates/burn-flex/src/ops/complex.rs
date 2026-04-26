@@ -1,11 +1,10 @@
+use burn_backend::tensor::{BoolTensor, Device, FloatTensor, IntTensor};
 use burn_backend::{Complex, Distribution};
 use burn_backend::{Element, TensorData};
 use burn_complex::base::{CBT, SplitTensorData};
 use burn_complex::utils::interleaved_data_to_imag_data;
 use burn_complex::{
-    base::{
-        ComplexDevice, ComplexTensor, ComplexTensorBackend, ComplexTensorOps, InterleavedLayout,
-    },
+    base::{ComplexTensor, ComplexTensorBackend, ComplexTensorOps, InterleavedLayout},
     utils::{
         interleave_from_split_data, interleaved_data_from_imag_data,
         interleaved_data_from_real_data, interleaved_data_to_real_data,
@@ -34,21 +33,15 @@ impl ComplexTensorBackend for Flex {
 
     type ComplexScalar = Complex<f32>;
 
-    type Layout = InterleavedLayout<FlexTensor>;
+    type Layout = InterleavedLayout;
 
-    fn complex_from_real_data(
-        data: TensorData,
-        _device: &ComplexDevice<Self>,
-    ) -> ComplexTensor<Self> {
+    fn complex_from_real_data(data: TensorData, _device: &Device<Self>) -> ComplexTensor<Self> {
         let interleaved_data = interleaved_data_from_real_data(data);
 
         FlexTensor::from_data(interleaved_data)
     }
 
-    fn complex_from_imag_data(
-        data: TensorData,
-        _device: &ComplexDevice<Self>,
-    ) -> ComplexTensor<Self> {
+    fn complex_from_imag_data(data: TensorData, _device: &Device<Self>) -> ComplexTensor<Self> {
         let interleaved_data = interleaved_data_from_imag_data(data);
 
         FlexTensor::from_data(interleaved_data)
@@ -96,22 +89,22 @@ impl ComplexTensorOps<Flex> for Flex {
         Ok(interleaved_data_to_split_data(tensor.into_data()))
     }
 
-    fn to_complex(tensor: burn_complex::base::FloatTensor<Flex>) -> ComplexTensor<Flex> {
+    fn to_complex(tensor: FloatTensor<Flex>) -> ComplexTensor<Flex> {
         let interleaved_data = interleaved_data_from_real_data(tensor.into_data());
         FlexTensor::from_data(interleaved_data)
     }
 
-    fn complex_squared_norm(tensor: ComplexTensor<Flex>) -> burn_complex::base::FloatTensor<Flex> {
+    fn complex_squared_norm(tensor: ComplexTensor<Flex>) -> FloatTensor<Flex> {
         crate::c2r_unary_op!(tensor, |a| a.norm_sqr())
     }
 
-    fn complex_device(_tensor: &ComplexTensor<Flex>) -> ComplexDevice<Flex> {
+    fn complex_device(_tensor: &ComplexTensor<Flex>) -> Device<Flex> {
         Default::default()
     }
 
     fn complex_to_device(
         tensor: ComplexTensor<Flex>,
-        _device: &ComplexDevice<Flex>,
+        _device: &Device<Flex>,
     ) -> ComplexTensor<Flex> {
         tensor
     }
@@ -132,22 +125,19 @@ impl ComplexTensorOps<Flex> for Flex {
         crate::c2c_binary_op!(lhs, rhs, |a, b| a / b)
     }
 
-    fn real(tensor: ComplexTensor<Flex>) -> burn_complex::base::FloatTensor<Flex> {
+    fn real(tensor: ComplexTensor<Flex>) -> FloatTensor<Flex> {
         crate::c2r_unary_op!(tensor, |a| a.real)
     }
 
-    fn imag(tensor: ComplexTensor<Flex>) -> burn_complex::base::FloatTensor<Flex> {
+    fn imag(tensor: ComplexTensor<Flex>) -> FloatTensor<Flex> {
         crate::c2r_unary_op!(tensor, |a| a.imag)
     }
 
-    fn abs(tensor: ComplexTensor<Flex>) -> burn_complex::base::FloatTensor<Flex> {
+    fn abs(tensor: ComplexTensor<Flex>) -> FloatTensor<Flex> {
         crate::c2r_unary_op!(tensor, |a| a.norm())
     }
 
-    fn complex_from_parts(
-        real: burn_complex::base::FloatTensor<Flex>,
-        imag: burn_complex::base::FloatTensor<Flex>,
-    ) -> ComplexTensor<Flex> {
+    fn complex_from_parts(real: FloatTensor<Flex>, imag: FloatTensor<Flex>) -> ComplexTensor<Flex> {
         <Flex as ComplexTensorBackend>::complex_from_parts_data(
             real.into_data(),
             imag.into_data(),
@@ -156,8 +146,8 @@ impl ComplexTensorOps<Flex> for Flex {
     }
 
     fn complex_from_polar(
-        magnitude: burn_complex::base::FloatTensor<Flex>,
-        phase: burn_complex::base::FloatTensor<Flex>,
+        magnitude: FloatTensor<Flex>,
+        phase: FloatTensor<Flex>,
     ) -> ComplexTensor<Flex> {
         // Convert polar to cartesian: magnitude * e^(i*phase) = magnitude * (cos(phase) + i*sin(phase))
         let real_part = crate::ops::binary::binary_op(
@@ -189,7 +179,7 @@ impl ComplexTensorOps<Flex> for Flex {
         lhs: ComplexTensor<Flex>,
         rhs: <Flex as ComplexTensorBackend>::ComplexScalar,
         out_dtype: BoolDType,
-    ) -> burn_complex::base::BoolTensor<Flex> {
+    ) -> BoolTensor<Flex> {
         let lhs = lhs;
         let rhs = rhs;
         let f32_cmp = |a, b| a != b;
@@ -209,7 +199,7 @@ impl ComplexTensorOps<Flex> for Flex {
         lhs: ComplexTensor<Flex>,
         rhs: <Flex as ComplexTensorBackend>::ComplexScalar,
         out_dtype: burn_std::BoolDType,
-    ) -> burn_complex::base::BoolTensor<Flex> {
+    ) -> BoolTensor<Flex> {
         let lhs = lhs;
         let rhs = rhs;
         let f32_cmp = |a, b| a == b;
@@ -229,7 +219,7 @@ impl ComplexTensorOps<Flex> for Flex {
         lhs: ComplexTensor<Flex>,
         rhs: ComplexTensor<Flex>,
         out_dtype: burn_std::BoolDType,
-    ) -> burn_complex::base::BoolTensor<Flex> {
+    ) -> BoolTensor<Flex> {
         let lhs = lhs;
         let rhs = rhs;
         let f32_cmp = |a, b| a == b;
@@ -253,7 +243,7 @@ impl ComplexTensorOps<Flex> for Flex {
         lhs: ComplexTensor<Flex>,
         rhs: ComplexTensor<Flex>,
         out_dtype: burn_std::BoolDType,
-    ) -> burn_complex::base::BoolTensor<Flex> {
+    ) -> BoolTensor<Flex> {
         let lhs = lhs;
         let rhs = rhs;
         let f32_cmp = |a, b| a != b;
@@ -276,7 +266,7 @@ impl ComplexTensorOps<Flex> for Flex {
     fn complex_gather(
         dim: usize,
         tensor: ComplexTensor<Flex>,
-        indices: burn_complex::base::IntTensor<Flex>,
+        indices: IntTensor<Flex>,
     ) -> ComplexTensor<Flex> {
         match tensor.dtype() {
             DType::Complex32 => {
@@ -292,7 +282,7 @@ impl ComplexTensorOps<Flex> for Flex {
     fn complex_scatter_add(
         dim: usize,
         tensor: ComplexTensor<Flex>,
-        indices: burn_complex::base::IntTensor<Flex>,
+        indices: IntTensor<Flex>,
         values: ComplexTensor<Flex>,
     ) -> ComplexTensor<Flex> {
         match tensor.dtype() {
@@ -312,7 +302,7 @@ impl ComplexTensorOps<Flex> for Flex {
     fn complex_random(
         shape: burn_std::Shape,
         distribution: Distribution,
-        _device: &ComplexDevice<Flex>,
+        _device: &Device<Flex>,
         dtype: FloatDType,
     ) -> ComplexTensor<Flex> {
         let mut seed = crate::backend::SEED.lock().unwrap();
@@ -350,7 +340,7 @@ impl ComplexTensorOps<Flex> for Flex {
         crate::c2c_unary_op!(tensor, |a| a.conj())
     }
 
-    fn complex_arg(tensor: ComplexTensor<Flex>) -> burn_complex::base::FloatTensor<Flex> {
+    fn complex_arg(tensor: ComplexTensor<Flex>) -> FloatTensor<Flex> {
         crate::c2r_unary_op!(tensor, |a| a.arg())
     }
 
@@ -382,7 +372,7 @@ impl ComplexTensorOps<Flex> for Flex {
     fn complex_select(
         tensor: ComplexTensor<Flex>,
         dim: usize,
-        indices: burn_complex::base::IntTensor<Flex>,
+        indices: IntTensor<Flex>,
     ) -> ComplexTensor<Flex> {
         match tensor.dtype() {
             DType::Complex32 => {
@@ -398,7 +388,7 @@ impl ComplexTensorOps<Flex> for Flex {
     fn complex_select_add(
         tensor: ComplexTensor<Flex>,
         dim: usize,
-        indices: burn_complex::base::IntTensor<Flex>,
+        indices: IntTensor<Flex>,
         values: ComplexTensor<Flex>,
     ) -> ComplexTensor<Flex> {
         match tensor.dtype() {
@@ -444,10 +434,7 @@ impl ComplexTensorOps<Flex> for Flex {
         crate::ops::cat::cat(tensors, dim)
     }
 
-    fn complex_any(
-        tensor: ComplexTensor<Flex>,
-        out_dtype: BoolDType,
-    ) -> burn_complex::base::BoolTensor<Flex> {
+    fn complex_any(tensor: ComplexTensor<Flex>, out_dtype: BoolDType) -> BoolTensor<Flex> {
         let has_any = match tensor.dtype() {
             DType::Complex32 => {
                 iter_elements::<Complex<f32>>(&tensor).any(|x| x.real != 0.0 || x.imag != 0.0)
@@ -464,14 +451,11 @@ impl ComplexTensorOps<Flex> for Flex {
         tensor: ComplexTensor<Flex>,
         dim: usize,
         out_dtype: BoolDType,
-    ) -> burn_complex::base::BoolTensor<Flex> {
+    ) -> BoolTensor<Flex> {
         reduce_bool_dim(&tensor, dim, false, |a, b| a || b, out_dtype)
     }
 
-    fn complex_all(
-        tensor: ComplexTensor<Flex>,
-        out_dtype: BoolDType,
-    ) -> burn_complex::base::BoolTensor<Flex> {
+    fn complex_all(tensor: ComplexTensor<Flex>, out_dtype: BoolDType) -> BoolTensor<Flex> {
         let all = match tensor.dtype() {
             DType::Complex32 => {
                 iter_elements::<Complex<f32>>(&tensor).all(|x| x.real != 0.0 || x.imag != 0.0)
@@ -489,7 +473,7 @@ impl ComplexTensorOps<Flex> for Flex {
         tensor: ComplexTensor<Flex>,
         dim: usize,
         out_dtype: BoolDType,
-    ) -> burn_complex::base::BoolTensor<Flex> {
+    ) -> BoolTensor<Flex> {
         reduce_bool_dim(&tensor, dim, true, |a, b| a && b, out_dtype)
     }
 
@@ -565,7 +549,7 @@ impl ComplexTensorOps<Flex> for Flex {
 
     fn complex_mask_where(
         tensor: ComplexTensor<Flex>,
-        mask: burn_complex::base::BoolTensor<Flex>,
+        mask: BoolTensor<Flex>,
         source: ComplexTensor<Flex>,
     ) -> ComplexTensor<Flex> {
         match tensor.dtype() {
@@ -577,7 +561,7 @@ impl ComplexTensorOps<Flex> for Flex {
 
     fn complex_mask_fill(
         tensor: ComplexTensor<Flex>,
-        mask: burn_complex::base::BoolTensor<Flex>,
+        mask: BoolTensor<Flex>,
         value: <Flex as ComplexTensorBackend>::ComplexScalar,
     ) -> ComplexTensor<Flex> {
         match tensor.dtype() {
@@ -644,10 +628,7 @@ impl ComplexTensorOps<Flex> for Flex {
         }
     }
 
-    fn complex_powf(
-        lhs: ComplexTensor<Flex>,
-        rhs: burn_complex::base::FloatTensor<Flex>,
-    ) -> ComplexTensor<Flex> {
+    fn complex_powf(lhs: ComplexTensor<Flex>, rhs: FloatTensor<Flex>) -> ComplexTensor<Flex> {
         match lhs.dtype() {
             DType::Complex32 => {
                 let rhs = if rhs.dtype() == DType::F32 {

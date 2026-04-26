@@ -2,12 +2,12 @@ use alloc::vec::Vec;
 use burn_std::{DType, Shape, Slice};
 
 use crate::{
-    AutodiffBackend, Backend, Distribution, ExecutionError, Scalar, TensorData, TensorMetadata,
-    TensorPrimitive, get_device_settings,
+    AutodiffBackend, Backend, BackendTypes, Distribution, ExecutionError, Scalar, TensorData,
+    TensorMetadata, TensorPrimitive, get_device_settings,
     ops::TransactionPrimitive,
     tensor::{
-        BasicAutodiffOps, BasicOps, Device, Float, IndexingUpdateOp, IntTensor, Numeric, Ordered,
-        TensorKind, TransactionOp,
+        BasicAutodiffOps, BasicOps, Device, Float, IndexingUpdateOp, Int, IntTensor, Numeric,
+        Ordered, TensorKind, TransactionOp,
     },
 };
 
@@ -316,6 +316,7 @@ impl<B: Backend> BasicOps<B> for Float {
 }
 
 impl<B: Backend> Numeric<B> for Float {
+    type IntTensor = Int;
     fn add(lhs: Self::Primitive, rhs: Self::Primitive) -> Self::Primitive {
         q_bin_ops!(lhs, rhs, float_add, q_add)
     }
@@ -433,8 +434,15 @@ impl<B: Backend> Numeric<B> for Float {
         }
     }
 
-    fn powi(lhs: Self::Primitive, rhs: Self::Primitive) -> Self::Primitive {
-        q_bin_ops!(lhs, rhs, float_powf, q_powf)
+    fn powi(lhs: Self::Primitive, rhs: <B as BackendTypes>::IntTensorPrimitive) -> Self::Primitive {
+        let rtype = rhs.dtype().into();
+        TensorPrimitive::Float(B::float_powf(
+            match lhs {
+                TensorPrimitive::Float(lhs) => lhs,
+                TensorPrimitive::QFloat(lhs) => B::dequantize(lhs, rtype),
+            },
+            B::int_into_float(rhs, rtype),
+        ))
     }
 
     fn powi_scalar(lhs: Self::Primitive, rhs: Scalar) -> Self::Primitive {

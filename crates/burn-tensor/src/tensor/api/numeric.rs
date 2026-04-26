@@ -775,7 +775,7 @@ where
     ///    // [[1, -8, 81], [5, 81, 216]]
     /// }
     /// ```
-    pub fn powi(self, other: Self) -> Self {
+    pub fn powi(self, other: Tensor<B, D, Int>) -> Self {
         Self::new(K::powi(self.primitive, other.primitive))
     }
 

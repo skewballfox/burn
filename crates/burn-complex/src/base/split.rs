@@ -10,13 +10,10 @@ use burn_tensor::{
     Complex, Device, ElementComparison, Scalar, TensorData, TensorMetadata,
     backend::{Backend, BackendTypes},
     cast::ToElement,
-    ops::FloatTensorOps,
 };
 use bytemuck::Pod;
 
-impl<T: TensorMetadata + 'static> Layout for SplitLayout<T> {
-    type ComplexTensorPrimitive = SplitComplexTensor<T>;
-}
+impl Layout for SplitLayout {}
 
 #[derive(Debug, Clone)]
 pub struct SplitComplexTensor<T: TensorMetadata> {
@@ -112,7 +109,7 @@ where
 {
     type InnerBackend = B;
     type ComplexScalar = Complex<B::FloatElem>;
-    type Layout = SplitLayout<B::FloatTensorPrimitive>;
+    type Layout = SplitLayout; //<B::FloatTensorPrimitive>;
 
     fn complex_from_real_data(data: TensorData, device: &B::Device) -> ComplexTensor<Self> {
         // ComplexTensor<Self> = Complex<SplitComplexTensor<B::FloatTensorPrimitive>>

@@ -1,6 +1,10 @@
 use burn_std::{DType, Shape};
 
-use crate::{BackendTypes, Distribution, Scalar, element::Element, tensor::BasicOps};
+use crate::{
+    BackendTypes, Distribution, Scalar,
+    element::Element,
+    tensor::{BasicOps, TensorKind},
+};
 
 /// Trait that list all operations that can be applied on all numerical tensors.
 ///
@@ -14,6 +18,8 @@ pub trait Numeric<B: BackendTypes>: BasicOps<B>
 where
     Self::Elem: Element,
 {
+    /// The type of the integer tensor primitive associated with this numeric kind.
+    type IntTensor: TensorKind<B>;
     /// Adds two tensors together.
     ///
     /// # Arguments
@@ -478,7 +484,7 @@ where
     /// # Arguments
     /// * `tensor` - The tensor to apply power to.
     /// * `power` - The power to apply to the tensor.
-    fn powi(lhs: Self::Primitive, rhs: Self::Primitive) -> Self::Primitive;
+    fn powi(lhs: Self::Primitive, rhs: B::IntTensorPrimitive) -> Self::Primitive;
 
     /// Element-wise power of a tensor to a scalar int
     ///

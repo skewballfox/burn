@@ -1,4 +1,4 @@
-use crate::{Backend, BackendTypes, TensorMetadata, TensorPrimitive};
+use crate::{BackendTypes, TensorMetadata, TensorPrimitive};
 
 /// A type-level representation of the kind of a float tensor
 #[derive(Clone, Debug)]
@@ -29,14 +29,14 @@ impl<B: BackendTypes + std::fmt::Debug + Clone> TensorKind<B> for Float {
     }
 }
 
-impl<B: Backend> TensorKind<B> for Int {
+impl<B: BackendTypes + std::fmt::Debug + Clone> TensorKind<B> for Int {
     type Primitive = B::IntTensorPrimitive;
     fn name() -> &'static str {
         "Int"
     }
 }
 
-impl<B: Backend> TensorKind<B> for Bool {
+impl<B: BackendTypes + std::fmt::Debug + Clone> TensorKind<B> for Bool {
     type Primitive = B::BoolTensorPrimitive;
     fn name() -> &'static str {
         "Bool"
