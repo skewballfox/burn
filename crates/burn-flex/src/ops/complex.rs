@@ -137,12 +137,8 @@ impl ComplexTensorOps<Flex> for Flex {
         crate::c2r_unary_op!(tensor, |a| a.norm())
     }
 
-    fn complex_from_parts(real: FloatTensor<Flex>, imag: FloatTensor<Flex>) -> ComplexTensor<Flex> {
-        <Flex as ComplexTensorBackend>::complex_from_parts_data(
-            real.into_data(),
-            imag.into_data(),
-            &FlexDevice,
-        )
+    fn complex_from_parts(real: TensorData, imag: TensorData) -> ComplexTensor<Flex> {
+        <Flex as ComplexTensorBackend>::complex_from_parts_data(real, imag, &FlexDevice)
     }
 
     fn complex_from_polar(
@@ -164,7 +160,7 @@ impl ComplexTensorOps<Flex> for Flex {
             |m, sin_p| m * sin_p,
             None,
         );
-        Self::complex_from_parts(real_part, imag_part)
+        Self::complex_from_parts(real_part.into_data(), imag_part.into_data())
     }
 
     fn complex_exp(tensor: ComplexTensor<Flex>) -> ComplexTensor<Flex> {
@@ -336,7 +332,7 @@ impl ComplexTensorOps<Flex> for Flex {
         crate::c2c_unary_op!(tensor, |a| -a)
     }
 
-    fn complex_conj(tensor: ComplexTensor<Flex>) -> ComplexTensor<Flex> {
+    fn conj(tensor: ComplexTensor<Flex>) -> ComplexTensor<Flex> {
         crate::c2c_unary_op!(tensor, |a| a.conj())
     }
 
@@ -681,7 +677,7 @@ pub fn any_complex(tensor: FlexTensor, out_dtype: BoolDType) -> FlexTensor {
         DType::Complex64 => {
             iter_elements::<Complex<f64>>(&tensor).any(|x| x != Complex::<f64>::new(0.0, 0.0))
         }
-        _ => panic!("any_float: unsupported dtype {:?}", tensor.dtype()),
+        _ => panic!("any_complex: unsupported dtype {:?}", tensor.dtype()),
     };
     bool_scalar(has_any, out_dtype)
 }

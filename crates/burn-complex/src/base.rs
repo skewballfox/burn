@@ -6,7 +6,8 @@ definitions in one spot.
 */
 use burn_tensor::{
     BasicOps, Bytes, ComplexElement, DType, Device, Distribution, Element, FloatDType,
-    IndexingUpdateOp, Int, Numeric, Scalar, Shape, Slice, TensorData, TensorKind, TensorMetadata,
+    IndexingUpdateOp, Int, Numeric, Scalar, Shape, Slice, Tensor, TensorData, TensorKind,
+    TensorMetadata,
     backend::{Backend, BackendTypes, ExecutionError},
     get_device_settings,
     ops::{FloatTensor, FloatTensorOps, IntTensorOps},
@@ -231,10 +232,7 @@ where
             device,
         );
         // ComplexTensor<B> = Complex<T> via SplitLayout
-        SplitComplexTensor {
-            real: real,
-            imag: imag,
-        }
+        SplitComplexTensor { real, imag }
     }
 
     fn ones(shape: Shape, device: &Device<B>) -> ComplexTensor<B> {
@@ -246,10 +244,7 @@ where
             TensorData::ones::<<B::InnerBackend as BackendTypes>::FloatElem, _>(shape),
             device,
         );
-        SplitComplexTensor {
-            real: real,
-            imag: imag,
-        }
+        SplitComplexTensor { real, imag }
     }
 
     fn full(shape: Shape, fill_value: B::ComplexScalar, device: &Device<B>) -> ComplexTensor<B> {
@@ -258,8 +253,8 @@ where
         let imag =
             B::InnerBackend::float_from_data(TensorData::full(shape, fill_value.imag()), device);
         SplitComplexTensor {
-            real: real.into(),
-            imag: imag.into(),
+            real,
+            imag,
         }
     }
 
@@ -557,7 +552,7 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
     /// # Returns
     ///
     /// The complex conjugate of the tensor.
-    fn complex_conj(tensor: ComplexTensor<B>) -> ComplexTensor<B>;
+    fn conj(tensor: ComplexTensor<B>) -> ComplexTensor<B>;
 
     /// Returns the real part of the complex tensor.
     ///
@@ -603,6 +598,20 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
     /// A float tensor containing the phases in radians.
     fn complex_arg(tensor: ComplexTensor<B>) -> FloatTensor<B>;
 
+    #[inline]
+    /// Returns the phase (argument) of the complex tensor.
+    ///
+    /// # Arguments
+    ///
+    /// * `tensor` - The complex tensor.
+    ///
+    /// # Returns
+    ///
+    /// A float tensor containing the phases in radians.
+    fn phase(tensor: ComplexTensor<B>) -> FloatTensor<B> {
+        Self::complex_arg(tensor)
+    }
+
     /// Creates a complex tensor from real and imaginary parts.
     ///
     /// # Arguments
@@ -613,7 +622,7 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
     /// # Returns
     ///
     /// A complex tensor constructed from the real and imaginary parts.
-    fn complex_from_parts(real: FloatTensor<B>, imag: FloatTensor<B>) -> ComplexTensor<B>;
+    fn complex_from_parts(real: TensorData, imag: TensorData) -> ComplexTensor<B>;
 
     /// Creates a complex tensor from magnitude and phase.
     ///
@@ -1500,6 +1509,75 @@ impl<C: ComplexTensorBackend> BasicOps<C> for ComplexKind {
     }
 }
 
+pub trait ComplexOnlyOps<C: ComplexTensorBackend> {
+    fn conj(self) -> C::ComplexTensorPrimitive;
+    fn phase(self) -> C::FloatTensorPrimitive;
+    fn real(self) -> C::FloatTensorPrimitive;
+    fn imag(self) -> C::FloatTensorPrimitive;
+    fn magnitude(self) -> C::FloatTensorPrimitive;
+    fn from_parts<T>(real: T, imag: T) -> Self
+    where
+        T: Into<TensorData>;
+    fn from_polar(magnitude: C::FloatTensorPrimitive, phase: C::FloatTensorPrimitive) -> Self;
+    fn exp(self) -> C::ComplexTensorPrimitive;
+    fn sin(self) -> C::ComplexTensorPrimitive;
+    fn cos(self) -> C::ComplexTensorPrimitive;
+    fn sqrt(self) -> C::ComplexTensorPrimitive;
+    fn log(self) -> C::ComplexTensorPrimitive;
+}
+
+impl<C: ComplexTensorBackend + Backend, const D: usize> ComplexOnlyOps<C>
+    for Tensor<C, D, ComplexKind>
+{
+    fn conj(self) -> C::ComplexTensorPrimitive {
+        C::conj(self.into_primitive())
+    }
+    fn phase(self) -> C::FloatTensorPrimitive {
+        C::phase(self.into_primitive())
+    }
+
+    fn real(self) -> C::FloatTensorPrimitive {
+        C::real(self.into_primitive())
+    }
+
+    fn imag(self) -> C::FloatTensorPrimitive {
+        C::imag(self.into_primitive())
+    }
+
+    fn magnitude(self) -> C::FloatTensorPrimitive {
+        C::abs(self.into_primitive())
+    }
+
+    fn from_parts<T>(real: T, imag: T) -> Self
+    where
+        T: Into<TensorData>,
+    {
+        Self::new(C::complex_from_parts(real.into(), imag.into()))
+    }
+    fn from_polar(magnitude: C::FloatTensorPrimitive, phase: C::FloatTensorPrimitive) -> Self {
+        Self::new(C::complex_from_polar(magnitude, phase))
+    }
+    fn exp(self) -> C::ComplexTensorPrimitive {
+        C::complex_exp(self.into_primitive())
+    }
+
+    fn sin(self) -> <C>::ComplexTensorPrimitive {
+        C::complex_sin(self.into_primitive())
+    }
+
+    fn cos(self) -> <C>::ComplexTensorPrimitive {
+        C::complex_cos(self.into_primitive())
+    }
+
+    fn sqrt(self) -> <C>::ComplexTensorPrimitive {
+        C::complex_sqrt(self.into_primitive())
+    }
+
+    fn log(self) -> C::ComplexTensorPrimitive {
+        C::complex_log(self.into_primitive())
+    }
+}
+
 #[allow(unused_variables)]
 impl<C: ComplexTensorBackend> Numeric<C> for ComplexKind
 where
@@ -1590,14 +1668,6 @@ where
     fn mean_dim(tensor: Self::Primitive, dim: usize) -> Self::Primitive {
         C::complex_mean_dim(tensor, dim)
     }
-
-    // fn equal_elem(lhs: Self::Primitive, rhs: Self::Elem) -> B::BoolTensorPrimitive {
-    //     B::complex_equal_elem(lhs, rhs)
-    // }
-
-    // fn not_equal_elem(lhs: Self::Primitive, rhs: Self::Elem) -> B::BoolTensorPrimitive {
-    //     B::complex_not_equal_elem(lhs, rhs)
-    // }
 
     fn powi(lhs: Self::Primitive, rhs: C::IntTensorPrimitive) -> Self::Primitive {
         C::complex_powi(lhs, rhs)

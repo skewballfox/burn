@@ -32,11 +32,11 @@ paste = { workspace = true }
 serde = { workspace = true }
 
 [dev-dependencies]
-burn-flex = { path = "../burn-flex",  features = ["complex"] }#, version = "=0.21.0-pre.3",    }
+burn-flex = { path = "../burn-flex", version = "=0.21.0-pre.3",  features = ["complex"] }
 #burn-tensor-testgen = { path = "../burn-tensor-testgen", version = "=0.21.0-pre.3", default-features = false }
-burn-backend-tests = { path = "../burn-backend-tests", version = "=0.21.0-pre.3", default-features = false, features = [
-    "std",
-] }
+# burn-backend-tests = { path = "../burn-backend-tests", version = "=0.21.0-pre.3", default-features = false, features = [
+#     "std",
+# ] }
 
 
 

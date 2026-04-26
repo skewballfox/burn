@@ -810,7 +810,6 @@ name = "burn-complex"
 version = "0.21.0-pre.3"
 dependencies = [
  "bon",
- "burn-backend-tests",
  "burn-flex",
  "burn-std",
  "burn-tensor",

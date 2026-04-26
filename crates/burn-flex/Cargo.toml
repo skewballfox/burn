@@ -49,7 +49,7 @@ critical-section = [
 burn-backend = { path = "../burn-backend", version = "=0.21.0-pre.3", default-features = false }
 burn-ir = { path = "../burn-ir", version = "=0.21.0-pre.3", default-features = false }
 burn-std = { path = "../burn-std", version = "=0.21.0-pre.3", default-features = false }
-burn-complex = { path ="../burn-complex", version = "=0.21.0-pre.3", optional = true }
+burn-complex = { path ="../burn-complex", optional = true }# version = "=0.21.0-pre.3" }
 
 bytemuck = { workspace = true }
 half = { workspace = true }

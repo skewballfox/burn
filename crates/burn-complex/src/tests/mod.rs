@@ -1,5 +1,3 @@
-pub mod ops;
-
 #[macro_export]
 macro_rules! testgen_all {
     () => {

@@ -397,11 +397,11 @@ where
         FlOps::<B>::float_sqrt(norm_sq)
     }
 
-    fn complex_from_parts(
-        real: super::FloatTensor<SplitBackend<B>>,
-        imag: super::FloatTensor<SplitBackend<B>>,
-    ) -> ComplexTensor<SplitBackend<B>> {
-        SplitComplexTensor { real, imag }
+    fn complex_from_parts(real: TensorData, imag: TensorData) -> ComplexTensor<SplitBackend<B>> {
+        SplitComplexTensor {
+            real: B::float_from_data(real, &Default::default()),
+            imag: B::float_from_data(imag, &Default::default()),
+        }
     }
 
     fn complex_exp(tensor: ComplexTensor<SplitBackend<B>>) -> ComplexTensor<SplitBackend<B>> {
@@ -524,7 +524,7 @@ where
         }
     }
 
-    fn complex_conj(tensor: ComplexTensor<SplitBackend<B>>) -> ComplexTensor<SplitBackend<B>> {
+    fn conj(tensor: ComplexTensor<SplitBackend<B>>) -> ComplexTensor<SplitBackend<B>> {
         // conj(a + bi) = a - bi
         SplitComplexTensor {
             real: tensor.real,
