@@ -1,6 +1,7 @@
 use crate::{
     base::{
-        ComplexTensor, ComplexTensorBackend, ComplexTensorOps, Layout, SplitLayout, SplitTensorData,
+        CBT, ComplexTensor, ComplexTensorBackend, ComplexTensorOps, Layout, SplitLayout,
+        SplitTensorData,
     },
     utils::real_to_complex_dtype,
 };
@@ -71,7 +72,9 @@ impl<T: TensorMetadata + 'static> TensorMetadata for SplitComplexTensor<T> {
 
 /// A newtype that wraps a real backend B and exposes a split-layout complex backend.
 pub struct SplitBackend<B: Backend>(core::marker::PhantomData<B>);
-
+impl<B: Backend> CBT for SplitBackend<B> {
+    type ComplexTensorPrimitive = SplitComplexTensor<B::FloatTensorPrimitive>;
+}
 impl<B: Backend> BackendTypes for SplitBackend<B> {
     type Device = B::Device;
 
@@ -127,7 +130,7 @@ where
         SplitComplexTensor { real, imag }
     }
 
-    fn complex_from_imag_data(data: TensorData, device: &Self::Device) -> ComplexTensor<Self> {
+    fn complex_from_imag_data(data: TensorData, device: &B::Device) -> ComplexTensor<Self> {
         let imag = B::float_from_data(data, device);
         // https://github.com/rust-lang/rust/issues/54628
         let real = B::float_from_data(
@@ -141,10 +144,7 @@ where
         SplitComplexTensor { real, imag }
     }
     // Should these be a result
-    fn complex_from_interleaved_data(
-        data: TensorData,
-        device: &Self::Device,
-    ) -> ComplexTensor<Self> {
+    fn complex_from_interleaved_data(data: TensorData, device: &B::Device) -> ComplexTensor<Self> {
         let mut real_bytes: Vec<u8> = Vec::with_capacity(data.bytes.len() / 2);
         let mut imag_bytes: Vec<u8> = Vec::with_capacity(data.bytes.len() / 2);
 

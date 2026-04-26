@@ -1,6 +1,6 @@
 use burn_backend::{Complex, Distribution};
 use burn_backend::{Element, TensorData};
-use burn_complex::base::SplitTensorData;
+use burn_complex::base::{CBT, SplitTensorData};
 use burn_complex::utils::interleaved_data_to_imag_data;
 use burn_complex::{
     base::{
@@ -26,7 +26,9 @@ use crate::ops::{
 
 use crate::strided_index::StridedIter;
 use crate::{Flex, FlexDevice, FlexTensor, ops::binary::scalar_op_typed};
-
+impl CBT for Flex {
+    type ComplexTensorPrimitive = FlexTensor;
+}
 impl ComplexTensorBackend for Flex {
     type InnerBackend = Flex;
 

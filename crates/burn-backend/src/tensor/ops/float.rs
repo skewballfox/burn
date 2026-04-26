@@ -433,8 +433,6 @@ impl<B: Backend> Numeric<B> for Float {
         }
     }
 
-    
-
     fn powi(lhs: Self::Primitive, rhs: Self::Primitive) -> Self::Primitive {
         q_bin_ops!(lhs, rhs, float_powf, q_powf)
     }

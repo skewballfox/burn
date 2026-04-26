@@ -36,7 +36,7 @@ where
     pub fn abs(self) -> Self {
         Self::new(K::abs(self.primitive))
     }
-    
+
     /// Sort the elements by value in ascending order along a given dimension.
     ///
     /// This sort is unstable (i.e., may reorder equal elements).
