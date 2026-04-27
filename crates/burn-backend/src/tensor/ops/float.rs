@@ -7,7 +7,7 @@ use crate::{
     ops::TransactionPrimitive,
     tensor::{
         BasicAutodiffOps, BasicOps, Device, Float, IndexingUpdateOp, IntTensor, Numeric, Ordered,
-        TensorKind, TransactionOp,
+        TensorKind, TransactionOp, Trigonometric,
     },
 };
 
@@ -720,6 +720,60 @@ impl<B: Backend> Ordered<B> for Float {
                 TensorPrimitive::QFloat(B::q_max_abs_dim(tensor, dim))
             }
         }
+    }
+}
+
+impl<B: Backend> Trigonometric<B> for Float {
+    fn cos(tensor: Self::Primitive) -> Self::Primitive {
+        TensorPrimitive::Float(B::float_cos(tensor.tensor()))
+    }
+
+    fn sin(tensor: Self::Primitive) -> Self::Primitive {
+        TensorPrimitive::Float(B::float_sin(tensor.tensor()))
+    }
+
+    fn tan(tensor: Self::Primitive) -> Self::Primitive {
+        TensorPrimitive::Float(B::float_tan(tensor.tensor()))
+    }
+
+    fn cosh(tensor: Self::Primitive) -> Self::Primitive {
+        TensorPrimitive::Float(B::float_cosh(tensor.tensor()))
+    }
+
+    fn sinh(tensor: Self::Primitive) -> Self::Primitive {
+        TensorPrimitive::Float(B::float_sinh(tensor.tensor()))
+    }
+
+    fn tanh(tensor: Self::Primitive) -> Self::Primitive {
+        TensorPrimitive::Float(B::float_tanh(tensor.tensor()))
+    }
+
+    fn acos(tensor: Self::Primitive) -> Self::Primitive {
+        TensorPrimitive::Float(B::float_acos(tensor.tensor()))
+    }
+
+    fn acosh(tensor: Self::Primitive) -> Self::Primitive {
+        TensorPrimitive::Float(B::float_acosh(tensor.tensor()))
+    }
+
+    fn asin(tensor: Self::Primitive) -> Self::Primitive {
+        TensorPrimitive::Float(B::float_asin(tensor.tensor()))
+    }
+
+    fn asinh(tensor: Self::Primitive) -> Self::Primitive {
+        TensorPrimitive::Float(B::float_asinh(tensor.tensor()))
+    }
+
+    fn atan(tensor: Self::Primitive) -> Self::Primitive {
+        TensorPrimitive::Float(B::float_atan(tensor.tensor()))
+    }
+
+    fn atanh(tensor: Self::Primitive) -> Self::Primitive {
+        TensorPrimitive::Float(B::float_atanh(tensor.tensor()))
+    }
+
+    fn atan2(lhs: Self::Primitive, rhs: Self::Primitive) -> Self::Primitive {
+        TensorPrimitive::Float(B::float_atan2(lhs.tensor(), rhs.tensor()))
     }
 }
 

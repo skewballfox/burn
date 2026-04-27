@@ -15,6 +15,7 @@ mod pad;
 pub use pad::IntoPadding;
 mod take;
 mod transaction;
+mod trig;
 mod trunc;
 
 pub use autodiff::*;
