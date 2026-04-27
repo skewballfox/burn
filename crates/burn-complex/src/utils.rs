@@ -225,7 +225,7 @@ pub const fn real_to_complex_dtype(real_data: DType) -> burn_std::DType {
     match real_data {
         burn_tensor::DType::F32 => burn_tensor::DType::Complex32,
         burn_tensor::DType::F64 => burn_tensor::DType::Complex64,
-        _ => panic!("Unsupported dtype for complex components"),
+        _ => panic!("r2c: Unsupported dtype"),
     }
 }
 
@@ -242,6 +242,6 @@ pub const fn complex_to_real_dtype(real_data: DType) -> burn_std::DType {
     match real_data {
         burn_tensor::DType::Complex32 => burn_tensor::DType::F32,
         burn_tensor::DType::Complex64 => burn_tensor::DType::F64,
-        _ => panic!("Unsupported dtype for complex components"),
+        _ => panic!("c2r: Unsupported dtype"),
     }
 }

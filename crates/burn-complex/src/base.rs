@@ -252,10 +252,7 @@ where
             B::InnerBackend::float_from_data(TensorData::full(&shape, fill_value.real()), device);
         let imag =
             B::InnerBackend::float_from_data(TensorData::full(shape, fill_value.imag()), device);
-        SplitComplexTensor {
-            real,
-            imag,
-        }
+        SplitComplexTensor { real, imag }
     }
 
     async fn complex_into_data(
@@ -1343,7 +1340,7 @@ impl<C: ComplexTensorBackend> BasicOps<C> for ComplexKind {
     }
 
     fn from_data(data: TensorData, device: &C::Device, dtype: DType) -> Self::Primitive {
-        C::complex_from_real_data(data.convert::<C::ComplexScalar>(), device)
+        C::complex_from_interleaved_data(data.convert::<C::ComplexScalar>(), device)
     }
 
     fn repeat_dim(tensor: Self::Primitive, dim: usize, times: usize) -> Self::Primitive {
