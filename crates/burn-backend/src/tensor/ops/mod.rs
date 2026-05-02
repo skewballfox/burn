@@ -5,13 +5,12 @@ mod float;
 mod int;
 mod numeric;
 mod ordered;
-mod trig;
 
 pub use autodiff::*;
 pub use base::*;
+pub use float::FloatMathOps;
 pub use numeric::*;
 pub use ordered::*;
-pub use trig::*;
 
 /// Computation to be used to update the existing values in indexed assignment operations (scatter/select).
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
