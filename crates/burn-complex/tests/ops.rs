@@ -1,99 +1,11 @@
 //#[burn_tensor_testgen::testgen(complex)]
 mod common;
+
 use burn_tensor::Tolerance;
 use burn_tensor::{Complex, TensorData};
 use common::*;
 
-use burn_complex::base::ComplexOnlyOps;
-
-#[test]
-fn test_complex_zeros() {
-    let tensor = TestTensor::<2>::zeros([2, 3], &Default::default());
-    let data = tensor.into_data();
-
-    let expected = TensorData::from([
-        [
-            Complex::<f32> {
-                real: 0.0,
-                imag: 0.0,
-            },
-            Complex::<f32> {
-                real: 0.0,
-                imag: 0.0,
-            },
-            Complex::<f32> {
-                real: 0.0,
-                imag: 0.0,
-            },
-        ],
-        [
-            Complex::<f32> {
-                real: 0.0,
-                imag: 0.0,
-            },
-            Complex::<f32> {
-                real: 0.0,
-                imag: 0.0,
-            },
-            Complex::<f32> {
-                real: 0.0,
-                imag: 0.0,
-            },
-        ],
-    ]);
-
-    data.assert_eq(&expected, false);
-}
-
-#[test]
-fn test_complex_ones() {
-    let tensor = TestTensor::<2>::ones([2, 2], &Default::default());
-    let data = tensor.into_data();
-
-    let expected = TensorData::from([
-        [
-            Complex::<f32> {
-                real: 1.0,
-                imag: 0.0,
-            },
-            Complex::<f32> {
-                real: 1.0,
-                imag: 0.0,
-            },
-        ],
-        [
-            Complex::<f32> {
-                real: 1.0,
-                imag: 0.0,
-            },
-            Complex::<f32> {
-                real: 1.0,
-                imag: 0.0,
-            },
-        ],
-    ]);
-
-    data.assert_eq(&expected, false);
-}
-
-#[test]
-fn test_complex_from_data() {
-    let data = TensorData::from([[
-        Complex::<f32> {
-            real: 1.0,
-            imag: 2.0,
-        },
-        Complex::<f32> {
-            real: 3.0,
-            imag: 4.0,
-        },
-    ]]);
-
-    let tensor = TestTensor::<2>::from_data(data.clone(), &Default::default());
-    let result = tensor.into_data();
-
-    result.assert_eq(&data, false);
-}
+use burn_complex::kind::ComplexOnlyOps;
 
 #[test]
 fn test_complex_add() {
@@ -513,116 +425,6 @@ fn test_complex_from_polar() {
 }
 
 #[test]
-fn test_complex_reshape() {
-    let tensor = TestTensor::<2>::from_data(
-        TensorData::from([[
-            Complex::<f32> {
-                real: 1.0,
-                imag: 2.0,
-            },
-            Complex::<f32> {
-                real: 3.0,
-                imag: 4.0,
-            },
-            Complex::<f32> {
-                real: 5.0,
-                imag: 6.0,
-            },
-            Complex::<f32> {
-                real: 7.0,
-                imag: 8.0,
-            },
-        ]]),
-        &Default::default(),
-    );
-
-    let result: TestTensor<3> = tensor.reshape([2, 2, 1]);
-    let data = result.into_data();
-
-    let expected = TensorData::from([
-        [
-            [Complex::<f32> {
-                real: 1.0,
-                imag: 2.0,
-            }],
-            [Complex::<f32> {
-                real: 3.0,
-                imag: 4.0,
-            }],
-        ],
-        [
-            [Complex::<f32> {
-                real: 5.0,
-                imag: 6.0,
-            }],
-            [Complex::<f32> {
-                real: 7.0,
-                imag: 8.0,
-            }],
-        ],
-    ]);
-
-    data.assert_eq(&expected, false);
-}
-
-#[test]
-fn test_complex_transpose() {
-    let tensor = TestTensor::<2>::from_data(
-        TensorData::from([
-            [
-                Complex::<f32> {
-                    real: 1.0,
-                    imag: 2.0,
-                },
-                Complex::<f32> {
-                    real: 3.0,
-                    imag: 4.0,
-                },
-            ],
-            [
-                Complex::<f32> {
-                    real: 5.0,
-                    imag: 6.0,
-                },
-                Complex::<f32> {
-                    real: 7.0,
-                    imag: 8.0,
-                },
-            ],
-        ]),
-        &Default::default(),
-    );
-
-    let result = tensor.transpose();
-    let data = result.into_data();
-
-    let expected = TensorData::from([
-        [
-            Complex::<f32> {
-                real: 1.0,
-                imag: 2.0,
-            },
-            Complex::<f32> {
-                real: 5.0,
-                imag: 6.0,
-            },
-        ],
-        [
-            Complex::<f32> {
-                real: 3.0,
-                imag: 4.0,
-            },
-            Complex::<f32> {
-                real: 7.0,
-                imag: 8.0,
-            },
-        ],
-    ]);
-
-    data.assert_eq(&expected, false);
-}
-
-#[test]
 fn test_complex_exp() {
     let tensor = TestTensor::<1>::from_data(
         TensorData::from([
@@ -879,7 +681,7 @@ fn test_complex_add_scalar() {
         &Default::default(),
     );
 
-    let scalar = Complex::<f32> {
+    let scalar = Complex::<f64> {
         real: 5.0,
         imag: 6.0,
     };

@@ -1,4 +1,4 @@
-use burn_complex::base::ComplexKind;
+use burn_complex::kind::ComplexKind;
 use burn_tensor::TensorData;
 use burn_tensor::{Float, Shape, Tensor, backend::Backend};
 // #[cfg(all(

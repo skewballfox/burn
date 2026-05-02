@@ -82,6 +82,8 @@ impl<B: Backend> TensorCreationOptions<B> {
                 settings.float_dtype.into()
             } else if (dtype.is_int() || dtype.is_uint()) && kind_name == "Int" {
                 settings.int_dtype.into()
+            } else if dtype.is_complex() {
+                settings.complex_dtype.into()
             } else {
                 settings.bool_dtype.into()
             }

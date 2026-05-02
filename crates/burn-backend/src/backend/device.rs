@@ -1,5 +1,5 @@
 pub use burn_std::device::*;
-use burn_std::{BoolDType, BoolStore, DType, FloatDType, IntDType};
+use burn_std::{BoolDType, BoolStore, ComplexDType, DType, FloatDType, IntDType};
 
 use alloc::format;
 use alloc::string::String;
@@ -24,7 +24,7 @@ pub use hashbrown::HashMap;
 #[cfg(not(feature = "std"))]
 use spin::{Lazy as LazyLock, Once as OnceLock};
 
-use crate::{Backend, BackendTypes};
+use crate::{Backend, BackendTypes, Complex};
 
 /// Device trait for all burn backend devices.
 pub trait DeviceOps: Clone + Default + PartialEq + Send + Sync + core::fmt::Debug + Device {
@@ -59,6 +59,8 @@ pub struct DeviceSettings {
     pub int_dtype: IntDType,
     /// Default bool data type.
     pub bool_dtype: BoolDType,
+    /// Default complex data type.
+    pub complex_dtype: ComplexDType,
 }
 
 impl DeviceSettings {
@@ -66,11 +68,13 @@ impl DeviceSettings {
         float_dtype: impl Into<FloatDType>,
         int_dtype: impl Into<IntDType>,
         bool_dtype: impl Into<BoolDType>,
+        complex_dtype: impl Into<ComplexDType>,
     ) -> Self {
         Self {
             float_dtype: float_dtype.into(),
             int_dtype: int_dtype.into(),
             bool_dtype: bool_dtype.into(),
+            complex_dtype: complex_dtype.into(),
         }
     }
 }
@@ -177,6 +181,7 @@ pub fn get_device_settings<B: BackendTypes>(device: &B::Device) -> DeviceSetting
             default_float::<B>(),
             default_int::<B>(),
             default_bool::<B>(device),
+            default_complex::<B>(),
         )
     };
     DeviceSettingsRegistry::get_or_insert(device, default_settings)
@@ -215,6 +220,10 @@ fn default_float<B: BackendTypes>() -> FloatDType {
 
 fn default_int<B: BackendTypes>() -> IntDType {
     <B::IntElem as crate::Element>::dtype().into()
+}
+
+fn default_complex<B: BackendTypes>() -> ComplexDType {
+    <Complex<B::FloatElem> as crate::Element>::dtype().into()
 }
 
 /// Errors that can occur during device-related operations.
@@ -309,7 +318,12 @@ pub fn set_default_dtypes<B: Backend>(
     check_dtype_support::<B>(device, float_dtype)?;
     check_dtype_support::<B>(device, int_dtype)?;
 
-    let settings = DeviceSettings::new(float_dtype, int_dtype, default_bool::<B>(device));
+    let settings = DeviceSettings::new(
+        float_dtype,
+        int_dtype,
+        default_bool::<B>(device),
+        default_complex::<B>(),
+    );
 
     initialize_unchecked(device, settings)?;
     Ok(())
@@ -348,7 +362,12 @@ pub fn set_default_float_dtype<B: Backend>(
     let dtype = dtype.into();
     check_dtype_support::<B>(device, dtype)?;
 
-    let settings = DeviceSettings::new(dtype, default_int::<B>(), default_bool::<B>(device));
+    let settings = DeviceSettings::new(
+        dtype,
+        default_int::<B>(),
+        default_bool::<B>(device),
+        default_complex::<B>(),
+    );
 
     initialize_unchecked(device, settings)?;
     Ok(())
@@ -387,7 +406,12 @@ pub fn set_default_int_dtype<B: Backend>(
     let dtype = dtype.into();
     check_dtype_support::<B>(device, dtype)?;
 
-    let settings = DeviceSettings::new(default_float::<B>(), dtype, default_bool::<B>(device));
+    let settings = DeviceSettings::new(
+        default_float::<B>(),
+        dtype,
+        default_bool::<B>(device),
+        default_complex::<B>(),
+    );
 
     initialize_unchecked(device, settings)?;
     Ok(())
@@ -458,7 +482,12 @@ mod tests {
     // Test defaults
     impl DeviceSettings {
         fn defaults() -> Self {
-            DeviceSettings::new(FloatDType::F32, IntDType::I32, BoolDType::Native)
+            DeviceSettings::new(
+                FloatDType::F32,
+                IntDType::I32,
+                BoolDType::Native,
+                ComplexDType::Complex32,
+            )
         }
     }
 
@@ -486,7 +515,12 @@ mod tests {
         clear_registry(); // reset registry for each test
 
         let device = TestDeviceA::new(0);
-        let settings = DeviceSettings::new(FloatDType::BF16, IntDType::I32, BoolDType::Native);
+        let settings = DeviceSettings::new(
+            FloatDType::BF16,
+            IntDType::I32,
+            BoolDType::Native,
+            ComplexDType::Complex32,
+        );
 
         initialize_unchecked(&device, settings).unwrap();
         let s1 = get_test_device_settings(&device);
@@ -504,7 +538,12 @@ mod tests {
 
         let d1 = TestDeviceA::new(0);
         let d2 = TestDeviceA::new(1);
-        let settings = DeviceSettings::new(FloatDType::F16, IntDType::I64, BoolDType::Native);
+        let settings = DeviceSettings::new(
+            FloatDType::F16,
+            IntDType::I64,
+            BoolDType::Native,
+            ComplexDType::Complex32,
+        );
 
         initialize_unchecked(&d1, settings).unwrap();
 
@@ -523,7 +562,12 @@ mod tests {
 
         let d1 = TestDeviceA::new(0);
         let d2 = TestDeviceB::new(0);
-        let settings = DeviceSettings::new(FloatDType::F16, IntDType::I64, BoolDType::Native);
+        let settings = DeviceSettings::new(
+            FloatDType::F16,
+            IntDType::I64,
+            BoolDType::Native,
+            ComplexDType::Complex32,
+        );
 
         initialize_unchecked(&d2, settings).unwrap();
 
@@ -544,7 +588,12 @@ mod tests {
         // Settings are set to default on first access, which forces consistency
         let _before = get_test_device_settings(&device);
 
-        let settings = DeviceSettings::new(FloatDType::BF16, IntDType::I64, BoolDType::Native);
+        let settings = DeviceSettings::new(
+            FloatDType::BF16,
+            IntDType::I64,
+            BoolDType::Native,
+            ComplexDType::Complex32,
+        );
         let result = initialize_unchecked(&device, settings);
 
         assert!(matches!(
@@ -559,7 +608,12 @@ mod tests {
         clear_registry(); // reset registry for each test
 
         let device = TestDeviceA::new(0);
-        let settings = DeviceSettings::new(FloatDType::F16, IntDType::I32, BoolDType::Native);
+        let settings = DeviceSettings::new(
+            FloatDType::F16,
+            IntDType::I32,
+            BoolDType::Native,
+            ComplexDType::Complex32,
+        );
         initialize_unchecked(&device, settings).unwrap();
 
         let result = initialize_unchecked(&device, DeviceSettings::defaults());
@@ -576,7 +630,12 @@ mod tests {
         clear_registry();
 
         let device = TestDeviceA::new(0);
-        let settings = DeviceSettings::new(FloatDType::F16, IntDType::I32, BoolDType::Native);
+        let settings = DeviceSettings::new(
+            FloatDType::F16,
+            IntDType::I32,
+            BoolDType::Native,
+            ComplexDType::Complex32,
+        );
 
         initialize_unchecked(&device, settings).unwrap();
         let settings_actual = get_test_device_settings(&device);

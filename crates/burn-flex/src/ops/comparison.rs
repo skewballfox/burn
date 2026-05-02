@@ -955,6 +955,22 @@ pub(crate) fn reduce_bool_dim(
                 data[idx].to_f32() != 0.0
             })
         }
+        #[cfg(feature = "complex")]
+        DType::Complex32 => {
+            let data: &[burn_backend::Complex<f32>] = tensor.storage();
+            reduce_bool_dim_with(&tensor, dim, init, combine, out_dtype, |idx| {
+                let c = data[idx];
+                c.real != 0.0 || c.imag != 0.0
+            })
+        }
+        #[cfg(feature = "complex")]
+        DType::Complex64 => {
+            let data: &[burn_backend::Complex<f64>] = tensor.storage();
+            reduce_bool_dim_with(&tensor, dim, init, combine, out_dtype, |idx| {
+                let c = data[idx];
+                c.real != 0.0 || c.imag != 0.0
+            })
+        }
         _ => panic!("reduce_bool_dim: unsupported dtype {:?}", tensor.dtype()),
     }
 }

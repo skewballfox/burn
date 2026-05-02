@@ -361,6 +361,32 @@ impl From<BoolDType> for DType {
     }
 }
 
+#[allow(missing_docs)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum ComplexDType {
+    Complex64,
+    Complex32,
+}
+
+impl From<DType> for ComplexDType {
+    fn from(value: DType) -> Self {
+        match value {
+            DType::Complex64 => ComplexDType::Complex64,
+            DType::Complex32 => ComplexDType::Complex32,
+            _ => panic!("Expected complex data type, got {value:?}"),
+        }
+    }
+}
+
+impl From<ComplexDType> for DType {
+    fn from(value: ComplexDType) -> Self {
+        match value {
+            ComplexDType::Complex64 => DType::Complex64,
+            ComplexDType::Complex32 => DType::Complex32,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

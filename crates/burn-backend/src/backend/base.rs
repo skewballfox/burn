@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::element::Element;
-use crate::ops::*;
 use crate::tensor::{BoolTensor, FloatTensor, IntTensor, QuantizedTensor};
+use crate::{ElementComparison, ops::*};
 use crate::{QTensorPrimitive, TensorData, TensorMetadata};
 
 #[cfg(feature = "distributed")]
@@ -24,7 +24,7 @@ pub trait BackendTypes {
     /// Tensor primitive to be used for all float operations.
     type FloatTensorPrimitive: TensorMetadata + 'static;
     /// Default float element type.
-    type FloatElem: Element;
+    type FloatElem: Element + ElementComparison + bytemuck::Pod;
 
     /// Tensor primitive to be used for all int operations.
     type IntTensorPrimitive: TensorMetadata + 'static;

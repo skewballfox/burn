@@ -321,6 +321,10 @@ impl FlexTensor {
             DType::Bool(burn_std::BoolStore::U32) => {
                 panic!("burn-flex: Bool(U32) storage is not yet supported")
             }
+            #[cfg(feature = "complex")]
+            DType::Complex32 => self.copy_contiguous::<burn_backend::Complex<f32>>(),
+            #[cfg(feature = "complex")]
+            DType::Complex64 => self.copy_contiguous::<burn_backend::Complex<f64>>(),
             _ => panic!("Unsupported dtype for contiguous copy: {:?}", self.dtype),
         }
     }
