@@ -110,7 +110,7 @@ where
     if !has_negative_strides && layout.start_offset() == 0 && src.len() == n {
         let result: Vec<O> = src.iter().map(|&x| op(x)).collect();
         let bytes = Bytes::from_elems(result);
-        return FlexTensor::new(bytes, layout, E::dtype());
+        return FlexTensor::new(bytes, layout, O::dtype());
     }
 
     // Fallback for negative strides: use StridedIter for correct element order
@@ -122,7 +122,7 @@ where
         return FlexTensor::new(
             bytes,
             Layout::contiguous(layout.shape().clone()),
-            E::dtype(),
+            O::dtype(),
         );
     }
 
@@ -163,7 +163,7 @@ where
     FlexTensor::new(
         bytes,
         Layout::contiguous(layout.shape().clone()),
-        E::dtype(),
+        O::dtype(),
     )
 }
 

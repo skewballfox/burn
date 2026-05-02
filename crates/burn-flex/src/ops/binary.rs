@@ -532,6 +532,44 @@ where
     make_tensor(result, shape, dtype)
 }
 
+pub(crate) fn scalar_op_typed_convert<E, O, Op>(
+    mut tensor: FlexTensor,
+    scalar: E,
+    op: Op,
+) -> FlexTensor
+where
+    E: Element + bytemuck::Pod,
+    O: Element + bytemuck::Pod,
+    Op: Fn(E, E) -> O,
+{
+    // In-place fast path: unique, contiguous at offset 0
+    if tensor.is_unique()
+        && let Some((0, end)) = tensor.layout().contiguous_offsets()
+    {
+        let storage: &mut [E] = tensor.storage_mut();
+
+        //note: maybe make issue about doing pointer magic when E and O have the same size
+        storage[..end].iter_mut().map(|x| {
+            op(*x, scalar);
+        });
+        return tensor;
+    }
+
+    // Allocating path
+    let shape = tensor.layout().shape().clone();
+    let dtype = tensor.dtype();
+    let storage: &[E] = tensor.storage();
+
+    let result: Vec<O> = match tensor.layout().contiguous_offsets() {
+        Some((start, end)) => storage[start..end].iter().map(|&x| op(x, scalar)).collect(),
+        None => StridedIter::new(tensor.layout())
+            .map(|i| op(storage[i], scalar))
+            .collect(),
+    };
+
+    make_tensor(result, shape, dtype)
+}
+
 pub(crate) fn scalar_op_typed_rhs<E, E2, Op>(
     mut tensor: FlexTensor,
     scalar: E2,

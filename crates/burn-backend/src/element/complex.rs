@@ -31,6 +31,12 @@ mod tch {
     impl<E: TchElement> TchElement for Complex<E> {}
 }
 
+#[cfg(feature = "gemm")]
+mod gemm {
+    use super::Complex;
+    use gemm::{c32, c64};
+    impl<E: TchElement> TchElement for Complex<E> {}
+}
 use std::ops::Div;
 
 /// trait to convert an element to a complex number when the conversion needs to be generic over
@@ -78,6 +84,32 @@ impl<E> From<NumComplex<E>> for Complex<E> {
             real: c.re,
             imag: c.im,
         }
+    }
+}
+
+impl<E: Element + ElementComparison + bytemuck::Pod + Zero + core::ops::Add + core::iter::Sum>
+    core::iter::Sum for Complex<E>
+{
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        iter.fold(Self::new(E::zero(), E::zero()), |a, b| a + b)
+    }
+}
+
+impl<E> core::iter::Product for Complex<E>
+where
+    E: Element
+        + ElementComparison
+        + bytemuck::Pod
+        + One
+        + Zero
+        + Mul<Output = E>
+        + Add<Output = E>
+        + Sub<Output = E>
+        + Copy
+        + core::iter::Product,
+{
+    fn product<I: Iterator<Item = Self>>(iter: I) -> Self {
+        iter.fold(Self::new(E::one(), E::zero()), |a, b| a * b)
     }
 }
 

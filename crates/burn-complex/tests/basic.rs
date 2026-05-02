@@ -1,6 +1,6 @@
 mod common;
 
-use burn_tensor::{Complex, Int, Tensor, TensorData};
+use burn_tensor::{Bool, Complex, IndexingUpdateOp, Int, Tensor, TensorData};
 use common::*;
 
 #[test]
@@ -980,4 +980,729 @@ fn test_complex_select() {
     ]);
 
     data.assert_eq(&expected, false);
+}
+
+#[test]
+fn test_complex_full() {
+    // Fills via scalar; the real part is propagated (imag always 0 via ElementConversion).
+    let fill = Complex::<f32> {
+        real: 3.0,
+        imag: 0.0,
+    };
+    let tensor = TestTensor::<2>::full([2, 2], fill, &Default::default());
+    let data = tensor.into_data();
+
+    let expected = TensorData::from([
+        [
+            Complex::<f32> {
+                real: 3.0,
+                imag: 0.0,
+            },
+            Complex::<f32> {
+                real: 3.0,
+                imag: 0.0,
+            },
+        ],
+        [
+            Complex::<f32> {
+                real: 3.0,
+                imag: 0.0,
+            },
+            Complex::<f32> {
+                real: 3.0,
+                imag: 0.0,
+            },
+        ],
+    ]);
+
+    data.assert_eq(&expected, false);
+}
+
+#[test]
+fn test_complex_equal_elem() {
+    // The scalar comparison converts through ElementConversion (imag always 0),
+    // so this exercises the real-part equality path.
+    let tensor = TestTensor::<1>::from_data(
+        TensorData::from([
+            Complex::<f32> {
+                real: 1.0,
+                imag: 0.0,
+            },
+            Complex::<f32> {
+                real: 3.0,
+                imag: 0.0,
+            },
+            Complex::<f32> {
+                real: 1.0,
+                imag: 0.0,
+            },
+        ]),
+        &Default::default(),
+    );
+
+    let result = tensor
+        .equal_elem(Complex::<f32> {
+            real: 1.0,
+            imag: 0.0,
+        })
+        .into_data();
+
+    result.assert_eq(&TensorData::from([true, false, true]), false);
+}
+
+#[test]
+fn test_complex_not_equal_elem() {
+    // The scalar comparison converts through ElementConversion (imag always 0),
+    // so this exercises the real-part inequality path.
+    let tensor = TestTensor::<1>::from_data(
+        TensorData::from([
+            Complex::<f32> {
+                real: 1.0,
+                imag: 0.0,
+            },
+            Complex::<f32> {
+                real: 3.0,
+                imag: 0.0,
+            },
+            Complex::<f32> {
+                real: 1.0,
+                imag: 0.0,
+            },
+        ]),
+        &Default::default(),
+    );
+
+    let result = tensor
+        .not_equal_elem(Complex::<f32> {
+            real: 1.0,
+            imag: 0.0,
+        })
+        .into_data();
+
+    result.assert_eq(&TensorData::from([false, true, false]), false);
+}
+
+#[test]
+fn test_complex_mask_where() {
+    let tensor = TestTensor::<2>::from_data(
+        TensorData::from([
+            [
+                Complex::<f32> {
+                    real: 1.0,
+                    imag: 1.0,
+                },
+                Complex::<f32> {
+                    real: 2.0,
+                    imag: 2.0,
+                },
+            ],
+            [
+                Complex::<f32> {
+                    real: 3.0,
+                    imag: 3.0,
+                },
+                Complex::<f32> {
+                    real: 4.0,
+                    imag: 4.0,
+                },
+            ],
+        ]),
+        &Default::default(),
+    );
+    let source = TestTensor::<2>::from_data(
+        TensorData::from([
+            [
+                Complex::<f32> {
+                    real: 9.0,
+                    imag: 9.0,
+                },
+                Complex::<f32> {
+                    real: 9.0,
+                    imag: 9.0,
+                },
+            ],
+            [
+                Complex::<f32> {
+                    real: 9.0,
+                    imag: 9.0,
+                },
+                Complex::<f32> {
+                    real: 9.0,
+                    imag: 9.0,
+                },
+            ],
+        ]),
+        &Default::default(),
+    );
+    let mask = Tensor::<TestBackend, 2, Bool>::from_data(
+        [[true, false], [false, true]],
+        &Default::default(),
+    );
+
+    let data = tensor.mask_where(mask, source).into_data();
+
+    let expected = TensorData::from([
+        [
+            Complex::<f32> {
+                real: 9.0,
+                imag: 9.0,
+            },
+            Complex::<f32> {
+                real: 2.0,
+                imag: 2.0,
+            },
+        ],
+        [
+            Complex::<f32> {
+                real: 3.0,
+                imag: 3.0,
+            },
+            Complex::<f32> {
+                real: 9.0,
+                imag: 9.0,
+            },
+        ],
+    ]);
+
+    data.assert_eq(&expected, false);
+}
+
+#[test]
+fn test_complex_mask_fill() {
+    let tensor = TestTensor::<2>::from_data(
+        TensorData::from([
+            [
+                Complex::<f32> {
+                    real: 1.0,
+                    imag: 1.0,
+                },
+                Complex::<f32> {
+                    real: 2.0,
+                    imag: 2.0,
+                },
+            ],
+            [
+                Complex::<f32> {
+                    real: 3.0,
+                    imag: 3.0,
+                },
+                Complex::<f32> {
+                    real: 4.0,
+                    imag: 4.0,
+                },
+            ],
+        ]),
+        &Default::default(),
+    );
+    let mask = Tensor::<TestBackend, 2, Bool>::from_data(
+        [[true, false], [false, true]],
+        &Default::default(),
+    );
+
+    let data = tensor
+        .mask_fill(
+            mask,
+            Complex::<f32> {
+                real: 0.0,
+                imag: 0.0,
+            },
+        )
+        .into_data();
+
+    let expected = TensorData::from([
+        [
+            Complex::<f32> {
+                real: 0.0,
+                imag: 0.0,
+            },
+            Complex::<f32> {
+                real: 2.0,
+                imag: 2.0,
+            },
+        ],
+        [
+            Complex::<f32> {
+                real: 3.0,
+                imag: 3.0,
+            },
+            Complex::<f32> {
+                real: 0.0,
+                imag: 0.0,
+            },
+        ],
+    ]);
+
+    data.assert_eq(&expected, false);
+}
+
+#[test]
+fn test_complex_gather() {
+    // tensor shape [2, 3]; output[i, j] = tensor[indices[i, j], j] for dim=0
+    let tensor = TestTensor::<2>::from_data(
+        TensorData::from([
+            [
+                Complex::<f32> {
+                    real: 1.0,
+                    imag: 1.0,
+                },
+                Complex::<f32> {
+                    real: 2.0,
+                    imag: 2.0,
+                },
+                Complex::<f32> {
+                    real: 3.0,
+                    imag: 3.0,
+                },
+            ],
+            [
+                Complex::<f32> {
+                    real: 4.0,
+                    imag: 4.0,
+                },
+                Complex::<f32> {
+                    real: 5.0,
+                    imag: 5.0,
+                },
+                Complex::<f32> {
+                    real: 6.0,
+                    imag: 6.0,
+                },
+            ],
+        ]),
+        &Default::default(),
+    );
+
+    let indices =
+        Tensor::<TestBackend, 2, Int>::from_ints([[0, 1, 0], [1, 0, 1]], &Default::default());
+    let data = tensor.gather(0, indices).into_data();
+
+    let expected = TensorData::from([
+        [
+            Complex::<f32> {
+                real: 1.0,
+                imag: 1.0,
+            },
+            Complex::<f32> {
+                real: 5.0,
+                imag: 5.0,
+            },
+            Complex::<f32> {
+                real: 3.0,
+                imag: 3.0,
+            },
+        ],
+        [
+            Complex::<f32> {
+                real: 4.0,
+                imag: 4.0,
+            },
+            Complex::<f32> {
+                real: 2.0,
+                imag: 2.0,
+            },
+            Complex::<f32> {
+                real: 6.0,
+                imag: 6.0,
+            },
+        ],
+    ]);
+
+    data.assert_eq(&expected, false);
+}
+
+#[test]
+fn test_complex_scatter_add() {
+    // Start with zeros [2, 2]; scatter-add values along dim 0.
+    // output[indices[i, j], j] += values[i, j]
+    let tensor = TestTensor::<2>::zeros([2, 2], &Default::default());
+    let indices = Tensor::<TestBackend, 2, Int>::from_ints([[0, 0], [1, 0]], &Default::default());
+    let values = TestTensor::<2>::from_data(
+        TensorData::from([
+            [
+                Complex::<f32> {
+                    real: 1.0,
+                    imag: 1.0,
+                },
+                Complex::<f32> {
+                    real: 2.0,
+                    imag: 2.0,
+                },
+            ],
+            [
+                Complex::<f32> {
+                    real: 3.0,
+                    imag: 3.0,
+                },
+                Complex::<f32> {
+                    real: 4.0,
+                    imag: 4.0,
+                },
+            ],
+        ]),
+        &Default::default(),
+    );
+
+    let data = tensor
+        .scatter(0, indices, values, IndexingUpdateOp::Add)
+        .into_data();
+
+    // out[0, 0] += 1+1i; out[0, 1] += 2+2i + 4+4i = 6+6i; out[1, 0] += 3+3i
+    let expected = TensorData::from([
+        [
+            Complex::<f32> {
+                real: 1.0,
+                imag: 1.0,
+            },
+            Complex::<f32> {
+                real: 6.0,
+                imag: 6.0,
+            },
+        ],
+        [
+            Complex::<f32> {
+                real: 3.0,
+                imag: 3.0,
+            },
+            Complex::<f32> {
+                real: 0.0,
+                imag: 0.0,
+            },
+        ],
+    ]);
+
+    data.assert_eq(&expected, false);
+}
+
+#[test]
+fn test_complex_select_assign_add() {
+    // tensor [3, 2]; add values to rows 0 and 2
+    let tensor = TestTensor::<2>::from_data(
+        TensorData::from([
+            [
+                Complex::<f32> {
+                    real: 1.0,
+                    imag: 1.0,
+                },
+                Complex::<f32> {
+                    real: 2.0,
+                    imag: 2.0,
+                },
+            ],
+            [
+                Complex::<f32> {
+                    real: 3.0,
+                    imag: 3.0,
+                },
+                Complex::<f32> {
+                    real: 4.0,
+                    imag: 4.0,
+                },
+            ],
+            [
+                Complex::<f32> {
+                    real: 5.0,
+                    imag: 5.0,
+                },
+                Complex::<f32> {
+                    real: 6.0,
+                    imag: 6.0,
+                },
+            ],
+        ]),
+        &Default::default(),
+    );
+    let indices = Tensor::<TestBackend, 1, Int>::from_ints([0, 2], &Default::default());
+    let values = TestTensor::<2>::from_data(
+        TensorData::from([
+            [
+                Complex::<f32> {
+                    real: 10.0,
+                    imag: 10.0,
+                },
+                Complex::<f32> {
+                    real: 20.0,
+                    imag: 20.0,
+                },
+            ],
+            [
+                Complex::<f32> {
+                    real: 30.0,
+                    imag: 30.0,
+                },
+                Complex::<f32> {
+                    real: 40.0,
+                    imag: 40.0,
+                },
+            ],
+        ]),
+        &Default::default(),
+    );
+
+    let data = tensor
+        .select_assign(0, indices, values, IndexingUpdateOp::Add)
+        .into_data();
+
+    let expected = TensorData::from([
+        [
+            Complex::<f32> {
+                real: 11.0,
+                imag: 11.0,
+            },
+            Complex::<f32> {
+                real: 22.0,
+                imag: 22.0,
+            },
+        ],
+        [
+            Complex::<f32> {
+                real: 3.0,
+                imag: 3.0,
+            },
+            Complex::<f32> {
+                real: 4.0,
+                imag: 4.0,
+            },
+        ],
+        [
+            Complex::<f32> {
+                real: 35.0,
+                imag: 35.0,
+            },
+            Complex::<f32> {
+                real: 46.0,
+                imag: 46.0,
+            },
+        ],
+    ]);
+
+    data.assert_eq(&expected, false);
+}
+
+#[test]
+fn test_complex_scatter_nd() {
+    let device = Default::default();
+
+    // data: shape [3, 2], values at indices [0] and [2] are updated
+    // data[0, :] = (1+1i, 2+2i), data[1, :] = (3+3i, 4+4i), data[2, :] = (5+5i, 6+6i)
+    let data = TestTensor::<2>::from_data(
+        TensorData::from([
+            [
+                Complex::<f32> {
+                    real: 1.0,
+                    imag: 1.0,
+                },
+                Complex::<f32> {
+                    real: 2.0,
+                    imag: 2.0,
+                },
+            ],
+            [
+                Complex::<f32> {
+                    real: 3.0,
+                    imag: 3.0,
+                },
+                Complex::<f32> {
+                    real: 4.0,
+                    imag: 4.0,
+                },
+            ],
+            [
+                Complex::<f32> {
+                    real: 5.0,
+                    imag: 5.0,
+                },
+                Complex::<f32> {
+                    real: 6.0,
+                    imag: 6.0,
+                },
+            ],
+        ]),
+        &device,
+    );
+
+    // indices: shape [2, 1] — two index tuples each of depth 1 (selects a row)
+    let indices: Tensor<_, 2, Int> = Tensor::from_data(TensorData::from([[0i64], [2i64]]), &device);
+
+    // values: shape [2, 2] matching the selected rows
+    let values = TestTensor::<2>::from_data(
+        TensorData::from([
+            [
+                Complex::<f32> {
+                    real: 10.0,
+                    imag: 10.0,
+                },
+                Complex::<f32> {
+                    real: 20.0,
+                    imag: 20.0,
+                },
+            ],
+            [
+                Complex::<f32> {
+                    real: 30.0,
+                    imag: 30.0,
+                },
+                Complex::<f32> {
+                    real: 40.0,
+                    imag: 40.0,
+                },
+            ],
+        ]),
+        &device,
+    );
+
+    let result = data.scatter_nd::<2, 2>(indices, values, IndexingUpdateOp::Assign);
+    let result_data = result.into_data();
+
+    let expected = TensorData::from([
+        [
+            Complex::<f32> {
+                real: 10.0,
+                imag: 10.0,
+            },
+            Complex::<f32> {
+                real: 20.0,
+                imag: 20.0,
+            },
+        ],
+        [
+            Complex::<f32> {
+                real: 3.0,
+                imag: 3.0,
+            },
+            Complex::<f32> {
+                real: 4.0,
+                imag: 4.0,
+            },
+        ],
+        [
+            Complex::<f32> {
+                real: 30.0,
+                imag: 30.0,
+            },
+            Complex::<f32> {
+                real: 40.0,
+                imag: 40.0,
+            },
+        ],
+    ]);
+
+    result_data.assert_eq(&expected, false);
+}
+
+#[test]
+fn test_complex_scatter_nd_add() {
+    let device = Default::default();
+
+    // data: shape [2, 3], update specific elements using depth-2 index tuples
+    let data = TestTensor::<2>::from_data(
+        TensorData::from([
+            [
+                Complex::<f32> {
+                    real: 1.0,
+                    imag: 1.0,
+                },
+                Complex::<f32> {
+                    real: 2.0,
+                    imag: 2.0,
+                },
+                Complex::<f32> {
+                    real: 3.0,
+                    imag: 3.0,
+                },
+            ],
+            [
+                Complex::<f32> {
+                    real: 4.0,
+                    imag: 4.0,
+                },
+                Complex::<f32> {
+                    real: 5.0,
+                    imag: 5.0,
+                },
+                Complex::<f32> {
+                    real: 6.0,
+                    imag: 6.0,
+                },
+            ],
+        ]),
+        &device,
+    );
+
+    // indices: shape [2, 2] — two index tuples of depth 2 (selects individual elements)
+    let indices: Tensor<_, 2, Int> =
+        Tensor::from_data(TensorData::from([[0i64, 1i64], [1i64, 2i64]]), &device);
+
+    // values: shape [2] — one scalar per index tuple
+    let values = TestTensor::<1>::from_data(
+        TensorData::from([
+            Complex::<f32> {
+                real: 10.0,
+                imag: 10.0,
+            },
+            Complex::<f32> {
+                real: 20.0,
+                imag: 20.0,
+            },
+        ]),
+        &device,
+    );
+
+    let result = data.scatter_nd::<2, 1>(indices, values, IndexingUpdateOp::Add);
+    let result_data = result.into_data();
+
+    // data[0,1] += (10+10i), data[1,2] += (20+20i)
+    let expected = TensorData::from([
+        [
+            Complex::<f32> {
+                real: 1.0,
+                imag: 1.0,
+            },
+            Complex::<f32> {
+                real: 12.0,
+                imag: 12.0,
+            },
+            Complex::<f32> {
+                real: 3.0,
+                imag: 3.0,
+            },
+        ],
+        [
+            Complex::<f32> {
+                real: 4.0,
+                imag: 4.0,
+            },
+            Complex::<f32> {
+                real: 5.0,
+                imag: 5.0,
+            },
+            Complex::<f32> {
+                real: 26.0,
+                imag: 26.0,
+            },
+        ],
+    ]);
+
+    result_data.assert_eq(&expected, false);
+}
+
+#[test]
+fn test_complex_to_device() {
+    let device = Default::default();
+    let tensor = TestTensor::<2>::from_data(
+        TensorData::from([[
+            Complex::<f32> {
+                real: 1.0,
+                imag: 2.0,
+            },
+            Complex::<f32> {
+                real: 3.0,
+                imag: 4.0,
+            },
+        ]]),
+        &device,
+    );
+    let original = tensor.clone().into_data();
+    let moved = tensor.to_device(&device).into_data();
+
+    moved.assert_eq(&original, false);
 }

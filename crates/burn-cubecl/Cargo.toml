@@ -66,6 +66,7 @@ burn-ir = { workspace = true }
 burn-std = { workspace = true, features = [
     "cubecl",
 ] }
+bytemuck = { workspace = true }
 burn-backend = { workspace = true, features = [
     "cubecl",
 ] }

@@ -307,8 +307,16 @@ impl TensorData {
                         .iter()
                         .map(|e: &u32| e.elem::<E>()),
                 ),
-                DType::Complex32 => unimplemented!("TensorData isn't used for Dtype Complex32"),
-                DType::Complex64 => unimplemented!("TensorData isn't used for Dtype Complex64"),
+                DType::Complex32 => Box::new(
+                    bytemuck::checked::cast_slice(&self.bytes)
+                        .iter()
+                        .map(|e: &Complex<f32>| e.elem::<E>()),
+                ),
+                DType::Complex64 => Box::new(
+                    bytemuck::checked::cast_slice(&self.bytes)
+                        .iter()
+                        .map(|e: &Complex<f64>| e.elem::<E>()),
+                ),
                 DType::QFloat(scheme) => match scheme {
                     QuantScheme {
                         level: QuantLevel::Tensor | QuantLevel::Block(_),

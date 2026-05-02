@@ -1,3 +1,5 @@
+use std::io::Split;
+
 use crate::{
     base::{
         CBT, ComplexTensor, ComplexTensorBackend, ComplexTensorOps, Layout, SplitLayout,
@@ -956,6 +958,18 @@ where
         SplitComplexTensor {
             real: FlOps::<B>::float_powf_scalar(lhs.real, rhs),
             imag: FlOps::<B>::float_powf_scalar(lhs.imag, rhs),
+        }
+    }
+
+    fn complex_scatter_nd(
+        tensor: ComplexTensor<SplitBackend<B>>,
+        indices: B::IntTensorPrimitive,
+        value: ComplexTensor<SplitBackend<B>>,
+        reduction: burn_tensor::IndexingUpdateOp,
+    ) -> ComplexTensor<SplitBackend<B>> {
+        SplitComplexTensor {
+            real: B::float_scatter_nd(tensor.real, indices.clone(), value.real, reduction),
+            imag: B::float_scatter_nd(tensor.imag, indices, value.imag, reduction),
         }
     }
 }

@@ -142,6 +142,21 @@ pub fn interleaved_data_to_real_data(interleaved: TensorData) -> TensorData {
     TensorData::from_bytes_vec(real_bytes, interleaved.shape.clone(), real_dtype)
 }
 
+/// Converts an interleaved complex `TensorData` into a float `TensorData`, flattening the real and imaginary parts into a single float buffer.
+#[inline]
+pub fn interleaved_data_to_raw_float_data(interleaved: TensorData) -> TensorData {
+    let real_dtype = complex_to_real_dtype(interleaved.dtype);
+
+    let out_shape = {
+        let mut s = interleaved.shape.clone();
+        s.push(2); // Add a new innermost dimension of size 2 for [Real, Imag]
+        s
+    };
+
+    // Shape is updated to include the new innermost dimension of size 2 for [Real, Imag]
+    TensorData::from_bytes(interleaved.bytes, out_shape, real_dtype)
+}
+
 /// Extracts the imaginary components from an interleaved complex `TensorData`.
 ///
 /// Each complex element `[r, i]` in the input yields only `i` in the output. The dtype is

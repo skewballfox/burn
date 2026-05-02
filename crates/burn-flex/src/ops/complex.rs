@@ -1,4 +1,4 @@
-use burn_backend::tensor::{BoolTensor, Device, FloatTensor, IntTensor};
+use burn_backend::tensor::{BoolTensor, Device, FloatTensor, Int, IntTensor};
 use burn_backend::{Complex, Distribution};
 use burn_backend::{Element, TensorData};
 use burn_complex::base::{CBT, SplitTensorData};
@@ -15,8 +15,10 @@ use burn_std::{BoolDType, DType, FloatDType, Slice};
 use num_traits::ToPrimitive;
 use num_traits::Zero;
 
-use crate::ops::binary::can_use_binary_inplace;
 use crate::ops::binary::make_tensor;
+use crate::ops::binary::{
+    binary_op_typed_convert, can_use_binary_inplace, scalar_op_typed_convert,
+};
 use crate::ops::comparison::compare_elem_typed;
 use crate::ops::{
     binary::scalar_op_typed_rhs,
@@ -666,6 +668,23 @@ impl ComplexTensorOps<Flex> for Flex {
             _ => panic!("complex_powf_scalar: unsupported dtype {:?}", lhs.dtype()),
         }
     }
+
+    fn complex_scatter_nd(
+        tensor: ComplexTensor<Flex>,
+        indices: IntTensor<Flex>,
+        value: ComplexTensor<Flex>,
+        reduction: burn_backend::tensor::IndexingUpdateOp,
+    ) -> ComplexTensor<Flex> {
+        match tensor.dtype() {
+            DType::Complex32 => crate::ops::gather_scatter::scatter_nd_no_ord::<Complex<f32>>(
+                tensor, indices, value, reduction,
+            ),
+            DType::Complex64 => crate::ops::gather_scatter::scatter_nd_no_ord::<Complex<f64>>(
+                tensor, indices, value, reduction,
+            ),
+            _ => panic!("complex_scatter_nd: unsupported dtype {:?}", tensor.dtype()),
+        }
+    }
 }
 
 /// Check if any element is non-zero (complex tensors).
@@ -801,8 +820,8 @@ pub fn c2r_binary_op<F32Op, F64Op>(
     f64_op: F64Op,
 ) -> FlexTensor
 where
-    F32Op: Fn(Complex<f32>, Complex<f32>) -> Complex<f32> + Copy,
-    F64Op: Fn(Complex<f64>, Complex<f64>) -> Complex<f64> + Copy,
+    F32Op: Fn(Complex<f32>, Complex<f32>) -> f32 + Copy,
+    F64Op: Fn(Complex<f64>, Complex<f64>) -> f64 + Copy,
 {
     use crate::ops::binary::binary_op_typed;
 
@@ -815,8 +834,8 @@ where
     let (lhs, rhs) = crate::ops::expand::broadcast_binary(lhs, rhs);
 
     match lhs.dtype() {
-        DType::Complex32 => binary_op_typed::<Complex<f32>, _>(lhs, &rhs, f32_op),
-        DType::Complex64 => binary_op_typed::<Complex<f64>, _>(lhs, &rhs, f64_op),
+        DType::Complex32 => binary_op_typed_convert::<Complex<f32>, f32, _>(lhs, &rhs, f32_op),
+        DType::Complex64 => binary_op_typed_convert::<Complex<f64>, f64, _>(lhs, &rhs, f64_op),
         _ => panic!("complex_binary_op: unsupported dtype {:?}", lhs.dtype()),
     }
 }
@@ -828,8 +847,8 @@ pub fn c2r_scalar_op<F32Op, F64Op>(
     f64_op: F64Op,
 ) -> FlexTensor
 where
-    F32Op: Fn(Complex<f32>, Complex<f32>) -> Complex<f32> + Copy,
-    F64Op: Fn(Complex<f64>, Complex<f64>) -> Complex<f64> + Copy,
+    F32Op: Fn(Complex<f32>, Complex<f32>) -> f32 + Copy,
+    F64Op: Fn(Complex<f64>, Complex<f64>) -> f64 + Copy,
 {
     match tensor.dtype() {
         DType::Complex32 => {
@@ -837,9 +856,9 @@ where
                 real: scalar.real as f32,
                 imag: scalar.imag as f32,
             };
-            scalar_op_typed(tensor, s, f32_op)
+            scalar_op_typed_convert(tensor, s, f32_op)
         }
-        DType::Complex64 => scalar_op_typed(tensor, scalar, f64_op),
+        DType::Complex64 => scalar_op_typed_convert(tensor, scalar, f64_op),
         _ => panic!("complex_scalar_op: unsupported dtype {:?}", tensor.dtype()),
     }
 }

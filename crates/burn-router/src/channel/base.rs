@@ -1,5 +1,5 @@
 use alloc::string::String;
-use burn_backend::{DType, Element, Shape, backend::DeviceOps};
+use burn_backend::{DType, Element, ElementComparison, Shape, backend::DeviceOps};
 use burn_ir::TensorIr;
 
 use crate::{MultiBackendBridge, RouterTensor, RunnerClient, get_client};
@@ -16,7 +16,7 @@ pub trait RunnerChannel: Clone + Send + Sync + 'static + Sized {
     /// Client type.
     type Client: RunnerClient<Device = Self::Device>;
     /// Float element type.
-    type FloatElem: Element;
+    type FloatElem: Element + ElementComparison + bytemuck::Pod;
     /// Int element type.
     type IntElem: Element;
     /// Bool element type.

@@ -1,236 +1,13 @@
 //#[burn_tensor_testgen::testgen(complex)]
 mod common;
 
+use burn_complex::utils::interleaved_data_to_raw_float_data;
+
 use burn_tensor::Tolerance;
 use burn_tensor::{Complex, TensorData};
 use common::*;
 
 use burn_complex::kind::ComplexOnlyOps;
-
-#[test]
-fn test_complex_add() {
-    let tensor1 = TestTensor::<2>::from_data(
-        TensorData::from([[
-            Complex::<f32> {
-                real: 1.0,
-                imag: 2.0,
-            },
-            Complex::<f32> {
-                real: 3.0,
-                imag: 4.0,
-            },
-        ]]),
-        &Default::default(),
-    );
-
-    let tensor2 = TestTensor::<2>::from_data(
-        TensorData::from([[
-            Complex::<f32> {
-                real: 5.0,
-                imag: 6.0,
-            },
-            Complex::<f32> {
-                real: 7.0,
-                imag: 8.0,
-            },
-        ]]),
-        &Default::default(),
-    );
-
-    let result = tensor1 + tensor2;
-    let data = result.into_data();
-
-    let expected = TensorData::from([[
-        Complex::<f32> {
-            real: 6.0,
-            imag: 8.0,
-        }, // (1+5) + (2+6)i
-        Complex::<f32> {
-            real: 10.0,
-            imag: 12.0,
-        }, // (3+7) + (4+8)i
-    ]]);
-
-    data.assert_eq(&expected, false);
-}
-
-#[test]
-fn test_complex_sub() {
-    let tensor1 = TestTensor::<2>::from_data(
-        TensorData::from([[
-            Complex::<f32> {
-                real: 5.0,
-                imag: 6.0,
-            },
-            Complex::<f32> {
-                real: 7.0,
-                imag: 8.0,
-            },
-        ]]),
-        &Default::default(),
-    );
-
-    let tensor2 = TestTensor::<2>::from_data(
-        TensorData::from([[
-            Complex::<f32> {
-                real: 1.0,
-                imag: 2.0,
-            },
-            Complex::<f32> {
-                real: 3.0,
-                imag: 4.0,
-            },
-        ]]),
-        &Default::default(),
-    );
-
-    let result = tensor1 - tensor2;
-    let data = result.into_data();
-
-    let expected = TensorData::from([[
-        Complex::<f32> {
-            real: 4.0,
-            imag: 4.0,
-        }, // (5-1) + (6-2)i
-        Complex::<f32> {
-            real: 4.0,
-            imag: 4.0,
-        }, // (7-3) + (8-4)i
-    ]]);
-
-    data.assert_eq(&expected, false);
-}
-
-#[test]
-fn test_complex_mul() {
-    let tensor1 = TestTensor::<2>::from_data(
-        TensorData::from([[
-            Complex::<f32> {
-                real: 1.0,
-                imag: 2.0,
-            },
-            Complex::<f32> {
-                real: 0.0,
-                imag: 1.0,
-            },
-        ]]),
-        &Default::default(),
-    );
-
-    let tensor2 = TestTensor::<2>::from_data(
-        TensorData::from([[
-            Complex::<f32> {
-                real: 3.0,
-                imag: 4.0,
-            },
-            Complex::<f32> {
-                real: 0.0,
-                imag: 1.0,
-            },
-        ]]),
-        &Default::default(),
-    );
-
-    let result = tensor1 * tensor2;
-    let data = result.into_data();
-
-    // (1+2i) * (3+4i) = (1*3 - 2*4) + (1*4 + 2*3)i = -5 + 10i
-    // (0+1i) * (0+1i) = (0*0 - 1*1) + (0*1 + 1*0)i = -1 + 0i
-    let expected = TensorData::from([[
-        Complex::<f32> {
-            real: -5.0,
-            imag: 10.0,
-        },
-        Complex::<f32> {
-            real: -1.0,
-            imag: 0.0,
-        },
-    ]]);
-
-    data.assert_eq(&expected, false);
-}
-
-#[test]
-fn test_complex_div() {
-    let tensor1 = TestTensor::<2>::from_data(
-        TensorData::from([[
-            Complex::<f32> {
-                real: 1.0,
-                imag: 1.0,
-            },
-            Complex::<f32> {
-                real: 2.0,
-                imag: 0.0,
-            },
-        ]]),
-        &Default::default(),
-    );
-
-    let tensor2 = TestTensor::<2>::from_data(
-        TensorData::from([[
-            Complex::<f32> {
-                real: 1.0,
-                imag: -1.0,
-            },
-            Complex::<f32> {
-                real: 1.0,
-                imag: 0.0,
-            },
-        ]]),
-        &Default::default(),
-    );
-
-    let result = tensor1 / tensor2;
-    let data = result.into_data();
-
-    // (1+1i) / (1-1i) = ((1+1i)(1+1i)) / ((1-1i)(1+1i)) = (1+2i-1) / (1+1) = 2i/2 = i
-    // (2+0i) / (1+0i) = 2/1 = 2
-    let expected = TensorData::from([[
-        Complex::<f32> {
-            real: 0.0,
-            imag: 1.0,
-        },
-        Complex::<f32> {
-            real: 2.0,
-            imag: 0.0,
-        },
-    ]]);
-
-    data.assert_eq(&expected, false);
-}
-
-#[test]
-fn test_complex_neg() {
-    let tensor = TestTensor::<2>::from_data(
-        TensorData::from([[
-            Complex::<f32> {
-                real: 1.0,
-                imag: -2.0,
-            },
-            Complex::<f32> {
-                real: -3.0,
-                imag: 4.0,
-            },
-        ]]),
-        &Default::default(),
-    );
-
-    let result = -tensor;
-    let data = result.into_data();
-
-    let expected = TensorData::from([[
-        Complex::<f32> {
-            real: -1.0,
-            imag: 2.0,
-        },
-        Complex::<f32> {
-            real: 3.0,
-            imag: -4.0,
-        },
-    ]]);
-
-    data.assert_eq(&expected, false);
-}
 
 #[test]
 fn test_complex_conj() {
@@ -360,8 +137,8 @@ fn test_complex_phase() {
 #[test]
 fn test_complex_from_parts() {
     let result = TestTensor::<2>::from_parts(
-        TensorData::from([[1.0, 2.0], [3.0, 4.0]]),
-        TensorData::from([[5.0, 6.0], [7.0, 8.0]]),
+        TensorData::from([[1.0_f32, 2.0], [3.0, 4.0]]),
+        TensorData::from([[5.0_f32, 6.0], [7.0, 8.0]]),
     );
     let data = result.into_data();
 
@@ -394,10 +171,10 @@ fn test_complex_from_parts() {
 #[test]
 fn test_complex_from_polar() {
     let magnitude =
-        FloatTensor::<2>::from_data(TensorData::from([[1.0, 2.0]]), &Default::default());
+        FloatTensor::<2>::from_data(TensorData::from([[1.0_f32, 2.0]]), &Default::default());
 
     let phase = FloatTensor::<2>::from_data(
-        TensorData::from([[0.0, std::f32::consts::FRAC_PI_2]]), // 0 and π/2 radians
+        TensorData::from([[0.0_f32, std::f32::consts::FRAC_PI_2]]), // 0 and π/2 radians
         &Default::default(),
     );
 
@@ -421,7 +198,7 @@ fn test_complex_from_polar() {
         },
     ]]);
 
-    data.assert_eq(&expected, false);
+    data.assert_approx_eq(&expected, Tolerance::<f32>::balanced());
 }
 
 #[test]
@@ -441,12 +218,13 @@ fn test_complex_exp() {
     );
 
     let result = tensor.exp();
-    let data = result.into_data();
 
     // exp(a + bi) = exp(a) * (cos(b) + i*sin(b))
     // exp(0 + 0i) = 1 * (1 + 0i) = 1 + 0i
     // exp(0 + πi) = 1 * (-1 + 0i) = -1 + 0i (approximately)
-    let expected_data: Vec<f32> = data.convert::<f32>().into_vec().unwrap();
+    let expected_data: Vec<f32> = interleaved_data_to_raw_float_data(result.into_data())
+        .into_vec()
+        .unwrap();
     assert!((expected_data[0] - 1.0).abs() < 1e-6); // real part of exp(0)
     assert!(expected_data[1].abs() < 1e-6); // imag part of exp(0)
     assert!((expected_data[2] + 1.0).abs() < 1e-5); // real part of exp(iπ), should be close to -1
@@ -470,9 +248,10 @@ fn test_complex_sin() {
     );
 
     let result = tensor.sin();
-    let data = result.into_data();
 
-    let expected_data: Vec<f32> = data.convert::<f32>().into_vec().unwrap();
+    let expected_data: Vec<f32> = interleaved_data_to_raw_float_data(result.into_data())
+        .into_vec()
+        .unwrap();
     assert!(expected_data[0].abs() < 1e-6); // real part of sin(0)
     assert!(expected_data[1].abs() < 1e-6); // imag part of sin(0)  
     assert!((expected_data[2] - 1.0).abs() < 1e-6); // real part of sin(π/2)
@@ -496,9 +275,10 @@ fn test_complex_cos() {
     );
 
     let result = tensor.cos();
-    let data = result.into_data();
 
-    let expected_data: Vec<f32> = data.convert::<f32>().into_vec().unwrap();
+    let expected_data: Vec<f32> = interleaved_data_to_raw_float_data(result.into_data())
+        .into_vec()
+        .unwrap();
     assert!((expected_data[0] - 1.0).abs() < 1e-6); // real part of cos(0)
     assert!(expected_data[1].abs() < 1e-6); // imag part of cos(0)
     assert!((expected_data[2] + 1.0).abs() < 1e-5); // real part of cos(π)
@@ -522,9 +302,10 @@ fn test_complex_log() {
     );
 
     let result = tensor.log();
-    let data = result.into_data();
 
-    let expected_data: Vec<f32> = data.convert::<f32>().into_vec().unwrap();
+    let expected_data: Vec<f32> = interleaved_data_to_raw_float_data(result.into_data())
+        .into_vec()
+        .unwrap();
     assert!(expected_data[0].abs() < 1e-6); // real part of log(1)
     assert!(expected_data[1].abs() < 1e-6); // imag part of log(1)
     assert!((expected_data[2] - 1.0).abs() < 1e-5); // real part of log(e)
@@ -548,9 +329,10 @@ fn test_complex_sqrt() {
     );
 
     let result = tensor.sqrt();
-    let data = result.into_data();
 
-    let expected_data: Vec<f32> = data.convert::<f32>().into_vec().unwrap();
+    let expected_data: Vec<f32> = interleaved_data_to_raw_float_data(result.into_data())
+        .into_vec()
+        .unwrap();
     assert!((expected_data[0] - 2.0).abs() < 1e-6); // real part of sqrt(4)
     assert!(expected_data[1].abs() < 1e-6); // imag part of sqrt(4)
     assert!(expected_data[2].abs() < 1e-5); // real part of sqrt(-1)
@@ -617,87 +399,4 @@ fn test_complex_matmul_identity() {
     let result = a.matmul(eye).into_data();
 
     result.assert_approx_eq(&expected, Tolerance::<f32>::strict());
-}
-
-#[test]
-fn test_complex_mean_dim() {
-    // a = [[3+4i, 2+0i], [0-2i, 3+0i]]
-    let a = TestTensor::<2>::from_data(
-        TensorData::from([
-            [
-                Complex::<f32> {
-                    real: 3.0,
-                    imag: 4.0,
-                },
-                Complex::<f32> {
-                    real: 2.0,
-                    imag: 0.0,
-                },
-            ],
-            [
-                Complex::<f32> {
-                    real: 0.0,
-                    imag: -2.0,
-                },
-                Complex::<f32> {
-                    real: 3.0,
-                    imag: 0.0,
-                },
-            ],
-        ]),
-        &Default::default(),
-    );
-
-    // mean along dim 0: col0 = (3+4i + 0-2i)/2 = 1.5+1i, col1 = (2+0i + 3+0i)/2 = 2.5+0i
-    let result = a.mean_dim(0).into_data();
-
-    let expected = TensorData::from([[
-        Complex::<f32> {
-            real: 1.5,
-            imag: 1.0,
-        },
-        Complex::<f32> {
-            real: 2.5,
-            imag: 0.0,
-        },
-    ]]);
-
-    result.assert_approx_eq(&expected, Tolerance::<f32>::strict());
-}
-
-#[test]
-fn test_complex_add_scalar() {
-    let tensor = TestTensor::<2>::from_data(
-        TensorData::from([[
-            Complex::<f32> {
-                real: 1.0,
-                imag: 2.0,
-            },
-            Complex::<f32> {
-                real: 3.0,
-                imag: 4.0,
-            },
-        ]]),
-        &Default::default(),
-    );
-
-    let scalar = Complex::<f64> {
-        real: 5.0,
-        imag: 6.0,
-    };
-    let result = tensor + scalar;
-    let data = result.into_data();
-
-    let expected = TensorData::from([[
-        Complex::<f32> {
-            real: 6.0,
-            imag: 8.0,
-        }, // (1+5) + (2+6)i
-        Complex::<f32> {
-            real: 8.0,
-            imag: 10.0,
-        }, // (3+5) + (4+6)i
-    ]]);
-
-    data.assert_approx_eq(&expected, Tolerance::<f32>::strict());
 }

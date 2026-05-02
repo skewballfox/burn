@@ -38,6 +38,8 @@ impl Scalar {
                 }
                 _ => unreachable!(),
             }
+        } else if dtype.is_complex() {
+            Self::Complex(value.elem())
         } else {
             unimplemented!("Scalar not supported for {dtype:?}")
         }

@@ -133,10 +133,7 @@ impl<C: ComplexTensorBackend> BasicOps<C> for ComplexKind {
     ) -> Self::Primitive {
         match update {
             IndexingUpdateOp::Add => C::complex_select_add(tensor, dim, indices, values),
-            IndexingUpdateOp::Assign => todo!(),
-            IndexingUpdateOp::Mul => todo!(),
-            IndexingUpdateOp::Min => todo!(),
-            IndexingUpdateOp::Max => todo!(),
+            _ => unimplemented!(),
         }
     }
 
@@ -187,10 +184,7 @@ impl<C: ComplexTensorBackend> BasicOps<C> for ComplexKind {
     ) -> Self::Primitive {
         match update {
             IndexingUpdateOp::Add => C::complex_scatter_add(dim, tensor, indices, values),
-            IndexingUpdateOp::Assign => todo!(),
-            IndexingUpdateOp::Mul => todo!(),
-            IndexingUpdateOp::Min => todo!(),
-            IndexingUpdateOp::Max => todo!(),
+            _ => unimplemented!(),
         }
     }
 
@@ -230,7 +224,7 @@ impl<C: ComplexTensorBackend> BasicOps<C> for ComplexKind {
         values: Self::Primitive,
         reduction: IndexingUpdateOp,
     ) -> Self::Primitive {
-        todo!()
+        C::complex_scatter_nd(data, indices, values, reduction)
     }
 
     fn gather_nd(
@@ -362,7 +356,12 @@ where
         device: &C::Device,
         dtype: DType,
     ) -> Self::Primitive {
-        C::complex_random(shape, distribution, device, FloatDType::from(dtype))
+        C::complex_random(
+            shape,
+            distribution,
+            device,
+            FloatDType::from(crate::utils::complex_to_real_dtype(dtype)),
+        )
     }
 
     fn remainder(lhs: Self::Primitive, rhs: Self::Primitive) -> Self::Primitive {

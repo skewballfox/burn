@@ -6,10 +6,8 @@ definitions in one spot.
 */
 use burn_tensor::{
     BasicOps, Bytes, ComplexElement, DType, Device, Distribution, Element, FloatDType,
-    IndexingUpdateOp, Int, Numeric, Scalar, Shape, Slice, Tensor, TensorData, TensorKind,
-    TensorMetadata,
+    IndexingUpdateOp, Scalar, Shape, TensorData, TensorMetadata,
     backend::{Backend, BackendTypes, ExecutionError},
-    get_device_settings,
     ops::{FloatTensor, FloatTensorOps, IntTensorOps},
 };
 use serde::{Deserialize, Serialize};
@@ -758,6 +756,13 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
         value: ComplexTensor<B>,
     ) -> ComplexTensor<B>;
 
+    fn complex_scatter_nd(
+        tensor: ComplexTensor<B>,
+        indices: B::IntTensorPrimitive,
+        value: ComplexTensor<B>,
+        reduction: IndexingUpdateOp,
+    ) -> ComplexTensor<B>;
+
     /// Swaps two dimensions of a tensor.
     ///
     /// # Arguments
@@ -1223,12 +1228,14 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
         // make the equality explicit at the use site
         <B::InnerBackend as BackendTypes>::IntTensorPrimitive: From<B::IntTensorPrimitive>,
     {
-        //TODO: add a method to get inner dtype
-        let dtype = lhs.dtype();
+        let dtype = crate::utils::complex_to_real_dtype(lhs.dtype());
 
         Self::complex_powf(
             lhs,
-            <B::InnerBackend as IntTensorOps<B::InnerBackend>>::int_into_float(rhs, dtype.into()),
+            <B::InnerBackend as IntTensorOps<B::InnerBackend>>::int_into_float(
+                rhs,
+                FloatDType::from(dtype),
+            ),
         )
     }
 
