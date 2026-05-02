@@ -288,6 +288,25 @@ where
         })
     }
 
+    fn int_scatter_nd(
+        data: NdArrayTensor,
+        indices: NdArrayTensor,
+        values: NdArrayTensor,
+        reduction: burn_backend::tensor::IndexingUpdateOp,
+    ) -> NdArrayTensor {
+        execute_with_int_dtype!((data, values), I, |data, values| -> NdArrayTensor {
+            execute_with_int_dtype!(indices, |idx_array| NdArrayOps::<I>::scatter_nd(
+                data, idx_array, values, reduction
+            ))
+        })
+    }
+
+    fn int_gather_nd(data: NdArrayTensor, indices: NdArrayTensor) -> NdArrayTensor {
+        execute_with_int_dtype!(data, E, |array| -> NdArrayTensor {
+            execute_with_int_dtype!(indices, |idx_array| NdArrayOps::gather_nd(array, idx_array))
+        })
+    }
+
     fn int_select(tensor: NdArrayTensor, dim: usize, indices: NdArrayTensor) -> NdArrayTensor {
         execute_with_int_dtype!(tensor, E, |array| -> NdArrayTensor {
             execute_with_int_dtype!(indices, |idx_array| NdArrayMathOps::select(
@@ -313,6 +332,10 @@ where
         execute_with_int_dtype!(tensor, E, |array: SharedArray<E>| {
             NdArrayMathOps::argmax_view::<I>(array.view(), dim)
         })
+    }
+
+    fn int_argtopk(_tensor: NdArrayTensor, _dim: usize, _k: usize) -> NdArrayTensor {
+        todo!();
     }
 
     fn int_argmin(tensor: NdArrayTensor, dim: usize) -> NdArrayTensor {

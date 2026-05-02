@@ -86,6 +86,7 @@ impl<B: Backend> BasicOps<B> for Bool {
     ) -> Self::Primitive {
         match update {
             IndexingUpdateOp::Add => B::bool_select_or(tensor, dim, indices, values),
+            _ => unimplemented!(),
         }
     }
 
@@ -122,7 +123,21 @@ impl<B: Backend> BasicOps<B> for Bool {
     ) -> Self::Primitive {
         match update {
             IndexingUpdateOp::Add => B::bool_scatter_or(dim, tensor, indices, values),
+            _ => unimplemented!(),
         }
+    }
+
+    fn scatter_nd(
+        _data: Self::Primitive,
+        _indices: IntTensor<B>,
+        _values: Self::Primitive,
+        _reduction: IndexingUpdateOp,
+    ) -> Self::Primitive {
+        panic!("scatter_nd is not supported for bool tensors")
+    }
+
+    fn gather_nd(_data: Self::Primitive, _indices: IntTensor<B>) -> Self::Primitive {
+        panic!("gather_nd is not supported for bool tensors")
     }
 
     fn device(tensor: &Self::Primitive) -> Device<B> {

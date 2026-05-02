@@ -14,12 +14,8 @@ version.workspace = true
 
 [dependencies]
 bon = { workspace = true }
-
-
-ndarray = { workspace = true, optional = true }
-tch = { workspace = true, optional = true }
-burn-tensor = { path = "../burn-tensor", version = "=0.21.0-pre.3" }
-burn-std = { path = "../burn-std", version = "=0.21.0-pre.3" }
+burn-tensor = { workspace = true}
+burn-std = { workspace = true }
 
 bytemuck = { workspace = true }
 cubecl = { workspace = true, optional = true }
@@ -32,9 +28,9 @@ paste = { workspace = true }
 serde = { workspace = true }
 
 [dev-dependencies]
-burn-flex = { path = "../burn-flex", version = "=0.21.0-pre.3",  features = ["complex"] }
-#burn-tensor-testgen = { path = "../burn-tensor-testgen", version = "=0.21.0-pre.3", default-features = false }
-# burn-backend-tests = { path = "../burn-backend-tests", version = "=0.21.0-pre.3", default-features = false, features = [
+burn-flex = { workspace=true,  features = ["complex"] }
+#burn-tensor-testgen = { workspace=true, default-features = false }
+# burn-backend-tests = { workspace=true, default-features = false, features = [
 #     "std",
 # ] }
 
