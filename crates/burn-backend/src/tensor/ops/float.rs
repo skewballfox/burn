@@ -765,6 +765,10 @@ impl<B: Backend> Ordered<B> for Float {
 #[cfg_attr(not(doc), doc = "`Tensor`")]
 /// struct.
 pub trait FloatMathOps<B: Backend>: Numeric<B> {
+    /// Applies element wise square operation
+    ///
+    #[cfg_attr(doc, doc = "$y_i = x^{2}$")]
+    #[cfg_attr(not(doc), doc = "`y = x^2`")]
     fn square(tensor: Self::Primitive) -> Self::Primitive;
 
     /// Applies element wise exponential operation.
