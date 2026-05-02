@@ -296,6 +296,19 @@ impl<E: TchElement> IntTensorOps<Self> for LibTorch<E> {
         TchOps::scatter(dim, tensor, indices, value)
     }
 
+    fn int_scatter_nd(
+        data: TchTensor,
+        indices: TchTensor,
+        values: TchTensor,
+        reduction: burn_backend::tensor::IndexingUpdateOp,
+    ) -> TchTensor {
+        TchOps::scatter_nd(data, indices, values, reduction)
+    }
+
+    fn int_gather_nd(data: TchTensor, indices: TchTensor) -> TchTensor {
+        TchOps::gather_nd(data, indices)
+    }
+
     fn int_select(tensor: TchTensor, dim: usize, indices: TchTensor) -> TchTensor {
         TchOps::index_select_dim(tensor, dim, indices)
     }
@@ -329,6 +342,10 @@ impl<E: TchElement> IntTensorOps<Self> for LibTorch<E> {
 
     fn int_argmax(tensor: TchTensor, dim: usize) -> TchTensor {
         TchOps::argmax(tensor, dim)
+    }
+
+    fn int_argtopk(_tensor: TchTensor, _dim: usize, _k: usize) -> TchTensor {
+        panic!("argtopk not implemented for torch")
     }
 
     fn int_argmin(tensor: TchTensor, dim: usize) -> TchTensor {

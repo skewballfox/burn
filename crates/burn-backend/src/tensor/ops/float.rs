@@ -126,6 +126,7 @@ impl<B: Backend> BasicOps<B> for Float {
                 indices,
                 values.tensor(),
             )),
+            _ => unimplemented!(),
         }
     }
 
@@ -170,7 +171,26 @@ impl<B: Backend> BasicOps<B> for Float {
                 indices,
                 values.tensor(),
             )),
+            _ => unimplemented!(),
         }
+    }
+
+    fn scatter_nd(
+        data: Self::Primitive,
+        indices: IntTensor<B>,
+        values: Self::Primitive,
+        reduction: IndexingUpdateOp,
+    ) -> Self::Primitive {
+        TensorPrimitive::Float(B::float_scatter_nd(
+            data.tensor(),
+            indices,
+            values.tensor(),
+            reduction,
+        ))
+    }
+
+    fn gather_nd(data: Self::Primitive, indices: IntTensor<B>) -> Self::Primitive {
+        TensorPrimitive::Float(B::float_gather_nd(data.tensor(), indices))
     }
 
     fn device(tensor: &Self::Primitive) -> Device<B> {
@@ -596,6 +616,19 @@ impl<B: Backend> Ordered<B> for Float {
             TensorPrimitive::QFloat(tensor) => {
                 let out_dtype = get_device_settings::<B>(&B::q_device(&tensor)).int_dtype;
                 B::q_argmax(tensor, dim, out_dtype)
+            }
+        }
+    }
+
+    fn argtopk(tensor: Self::Primitive, dim: usize, k: usize) -> IntTensor<B> {
+        match tensor {
+            TensorPrimitive::Float(tensor) => {
+                let out_dtype = get_device_settings::<B>(&B::float_device(&tensor)).int_dtype;
+                B::float_argtopk(tensor, dim, k, out_dtype)
+            }
+            TensorPrimitive::QFloat(tensor) => {
+                let out_dtype = get_device_settings::<B>(&B::q_device(&tensor)).int_dtype;
+                B::q_argtopk(tensor, dim, k, out_dtype)
             }
         }
     }
