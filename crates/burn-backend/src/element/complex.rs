@@ -45,7 +45,7 @@ mod tch {
 }
 
 /// trait to convert an element to a complex number when the conversion needs to be generic over
-/// the target complex type (e.g. Complex<f32> or Complex<f64>)
+/// the target complex type (e.g. `Complex<f32>` or `Complex<f64>`)
 pub trait ToComplex<C> {
     /// Convert self to a complex number of type C
     fn to_complex(&self) -> C;
@@ -53,7 +53,7 @@ pub trait ToComplex<C> {
 
 /// Trait to access the real and imaginary parts of a complex element
 pub trait ComplexElement: Element {
-    /// The inner type of the complex number (e.g. f32 for Complex<f32>)
+    /// The inner type of the complex number (e.g. f32 for `Complex<f32>`)
     type InnerType: Element;
     /// Get the real part of the complex number
     fn real(&self) -> Self::InnerType;
@@ -680,6 +680,7 @@ impl ToComplex<Complex<f64>> for Complex<f64> {
 pub(crate) mod tests {
 
     use super::*;
+    extern crate alloc;
 
     #[test]
     fn test_complex32_basic() {
@@ -715,12 +716,12 @@ pub(crate) mod tests {
     #[test]
     fn test_complex_display() {
         let c1 = Complex::<f32>::new(3.0, 4.0);
-        assert_eq!(format!("{}", c1), "3+4i");
+        assert_eq!(alloc::format!("{}", c1), "3+4i");
 
         let c2 = Complex::<f32>::new(3.0, -4.0);
-        assert_eq!(format!("{}", c2), "3-4i");
+        assert_eq!(alloc::format!("{}", c2), "3-4i");
 
         let c3 = Complex::<f64>::new(-3.0, 4.0);
-        assert_eq!(format!("{}", c3), "-3+4i");
+        assert_eq!(alloc::format!("{}", c3), "-3+4i");
     }
 }

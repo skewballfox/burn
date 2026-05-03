@@ -13,7 +13,6 @@ version.workspace = true
 
 
 [dependencies]
-bon = { workspace = true }
 burn-tensor = { workspace = true}
 burn-std = { workspace = true }
 

@@ -971,8 +971,8 @@ pub fn scatter_nd<
 
 /// Multi-dimensional scatter for element types that do not implement [`PartialOrd`].
 ///
-/// Identical to [`scatter_nd`] except that [`IndexingUpdateOp::Min`] and
-/// [`IndexingUpdateOp::Max`] are not supported and will panic at runtime.
+/// Identical to [`scatter_nd`] except that [`burn_backend::tensor::IndexingUpdateOp::Min`] and
+/// [`burn_backend::tensor::IndexingUpdateOp::Max`] are not supported and will panic at runtime.
 pub fn scatter_nd_no_ord<
     E: Element + Pod + Default + Copy + core::ops::AddAssign + core::ops::Mul<Output = E>,
 >(

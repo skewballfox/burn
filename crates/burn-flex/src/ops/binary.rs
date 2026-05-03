@@ -580,6 +580,8 @@ where
     make_tensor(result, shape, O::dtype())
 }
 
+// used for complex, likely useful outside of that feature
+#[allow(unused)]
 pub(crate) fn scalar_op_typed_rhs<E, E2, Op>(
     mut tensor: FlexTensor,
     scalar: E2,

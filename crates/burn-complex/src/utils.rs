@@ -39,12 +39,10 @@ pub fn interleaved_data_from_real_data(data: TensorData) -> TensorData {
         real_to_complex_dtype(data.dtype),
     )
 }
-
+#[inline]
 fn zeroed_vec(size: usize) -> Vec<u8> {
     let mut vec = Vec::with_capacity(size);
-    for _ in 0..size {
-        vec.push(0u8);
-    }
+    vec.extend(core::iter::repeat_n(0, size));
     vec
 }
 

@@ -160,6 +160,7 @@ impl FlexTensor {
         }
     }
 
+    #[allow(unused)]
     /// Return this tensor with its dtype metadata changed to `new_dtype`.
     ///
     /// The byte storage is unchanged. The caller must ensure the stored

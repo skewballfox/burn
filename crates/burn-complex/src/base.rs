@@ -47,7 +47,7 @@ pub trait ComplexTensorBackend: ComplexTensorOps<Self> + Sized + CBT {
     /// a complex element in interleaved layout
     type ComplexScalar: ComplexElement;
 
-    /// The underlaying layout for the complex elements
+    /// The underlying layout for the complex elements
     type Layout: Layout + DefaultComplexOps<Self>;
 
     /// Creates a complex tensor from real-valued data, padding the imaginary part with zeros.

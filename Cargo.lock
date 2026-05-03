@@ -855,7 +855,6 @@ dependencies = [
 name = "burn-complex"
 version = "0.21.0-pre.4"
 dependencies = [
- "bon",
  "burn-flex",
  "burn-std",
  "burn-tensor",
