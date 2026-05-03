@@ -7,11 +7,11 @@ use burn_backend::{
     tensor::IntTensor,
 };
 
-use crate::{IntoKind, LibTorch, LibTorchDevice, TchShape, TchTensor, element::TchElement};
+use crate::{FloatTchElement, IntoKind, LibTorch, LibTorchDevice, TchShape, TchTensor};
 
 use super::TchOps;
 
-impl<E: TchElement> IntTensorOps<Self> for LibTorch<E> {
+impl<E: FloatTchElement> IntTensorOps<Self> for LibTorch<E> {
     fn int_from_data(data: TensorData, device: &LibTorchDevice) -> TchTensor {
         match data.dtype {
             burn_backend::DType::I64 => TchTensor::from_data::<i64>(data, (*device).into()),

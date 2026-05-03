@@ -1,4 +1,4 @@
-use crate::{LibTorch, TchTensor, element::TchElement};
+use crate::{FloatTchElement, LibTorch, TchTensor};
 use burn_backend::{
     TensorMetadata,
     ops::{
@@ -9,7 +9,7 @@ use burn_backend::{
     tensor::{FloatTensor, IntTensor},
 };
 
-impl<E: TchElement> ModuleOps<Self> for LibTorch<E> {
+impl<E: FloatTchElement> ModuleOps<Self> for LibTorch<E> {
     fn embedding(weights: TchTensor, indices: TchTensor) -> TchTensor {
         // Workaround for MPS "Placeholder storage has not been allocated" error.
         // See: https://github.com/pytorch/pytorch/issues/123995

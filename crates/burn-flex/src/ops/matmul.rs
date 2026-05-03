@@ -7,7 +7,7 @@
 
 use alloc::vec;
 use alloc::vec::Vec;
-use burn_backend::{ComplexElement, DType, Element};
+use burn_backend::{DType, Element};
 use burn_std::{Bytes, Shape, bf16, f16};
 #[cfg(feature = "complex")]
 use gemm::{c32, c64};
@@ -286,7 +286,7 @@ fn matmul_gemm<T: GemmScalar + Element>(lhs: FlexTensor, rhs: FlexTensor) -> Fle
 }
 
 #[cfg(feature = "complex")]
-fn matmul_gemm_complex<T: ComplexElement + bytemuck::Pod, G: GemmScalar>(
+fn matmul_gemm_complex<T: burn_backend::ComplexElement + bytemuck::Pod, G: GemmScalar>(
     lhs: FlexTensor,
     rhs: FlexTensor,
 ) -> FlexTensor {

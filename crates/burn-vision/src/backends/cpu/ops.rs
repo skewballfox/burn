@@ -1,13 +1,13 @@
 #[cfg(feature = "tch")]
 mod tch {
     use crate::{BoolVisionOps, FloatVisionOps, IntVisionOps, QVisionOps, VisionBackend};
-    use burn_tch::{LibTorch, TchElement};
+    use burn_tch::{FloatTchElement, LibTorch};
 
-    impl<E: TchElement> BoolVisionOps for LibTorch<E> {}
-    impl<E: TchElement> IntVisionOps for LibTorch<E> {}
-    impl<E: TchElement> FloatVisionOps for LibTorch<E> {}
-    impl<E: TchElement> QVisionOps for LibTorch<E> {}
-    impl<E: TchElement> VisionBackend for LibTorch<E> {}
+    impl<E: FloatTchElement> BoolVisionOps for LibTorch<E> {}
+    impl<E: FloatTchElement> IntVisionOps for LibTorch<E> {}
+    impl<E: FloatTchElement> FloatVisionOps for LibTorch<E> {}
+    impl<E: FloatTchElement> QVisionOps for LibTorch<E> {}
+    impl<E: FloatTchElement> VisionBackend for LibTorch<E> {}
 }
 
 #[cfg(feature = "flex")]

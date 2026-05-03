@@ -29,6 +29,11 @@ mod ndarray {
 mod tch {
     use super::Complex;
     use tch::kind::Element as TchElement;
+    // Not supported right now burn side, apparently supported for tch
+    impl<E: TchElement> TchElement for Complex<f16> {
+        const KIND: tch::Kind = tch::Kind::ComplexHalf;
+        const ZERO: Self = Self::new(0.0, 0.0);
+    }
     impl<E: TchElement> TchElement for Complex<f32> {
         const KIND: tch::Kind = tch::Kind::ComplexFloat;
         const ZERO: Self = Self::new(0.0, 0.0);

@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use burn_backend::tensor::{BoolTensor, Device, FloatTensor, IntTensor};
 use burn_backend::{Complex, Distribution};
 use burn_backend::{Element, TensorData};
@@ -11,7 +12,6 @@ use burn_complex::{
         split_from_interleaved_data,
     },
 };
-use alloc::vec::Vec;
 use burn_std::{BoolDType, DType, FloatDType, Slice};
 use num_traits::ToPrimitive;
 use num_traits::Zero;
@@ -818,8 +818,6 @@ where
     F32Op: Fn(Complex<f32>, Complex<f32>) -> f32 + Copy,
     F64Op: Fn(Complex<f64>, Complex<f64>) -> f64 + Copy,
 {
-    
-
     debug_assert_eq!(
         lhs.dtype(),
         rhs.dtype(),

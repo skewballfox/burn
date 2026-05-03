@@ -28,7 +28,7 @@ burn-backend = { workspace = true }
 libc = { workspace = true }
 log = { workspace = true }
 bytemuck = { workspace = true }
-tch = { workspace = true, features = ["download-libtorch"] }
+tch = { workspace = true, default-features = true, features = ["download-libtorch"] }
 torch-sys = { workspace = true }                             # for build script lib dir detection
 
 [build-dependencies]

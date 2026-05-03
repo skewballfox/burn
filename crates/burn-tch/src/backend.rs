@@ -1,9 +1,8 @@
 use std::marker::PhantomData;
 
-use crate::IntoKind;
+use crate::{FloatTchElement, IntoKind};
 
 use super::TchTensor;
-use super::element::TchElement;
 use burn_backend::backend::{Backend, BackendTypes, DeviceId, DeviceOps, ExecutionError};
 use burn_backend::ops::IntTensorOps;
 
@@ -106,7 +105,7 @@ pub struct LibTorch<E = f32> {
     _e: PhantomData<E>,
 }
 
-impl<E: TchElement> BackendTypes for LibTorch<E> {
+impl<E: FloatTchElement> BackendTypes for LibTorch<E> {
     type Device = LibTorchDevice;
 
     type FloatTensorPrimitive = TchTensor;
@@ -137,7 +136,7 @@ impl<E: TchElement> BackendTypes for LibTorch<E> {
     }
 }
 
-impl<E: TchElement> Backend for LibTorch<E> {
+impl<E: FloatTchElement> Backend for LibTorch<E> {
     fn seed(_device: &Self::Device, seed: u64) {
         tch::manual_seed(seed as i64);
     }

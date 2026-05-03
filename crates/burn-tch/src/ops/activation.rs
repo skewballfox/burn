@@ -1,7 +1,7 @@
-use crate::{LibTorch, TchTensor, element::TchElement};
+use crate::{FloatTchElement, LibTorch, TchTensor};
 use burn_backend::ops::ActivationOps;
 
-impl<E: TchElement> ActivationOps<Self> for LibTorch<E> {
+impl<E: FloatTchElement> ActivationOps<Self> for LibTorch<E> {
     fn relu(tensor: TchTensor) -> TchTensor {
         tensor.unary_ops(|mut tensor| tensor.relu_(), |tensor| tensor.relu())
     }
