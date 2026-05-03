@@ -1,3 +1,4 @@
+//use burn_complex::base::split::SplitBackend;
 use burn_complex::kind::ComplexKind;
 use burn_tensor::TensorData;
 use burn_tensor::{Float, Shape, Tensor, backend::Backend};
@@ -8,4 +9,5 @@ use burn_tensor::{Float, Shape, Tensor, backend::Backend};
 
 pub type TestBackend = burn_flex::Flex;
 pub type TestTensor<const D: usize> = Tensor<TestBackend, D, ComplexKind>;
+//pub type SplitTestTensor<const D: usize> = Tensor<SplitBackend<TestBackend>, D, Float>;
 pub type FloatTensor<const D: usize> = Tensor<TestBackend, D, Float>;

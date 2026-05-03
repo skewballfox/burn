@@ -696,7 +696,6 @@ dependencies = [
  "cubecl",
  "derive-new",
  "enumset",
- "gemm 0.19.0",
  "hashbrown 0.16.1",
  "ndarray 0.17.2",
  "num-complex",

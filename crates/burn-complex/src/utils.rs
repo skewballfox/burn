@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use burn_std::{Bytes, DType};
 use burn_tensor::TensorData;
 
@@ -20,7 +21,8 @@ use crate::base::SplitTensorData;
 #[inline]
 pub fn interleaved_data_from_real_data(data: TensorData) -> TensorData {
     let elem_size = data.dtype.size();
-    let mut interleaved_bytes = vec![0u8; data.bytes.len() * 2];
+
+    let mut interleaved_bytes = zeroed_vec(data.bytes.len() * 2);
 
     // Create chunks of [Real, Imag] (size is 2 * elem_size)
     // We only iterate over the source 'data.bytes' in elem_size steps
@@ -36,6 +38,14 @@ pub fn interleaved_data_from_real_data(data: TensorData) -> TensorData {
         data.shape.clone(),
         real_to_complex_dtype(data.dtype),
     )
+}
+
+fn zeroed_vec(size: usize) -> Vec<u8> {
+    let mut vec = Vec::with_capacity(size);
+    for _ in 0..size {
+        vec.push(0u8);
+    }
+    vec
 }
 
 /// Converts an imaginary float `TensorData` into interleaved complex `TensorData` by inserting
@@ -55,7 +65,7 @@ pub fn interleaved_data_from_real_data(data: TensorData) -> TensorData {
 #[inline]
 pub fn interleaved_data_from_imag_data(data: TensorData) -> TensorData {
     let elem_size = data.dtype.size();
-    let mut interleaved_bytes = vec![0u8; data.bytes.len() * 2];
+    let mut interleaved_bytes = zeroed_vec(data.bytes.len() * 2);
 
     // Create chunks of [Real, Imag] (size is 2 * elem_size)
     // We only iterate over the source 'data.bytes' in elem_size steps
@@ -91,7 +101,7 @@ pub fn interleaved_data_from_imag_data(data: TensorData) -> TensorData {
 pub fn interleave_from_split_data(real: TensorData, imag: TensorData) -> TensorData {
     let elem_size = real.dtype.size();
     // Pre-allocate the full size
-    let mut interleaved_bytes = vec![0u8; real.bytes.len() * 2];
+    let mut interleaved_bytes = zeroed_vec(real.bytes.len() * 2);
 
     let real_chunks = real.bytes.chunks_exact(elem_size);
     let imag_chunks = imag.bytes.chunks_exact(elem_size);
@@ -204,7 +214,7 @@ pub fn interleaved_data_to_imag_data(interleaved: TensorData) -> TensorData {
 ///
 /// A [`SplitTensorData`] containing the real and imaginary byte buffers with the same shape.
 #[inline]
-pub fn interleaved_data_to_split_data(interleaved: TensorData) -> SplitTensorData {
+pub fn split_from_interleaved_data(interleaved: TensorData) -> SplitTensorData {
     let real_dtype = complex_to_real_dtype(interleaved.dtype);
     let real_elem_size = real_dtype.size();
     let complex_elem_size = interleaved.dtype.size(); // This should be 2 * real_elem_size

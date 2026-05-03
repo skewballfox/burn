@@ -160,6 +160,18 @@ impl FlexTensor {
         }
     }
 
+    /// Return this tensor with its dtype metadata changed to `new_dtype`.
+    ///
+    /// The byte storage is unchanged. The caller must ensure the stored
+    /// bytes are valid for `new_dtype`.
+    pub(crate) fn with_dtype(self, new_dtype: DType) -> Self {
+        Self {
+            data: self.data,
+            layout: self.layout,
+            dtype: new_dtype,
+        }
+    }
+
     /// Zero-copy typed view of the full storage buffer.
     ///
     /// Use with `StridedIter` for non-contiguous access, or with

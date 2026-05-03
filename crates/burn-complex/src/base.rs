@@ -1,18 +1,15 @@
-pub mod split;
 /*
 The base implementation for complex tensors, contains everything that would be in burn-tensor.
 May get split into separate files at some point, but for now it's easier to keep all the base
 definitions in one spot.
 */
 use burn_tensor::{
-    BasicOps, Bytes, ComplexElement, DType, Device, Distribution, Element, FloatDType,
-    IndexingUpdateOp, Scalar, Shape, TensorData, TensorMetadata,
+    Bytes, ComplexElement, DType, Device, Distribution, FloatDType, IndexingUpdateOp, Scalar,
+    Shape, TensorData, TensorMetadata,
     backend::{Backend, BackendTypes, ExecutionError},
-    ops::{FloatTensor, FloatTensorOps, IntTensorOps},
+    ops::{FloatTensor, IntTensorOps},
 };
 use serde::{Deserialize, Serialize};
-
-use crate::base::split::SplitComplexTensor;
 
 pub trait CBT: BackendTypes {
     type ComplexTensorPrimitive: TensorMetadata + 'static;
@@ -212,53 +209,6 @@ where
     }
 }
 
-impl<B, F> DefaultComplexOps<B> for SplitLayout
-where
-    B: ComplexTensorBackend<Layout = SplitLayout>,
-    B: BackendTypes<FloatTensorPrimitive = F>,
-    B: CBT<ComplexTensorPrimitive = SplitComplexTensor<F>>,
-    F: TensorMetadata + 'static,
-{
-    type OutTensorData = SplitTensorData;
-    fn zeros(shape: Shape, device: &Device<B>) -> ComplexTensor<B> {
-        let real = B::InnerBackend::float_from_data(
-            TensorData::zeros::<<B::InnerBackend as BackendTypes>::FloatElem, _>(&shape),
-            device,
-        );
-        let imag = B::InnerBackend::float_from_data(
-            TensorData::zeros::<<B::InnerBackend as BackendTypes>::FloatElem, _>(shape),
-            device,
-        );
-        // ComplexTensor<B> = Complex<T> via SplitLayout
-        SplitComplexTensor { real, imag }
-    }
-
-    fn ones(shape: Shape, device: &Device<B>) -> ComplexTensor<B> {
-        let real = B::InnerBackend::float_from_data(
-            TensorData::ones::<<B::InnerBackend as BackendTypes>::FloatElem, _>(&shape),
-            device,
-        );
-        let imag = B::InnerBackend::float_from_data(
-            TensorData::ones::<<B::InnerBackend as BackendTypes>::FloatElem, _>(shape),
-            device,
-        );
-        SplitComplexTensor { real, imag }
-    }
-
-    fn full(shape: Shape, fill_value: B::ComplexScalar, device: &Device<B>) -> ComplexTensor<B> {
-        let real =
-            B::InnerBackend::float_from_data(TensorData::full(&shape, fill_value.real()), device);
-        let imag =
-            B::InnerBackend::float_from_data(TensorData::full(shape, fill_value.imag()), device);
-        SplitComplexTensor { real, imag }
-    }
-
-    async fn complex_into_data(
-        tensor: ComplexTensor<B>,
-    ) -> Result<Self::OutTensorData, ExecutionError> {
-        B::complex_into_split_data(tensor).await
-    }
-}
 type OutTensorData<B> =
     <<B as ComplexTensorBackend>::Layout as DefaultComplexOps<B>>::OutTensorData;
 /// Operations on complex tensors.
@@ -831,7 +781,7 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
     /// # Returns
     ///
     /// A tensor with the concatenated tensors along `dim`.
-    fn complex_cat(tensors: Vec<ComplexTensor<B>>, dim: usize) -> ComplexTensor<B>;
+    fn complex_cat(tensors: alloc::vec::Vec<ComplexTensor<B>>, dim: usize) -> ComplexTensor<B>;
 
     /// Tests if any element in the `tensor` evaluates to True.
     ///

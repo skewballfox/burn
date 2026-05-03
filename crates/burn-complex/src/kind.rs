@@ -1,3 +1,5 @@
+use crate::base::{CBT, ComplexTensor, ComplexTensorBackend};
+use alloc::vec::Vec;
 use burn_std::{DType, FloatDType, Shape, Slice};
 use burn_tensor::{
     BasicOps, Device, Distribution, IndexingUpdateOp, Int, Numeric, Scalar, Tensor, TensorData,
@@ -5,8 +7,6 @@ use burn_tensor::{
     backend::{Backend, BackendTypes, ExecutionError},
     get_device_settings,
 };
-
-use crate::base::{CBT, ComplexTensor, ComplexTensorBackend};
 
 /// A type-level representation of the kind of a complex tensor.
 #[derive(Clone, Debug)]
@@ -244,6 +244,7 @@ pub trait ComplexOnlyOps<C: ComplexTensorBackend> {
     fn from_parts<T>(real: T, imag: T) -> Self
     where
         T: Into<TensorData>;
+    fn from_interleaved_data(data: TensorData, device: &C::Device) -> Self;
     fn from_polar(magnitude: C::FloatTensorPrimitive, phase: C::FloatTensorPrimitive) -> Self;
     fn exp(self) -> C::ComplexTensorPrimitive;
     fn sin(self) -> C::ComplexTensorPrimitive;
@@ -260,6 +261,13 @@ impl<C: ComplexTensorBackend + Backend, const D: usize> ComplexOnlyOps<C>
     }
     fn phase(self) -> C::FloatTensorPrimitive {
         C::phase(self.into_primitive())
+    }
+
+    fn from_interleaved_data(
+        data: TensorData,
+        device: &C::Device,
+    ) -> burn_tensor::Tensor<C, D, ComplexKind> {
+        Tensor::from_primitive(C::complex_from_interleaved_data(data, device))
     }
 
     fn real(self) -> C::FloatTensorPrimitive {
@@ -307,7 +315,7 @@ impl<C: ComplexTensorBackend + Backend, const D: usize> ComplexOnlyOps<C>
 #[allow(unused_variables)]
 impl<C: ComplexTensorBackend> Numeric<C> for ComplexKind
 where
-    C: CBT + std::fmt::Debug + Clone,
+    C: CBT + core::fmt::Debug + Clone,
 {
     type IntTensor = Int;
     fn add(lhs: Self::Primitive, rhs: Self::Primitive) -> Self::Primitive {

@@ -1,18 +1,21 @@
-use std::io::Split;
-
+mod ops;
 use crate::{
     base::{
-        CBT, ComplexTensor, ComplexTensorBackend, ComplexTensorOps, Layout, SplitLayout,
-        SplitTensorData,
+        CBT, ComplexTensor, ComplexTensorBackend, ComplexTensorOps, DefaultComplexOps, Layout,
+        SplitLayout, SplitTensorData,
     },
-    utils::real_to_complex_dtype,
+    utils::{real_to_complex_dtype, split_from_interleaved_data},
 };
-use burn_std::FloatDType;
+
+use alloc::vec::Vec;
+use burn_std::{FloatDType, Shape};
 use burn_tensor::{
-    Complex, Device, ElementComparison, Scalar, TensorData, TensorMetadata,
-    backend::{Backend, BackendTypes},
+    Complex, ComplexElement, Device, ElementComparison, Scalar, TensorData, TensorMetadata,
+    backend::{Backend, BackendTypes, ExecutionError},
     cast::ToElement,
+    ops::FloatTensorOps,
 };
+
 use bytemuck::Pod;
 
 impl Layout for SplitLayout {}
@@ -36,6 +39,47 @@ impl<T: TensorMetadata> SplitComplexTensor<T> {
             "Real and imaginary parts must have the same dtype"
         );
         Self { real, imag }
+    }
+
+    pub fn from_real_data<B: Backend>(
+        data: TensorData,
+        device: &B::Device,
+    ) -> SplitComplexTensor<B::FloatTensorPrimitive> {
+        let real = data.clone();
+
+        SplitComplexTensor::<B::FloatTensorPrimitive> {
+            real: B::float_from_data(real, device),
+            imag: B::float_zeros(data.shape, device, data.dtype.into()),
+        }
+    }
+
+    pub fn from_imag_data<B: Backend>(
+        data: TensorData,
+        device: &B::Device,
+    ) -> SplitComplexTensor<B::FloatTensorPrimitive> {
+        let imag = data.clone();
+
+        SplitComplexTensor::<B::FloatTensorPrimitive> {
+            real: B::float_zeros(data.shape, device, data.dtype.into()),
+            imag: B::float_from_data(imag, device),
+        }
+    }
+
+    pub fn from_split_data<B: Backend>(
+        data: SplitTensorData,
+        device: &B::Device,
+    ) -> SplitComplexTensor<B::FloatTensorPrimitive> {
+        let SplitTensorData {
+            real_bytes: real,
+            imag_bytes: imag,
+            shape,
+            dtype,
+        } = data;
+
+        SplitComplexTensor::<B::FloatTensorPrimitive> {
+            real: B::float_from_data(TensorData::from_bytes(real, shape.clone(), dtype), device),
+            imag: B::float_from_data(TensorData::from_bytes(imag, shape, dtype), device),
+        }
     }
     pub fn real(&self) -> &T {
         &self.real
@@ -116,57 +160,22 @@ where
     fn complex_from_real_data(data: TensorData, device: &B::Device) -> ComplexTensor<Self> {
         // ComplexTensor<Self> = Complex<SplitComplexTensor<B::FloatTensorPrimitive>>
         // i.e. Complex { re: SplitComplexTensor { real, imag } }
-        let real = B::float_from_data(data, device);
-        // https://github.com/rust-lang/rust/issues/54628
-        let imag = B::float_from_data(
-            TensorData::from_bytes_vec(
-                vec![0u8; real.shape().num_elements() * real.dtype().size()],
-                real.shape().clone(),
-                real.dtype(),
-            ),
-            device,
-        );
-        SplitComplexTensor { real, imag }
+        SplitComplexTensor::<B::FloatTensorPrimitive>::from_real_data::<Self::InnerBackend>(
+            data, device,
+        )
     }
 
     fn complex_from_imag_data(data: TensorData, device: &B::Device) -> ComplexTensor<Self> {
-        let imag = B::float_from_data(data, device);
-        // https://github.com/rust-lang/rust/issues/54628
-        let real = B::float_from_data(
-            TensorData::from_bytes_vec(
-                vec![0u8; imag.shape().num_elements() * imag.dtype().size()],
-                imag.shape().clone(),
-                imag.dtype(),
-            ),
-            device,
-        );
-        SplitComplexTensor { real, imag }
+        SplitComplexTensor::<B::FloatTensorPrimitive>::from_imag_data::<Self::InnerBackend>(
+            data, device,
+        )
     }
     // Should these be a result
     fn complex_from_interleaved_data(data: TensorData, device: &B::Device) -> ComplexTensor<Self> {
-        let mut real_bytes: Vec<u8> = Vec::with_capacity(data.bytes.len() / 2);
-        let mut imag_bytes: Vec<u8> = Vec::with_capacity(data.bytes.len() / 2);
-
-        let element_size = data.dtype.size();
-        let complex_pair_size = 2 * element_size;
-
-        // Iterate through the bytes in chunks of (Real + Imag)
-        for chunk in data.bytes.chunks_exact(complex_pair_size) {
-            let (real_part, imag_part) = chunk.split_at(element_size);
-
-            real_bytes.extend_from_slice(real_part);
-            imag_bytes.extend_from_slice(imag_part);
-        }
-        SplitComplexTensor {
-            real: B::float_from_data(
-                TensorData::from_bytes_vec(real_bytes, data.shape.clone(), data.dtype),
-                device,
-            ),
-            imag: B::float_from_data(
-                TensorData::from_bytes_vec(imag_bytes, data.shape, data.dtype),
-                device,
-            ),
-        }
+        SplitComplexTensor::<B::FloatTensorPrimitive>::from_split_data::<Self::InnerBackend>(
+            split_from_interleaved_data(data),
+            device,
+        )
     }
 
     fn complex_from_parts_data(
@@ -195,7 +204,7 @@ where
     B: Backend,
     B::FloatElem: ElementComparison + Pod,
 {
-    fn to_complex(tensor: super::FloatTensor<SplitBackend<B>>) -> ComplexTensor<SplitBackend<B>> {
+    fn to_complex(tensor: B::FloatTensorPrimitive) -> ComplexTensor<SplitBackend<B>> {
         SplitComplexTensor {
             imag: B::float_zeros(
                 tensor.shape().clone(),
@@ -206,10 +215,10 @@ where
         }
     }
 
-    fn real(tensor: ComplexTensor<SplitBackend<B>>) -> super::FloatTensor<SplitBackend<B>> {
+    fn real(tensor: ComplexTensor<SplitBackend<B>>) -> B::FloatTensorPrimitive {
         tensor.real
     }
-    fn imag(tensor: ComplexTensor<SplitBackend<B>>) -> super::FloatTensor<SplitBackend<B>> {
+    fn imag(tensor: ComplexTensor<SplitBackend<B>>) -> B::FloatTensorPrimitive {
         tensor.imag
     }
 
@@ -390,7 +399,7 @@ where
             ),
         }
     }
-    fn abs(tensor: ComplexTensor<SplitBackend<B>>) -> super::FloatTensor<SplitBackend<B>> {
+    fn abs(tensor: ComplexTensor<SplitBackend<B>>) -> B::FloatTensorPrimitive {
         //todo! https://github.com/tracel-ai/burn/issues/4836
         // |z| = sqrt(real^2 + imag^2)
         let real_sq = FlOps::<B>::float_mul(tensor.real.clone(), tensor.real.clone());
@@ -439,17 +448,15 @@ where
         }
     }
 
-    fn complex_squared_norm(
-        tensor: ComplexTensor<SplitBackend<B>>,
-    ) -> super::FloatTensor<SplitBackend<B>> {
+    fn complex_squared_norm(tensor: ComplexTensor<SplitBackend<B>>) -> B::FloatTensorPrimitive {
         let real_sq = FlOps::<B>::float_mul(tensor.real.clone(), tensor.real.clone());
         let imag_sq = FlOps::<B>::float_mul(tensor.imag.clone(), tensor.imag.clone());
         FlOps::<B>::float_add(real_sq, imag_sq)
     }
 
     fn complex_from_polar(
-        magnitude: super::FloatTensor<SplitBackend<B>>,
-        phase: super::FloatTensor<SplitBackend<B>>,
+        magnitude: B::FloatTensorPrimitive,
+        phase: B::FloatTensorPrimitive,
     ) -> ComplexTensor<SplitBackend<B>> {
         SplitComplexTensor {
             real: FlOps::<B>::float_mul(magnitude.clone(), FlOps::<B>::float_cos(phase.clone())),
@@ -534,7 +541,7 @@ where
         }
     }
 
-    fn complex_arg(tensor: ComplexTensor<SplitBackend<B>>) -> super::FloatTensor<SplitBackend<B>> {
+    fn complex_arg(tensor: ComplexTensor<SplitBackend<B>>) -> B::FloatTensorPrimitive {
         // arg(a + bi) = atan2(b, a)
         FlOps::<B>::float_atan2(tensor.imag, tensor.real)
     }
@@ -940,7 +947,7 @@ where
 
     fn complex_powf(
         lhs: ComplexTensor<SplitBackend<B>>,
-        rhs: super::FloatTensor<SplitBackend<B>>,
+        rhs: B::FloatTensorPrimitive,
     ) -> ComplexTensor<SplitBackend<B>> {
         // z^w = exp(w * ln(z)) where w is a real tensor
         let log_z = SplitBackend::<B>::complex_log(lhs);
@@ -971,5 +978,53 @@ where
             real: B::float_scatter_nd(tensor.real, indices.clone(), value.real, reduction),
             imag: B::float_scatter_nd(tensor.imag, indices, value.imag, reduction),
         }
+    }
+}
+
+impl<B, F> DefaultComplexOps<B> for SplitLayout
+where
+    B: ComplexTensorBackend<Layout = SplitLayout>,
+    B: BackendTypes<FloatTensorPrimitive = F>,
+    B: CBT<ComplexTensorPrimitive = SplitComplexTensor<F>>,
+    F: TensorMetadata + 'static,
+{
+    type OutTensorData = SplitTensorData;
+    fn zeros(shape: Shape, device: &Device<B>) -> ComplexTensor<B> {
+        let real = B::InnerBackend::float_from_data(
+            TensorData::zeros::<<B::InnerBackend as BackendTypes>::FloatElem, _>(&shape),
+            device,
+        );
+        let imag = B::InnerBackend::float_from_data(
+            TensorData::zeros::<<B::InnerBackend as BackendTypes>::FloatElem, _>(shape),
+            device,
+        );
+        // ComplexTensor<B> = Complex<T> via SplitLayout
+        SplitComplexTensor { real, imag }
+    }
+
+    fn ones(shape: Shape, device: &Device<B>) -> ComplexTensor<B> {
+        let real = B::InnerBackend::float_from_data(
+            TensorData::ones::<<B::InnerBackend as BackendTypes>::FloatElem, _>(&shape),
+            device,
+        );
+        let imag = B::InnerBackend::float_from_data(
+            TensorData::ones::<<B::InnerBackend as BackendTypes>::FloatElem, _>(shape),
+            device,
+        );
+        SplitComplexTensor { real, imag }
+    }
+
+    fn full(shape: Shape, fill_value: B::ComplexScalar, device: &Device<B>) -> ComplexTensor<B> {
+        let real =
+            B::InnerBackend::float_from_data(TensorData::full(&shape, fill_value.real()), device);
+        let imag =
+            B::InnerBackend::float_from_data(TensorData::full(shape, fill_value.imag()), device);
+        SplitComplexTensor { real, imag }
+    }
+
+    async fn complex_into_data(
+        tensor: ComplexTensor<B>,
+    ) -> Result<Self::OutTensorData, ExecutionError> {
+        B::complex_into_split_data(tensor).await
     }
 }

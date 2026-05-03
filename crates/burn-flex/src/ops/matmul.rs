@@ -285,6 +285,7 @@ fn matmul_gemm<T: GemmScalar + Element>(lhs: FlexTensor, rhs: FlexTensor) -> Fle
     }
 }
 
+#[cfg(feature = "complex")]
 fn matmul_gemm_complex<T: ComplexElement + bytemuck::Pod, G: GemmScalar>(
     lhs: FlexTensor,
     rhs: FlexTensor,

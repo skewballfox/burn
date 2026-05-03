@@ -32,7 +32,7 @@ impl<B: Backend> TensorPrimitive<B> {
     }
 }
 
-impl<B: BackendTypes + Clone + std::fmt::Debug> TensorMetadata for TensorPrimitive<B> {
+impl<B: BackendTypes + Clone + core::fmt::Debug> TensorMetadata for TensorPrimitive<B> {
     fn dtype(&self) -> DType {
         match self {
             TensorPrimitive::Float(tensor) => tensor.dtype(),

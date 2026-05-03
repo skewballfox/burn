@@ -1,4 +1,4 @@
-use burn_backend::tensor::{BoolTensor, Device, FloatTensor, Int, IntTensor};
+use burn_backend::tensor::{BoolTensor, Device, FloatTensor, IntTensor};
 use burn_backend::{Complex, Distribution};
 use burn_backend::{Element, TensorData};
 use burn_complex::base::{CBT, SplitTensorData};
@@ -8,7 +8,7 @@ use burn_complex::{
     utils::{
         interleave_from_split_data, interleaved_data_from_imag_data,
         interleaved_data_from_real_data, interleaved_data_to_real_data,
-        interleaved_data_to_split_data,
+        split_from_interleaved_data,
     },
 };
 use burn_std::{BoolDType, DType, FloatDType, Slice};
@@ -88,7 +88,7 @@ impl ComplexTensorOps<Flex> for Flex {
     async fn complex_into_split_data(
         tensor: ComplexTensor<Flex>,
     ) -> Result<SplitTensorData, burn_backend::ExecutionError> {
-        Ok(interleaved_data_to_split_data(tensor.into_data()))
+        Ok(split_from_interleaved_data(tensor.into_data()))
     }
 
     fn to_complex(tensor: FloatTensor<Flex>) -> ComplexTensor<Flex> {
@@ -178,8 +178,6 @@ impl ComplexTensorOps<Flex> for Flex {
         rhs: <Flex as ComplexTensorBackend>::ComplexScalar,
         out_dtype: BoolDType,
     ) -> BoolTensor<Flex> {
-        let lhs = lhs;
-        let rhs = rhs;
         let f32_cmp = |a, b| a != b;
         let f64_cmp = |a, b| a != b;
         //let _simd_hint = Some(CompareOp::Ne);
@@ -198,8 +196,6 @@ impl ComplexTensorOps<Flex> for Flex {
         rhs: <Flex as ComplexTensorBackend>::ComplexScalar,
         out_dtype: burn_std::BoolDType,
     ) -> BoolTensor<Flex> {
-        let lhs = lhs;
-        let rhs = rhs;
         let f32_cmp = |a, b| a == b;
         let f64_cmp = |a, b| a == b;
         //let _simd_hint = Some(CompareOp::Eq);
@@ -218,8 +214,6 @@ impl ComplexTensorOps<Flex> for Flex {
         rhs: ComplexTensor<Flex>,
         out_dtype: burn_std::BoolDType,
     ) -> BoolTensor<Flex> {
-        let lhs = lhs;
-        let rhs = rhs;
         let f32_cmp = |a, b| a == b;
         let f64_cmp = |a, b| a == b;
         //let _simd_hint = Some(CompareOp::Eq);
@@ -823,7 +817,7 @@ where
     F32Op: Fn(Complex<f32>, Complex<f32>) -> f32 + Copy,
     F64Op: Fn(Complex<f64>, Complex<f64>) -> f64 + Copy,
 {
-    use crate::ops::binary::binary_op_typed;
+    
 
     debug_assert_eq!(
         lhs.dtype(),

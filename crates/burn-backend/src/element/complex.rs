@@ -6,6 +6,11 @@ use crate::{
     cast::ToElement,
 };
 use bytemuck::Zeroable;
+use core::ops::Add;
+use core::ops::Div;
+use core::ops::Mul;
+use core::ops::Neg;
+use core::ops::Sub;
 use core::ops::{AddAssign, Rem};
 use num_complex::Complex as NumComplex;
 use num_traits::FromPrimitive;
@@ -13,10 +18,6 @@ use num_traits::Num;
 use num_traits::One;
 use num_traits::Zero;
 use rand::Rng;
-use std::ops::Add;
-use std::ops::Mul;
-use std::ops::Neg;
-use std::ops::Sub;
 #[cfg(feature = "ndarray")]
 mod ndarray {
     use super::Complex;
@@ -30,14 +31,6 @@ mod tch {
     use tch::kind::Element as TchElement;
     impl<E: TchElement> TchElement for Complex<E> {}
 }
-
-#[cfg(feature = "gemm")]
-mod gemm {
-    use super::Complex;
-    use gemm::{c32, c64};
-    impl<E: TchElement> TchElement for Complex<E> {}
-}
-use std::ops::Div;
 
 /// trait to convert an element to a complex number when the conversion needs to be generic over
 /// the target complex type (e.g. Complex<f32> or Complex<f64>)
@@ -119,7 +112,7 @@ impl<E> From<Complex<E>> for NumComplex<E> {
     }
 }
 
-impl<E: Num + std::marker::Copy> Num for Complex<E> {
+impl<E: Num + core::marker::Copy> Num for Complex<E> {
     type FromStrRadixErr = <NumComplex<E> as Num>::FromStrRadixErr;
 
     fn from_str_radix(str: &str, radix: u32) -> Result<Self, Self::FromStrRadixErr> {

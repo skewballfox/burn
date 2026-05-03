@@ -531,7 +531,8 @@ where
 
     make_tensor(result, shape, dtype)
 }
-
+//Remove this if it turns out to be used elsewhere
+#[cfg(feature = "complex")]
 pub(crate) fn scalar_op_typed_convert<E, O, Op>(
     mut tensor: FlexTensor,
     scalar: E,
@@ -542,22 +543,31 @@ where
     O: Element + bytemuck::Pod,
     Op: Fn(E, E) -> O,
 {
-    // In-place fast path: unique, contiguous at offset 0
+    // In-place fast path: when E and O are the same size we can convert
+    // each element in the existing buffer without allocating.
     if tensor.is_unique()
         && let Some((0, end)) = tensor.layout().contiguous_offsets()
+        && core::mem::size_of::<E>() == core::mem::size_of::<O>()
     {
-        let storage: &mut [E] = tensor.storage_mut();
-
-        //note: maybe make issue about doing pointer magic when E and O have the same size
-        storage[..end].iter_mut().map(|x| {
-            op(*x, scalar);
-        });
-        return tensor;
+        let elem_size = core::mem::size_of::<E>();
+        {
+            // Reinterpret the typed slice as raw bytes so we can read E
+            // values and write O values into the same memory.  Both E and
+            // O are `Pod`, so any bit pattern is valid and no padding bytes
+            // are hidden.
+            let bytes: &mut [u8] = bytemuck::cast_slice_mut(tensor.storage_mut::<E>());
+            for i in 0..end {
+                let chunk = &mut bytes[i * elem_size..(i + 1) * elem_size];
+                let e: E = bytemuck::pod_read_unaligned(chunk);
+                let o: O = op(e, scalar);
+                chunk.copy_from_slice(bytemuck::bytes_of(&o));
+            }
+        }
+        return tensor.with_dtype(O::dtype());
     }
 
     // Allocating path
     let shape = tensor.layout().shape().clone();
-    let dtype = tensor.dtype();
     let storage: &[E] = tensor.storage();
 
     let result: Vec<O> = match tensor.layout().contiguous_offsets() {
@@ -567,7 +577,7 @@ where
             .collect(),
     };
 
-    make_tensor(result, shape, dtype)
+    make_tensor(result, shape, O::dtype())
 }
 
 pub(crate) fn scalar_op_typed_rhs<E, E2, Op>(
