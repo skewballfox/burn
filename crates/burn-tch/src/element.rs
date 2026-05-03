@@ -1,8 +1,8 @@
-use burn_backend::Element;
+use burn_backend::{Element, ElementComparison};
 use burn_backend::{bf16, f16};
 
 /// The element type for the tch backend.
-pub trait TchElement: Element + tch::kind::Element {
+pub trait TchElement: Element + tch::kind::Element + ElementComparison + bytemuck::Pod {
     /// Returns the associated tensor kind for [`tch::kind::Element`].
     fn kind() -> tch::Kind {
         Self::KIND

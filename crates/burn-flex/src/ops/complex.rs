@@ -11,6 +11,7 @@ use burn_complex::{
         split_from_interleaved_data,
     },
 };
+use alloc::vec::Vec;
 use burn_std::{BoolDType, DType, FloatDType, Slice};
 use num_traits::ToPrimitive;
 use num_traits::Zero;
