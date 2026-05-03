@@ -29,7 +29,14 @@ mod ndarray {
 mod tch {
     use super::Complex;
     use tch::kind::Element as TchElement;
-    impl<E: TchElement> TchElement for Complex<E> {}
+    impl<E: TchElement> TchElement for Complex<f32> {
+        const KIND: tch::Kind = tch::Kind::ComplexFloat;
+        const ZERO: Self = Self::new(0.0, 0.0);
+    }
+    impl<E: TchElement> TchElement for Complex<f64> {
+        const KIND: tch::Kind = tch::Kind::ComplexDouble;
+        const ZERO: Self = Self::new(0.0, 0.0);
+    }
 }
 
 /// trait to convert an element to a complex number when the conversion needs to be generic over

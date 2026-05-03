@@ -60,7 +60,7 @@ gix-tempfile = { version = "22.0.0", features = ["signals"] }
 globwalk = "0.9.1"
 hashbrown = "0.16"
 hound = "3.5.1"
-image = "0.25"
+image = "0.25.10"
 indicatif = "0.18.0"
 insta = "1.45.0"
 js-sys = "0.3.77"
@@ -85,7 +85,7 @@ regex = { version = "1.12.3", default-features = false, features = [
     "perf",
     "unicode",
 ] }
-reqwest = { version = "0.12.23", default-features = false, features = [
+reqwest = { version = "0.12.28", default-features = false, features = [
     "rustls-tls",
 ] }
 rmp-serde = { version = "1.3.1", default-features = false }
@@ -173,7 +173,7 @@ libc = "0.2.182"
 nvml-wrapper = "0.12.0"
 sysinfo = "0.38.0"
 systemstat = "0.2.6"
-tch = "0.22.0"
+tch = { version = "0.22.0", default-features = false }
 torch-sys = "0.22.0"                                        # matches what tch is using, required for lib detection
 
 ahash = { version = "0.8.12", default-features = false }
