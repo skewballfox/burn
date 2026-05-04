@@ -1,4 +1,4 @@
-use burn_backend::Scalar;
+use burn_backend::{BackendTypes, Scalar};
 pub use burn_backend::tensor::Numeric;
 
 use crate::alloc::borrow::ToOwned;
@@ -12,7 +12,7 @@ use crate::{IndexingUpdateOp, TensorCreationOptions};
 
 impl<B, const D: usize, K> Tensor<B, D, K>
 where
-    B: Backend,
+    B: BackendTypes,
     K: Numeric<B>,
     K::Elem: Element,
 {
@@ -665,94 +665,7 @@ where
         Self::new(K::cumprod(self.primitive, dim))
     }
 
-    /// Returns the upper triangular part of a matrix (2-D tensor) or batch of matrices input,
-    /// the other elements of the result tensor out are set to 0.
-    ///
-    /// See also [`triu_mask`](Tensor::triu_mask).
-    ///
-    /// # Arguments
-    ///
-    /// * `diagonal` - The offset from the diagonal, where 0 means the diagonal, and positive values shift
-    ///   towards the upper triangle.
-    ///
-    /// # Example
-    /// ```rust
-    /// use burn_tensor::backend::Backend;
-    /// use burn_tensor::{Int, Tensor};
-    ///
-    /// fn example<B: Backend>() {
-    ///    let device = Default::default();
-    ///    let tensor = Tensor::<B, 2, Int>::from_ints(
-    ///        [
-    ///          [1, 2, 3],
-    ///          [4, 5, 6],
-    ///          [7, 8, 9]
-    ///        ],
-    ///        &device
-    ///    );
-    ///    let tensor = tensor.triu(1);
-    ///    println!("{tensor}");
-    ///    // [
-    ///    //   [0, 2, 3],
-    ///    //   [0, 0, 6],
-    ///    //   [0, 0, 0]
-    ///    // ]
-    /// }
-    /// ```
-    pub fn triu(self, diagonal: i64) -> Self {
-        check!(TensorCheck::tri::<{ D }>());
-
-        // last two dimensions
-        let shape = &self.shape()[D - 2..].to_owned();
-
-        let mask = Tensor::<B, 2, Bool>::triu_mask(shape, diagonal, &self.device()).unsqueeze();
-        self.mask_fill(mask, 0)
-    }
-
-    /// Returns the lower triangular part of a matrix (2-D tensor) or batch of matrices input,
-    /// the other elements of the result tensor out are set to 0.
-    ///
-    /// See also [`tril_mask`](Tensor::tril_mask).
-    ///
-    /// # Arguments
-    ///
-    /// * `diagonal` - The offset from the diagonal, where 0 means the diagonal, and positive values shift
-    ///   towards the upper triangle.
-    ///
-    /// # Example
-    /// ```rust
-    /// use burn_tensor::backend::Backend;
-    /// use burn_tensor::{Int, Tensor};
-    ///
-    /// fn example<B: Backend>() {
-    ///    let device = Default::default();
-    ///    let tensor = Tensor::<B, 2, Int>::from_ints(
-    ///        [
-    ///          [1, 2, 3],
-    ///          [4, 5, 6],
-    ///          [7, 8, 9]
-    ///        ],
-    ///        &device
-    ///    );
-    ///
-    ///    let tensor = tensor.tril(-1);
-    ///    println!("{tensor}");
-    ///    // [
-    ///    //   [0, 0, 0],
-    ///    //   [4, 0, 0],
-    ///    //   [7, 8, 0]
-    ///    // ]
-    /// }
-    /// ```
-    pub fn tril(self, diagonal: i64) -> Self {
-        check!(TensorCheck::tri::<{ D }>());
-
-        // last two dimensions
-        let shape = &self.shape()[D - 2..].to_owned();
-        let mask = Tensor::<B, 2, Bool>::tril_mask(shape, diagonal, &self.device()).unsqueeze();
-
-        self.mask_fill(mask, 0)
-    }
+    
 
     /// Applies element wise power operation with a integer Tensor
     ///
@@ -911,6 +824,101 @@ where
     }
 }
 
+impl<B, const D: usize, K> Tensor<B, D, K>
+where
+    B: Backend,
+    K: Numeric<B>,
+    K::Elem: Element,
+{
+    /// Returns the upper triangular part of a matrix (2-D tensor) or batch of matrices input,
+    /// the other elements of the result tensor out are set to 0.
+    ///
+    /// See also [`triu_mask`](Tensor::triu_mask).
+    ///
+    /// # Arguments
+    ///
+    /// * `diagonal` - The offset from the diagonal, where 0 means the diagonal, and positive values shift
+    ///   towards the upper triangle.
+    ///
+    /// # Example
+    /// ```rust
+    /// use burn_tensor::backend::Backend;
+    /// use burn_tensor::{Int, Tensor};
+    ///
+    /// fn example<B: Backend>() {
+    ///    let device = Default::default();
+    ///    let tensor = Tensor::<B, 2, Int>::from_ints(
+    ///        [
+    ///          [1, 2, 3],
+    ///          [4, 5, 6],
+    ///          [7, 8, 9]
+    ///        ],
+    ///        &device
+    ///    );
+    ///    let tensor = tensor.triu(1);
+    ///    println!("{tensor}");
+    ///    // [
+    ///    //   [0, 2, 3],
+    ///    //   [0, 0, 6],
+    ///    //   [0, 0, 0]
+    ///    // ]
+    /// }
+    /// ```
+    pub fn triu(self, diagonal: i64) -> Self {
+        check!(TensorCheck::tri::<{ D }>());
+
+        // last two dimensions
+        let shape = &self.shape()[D - 2..].to_owned();
+
+        let mask = Tensor::<B, 2, Bool>::triu_mask(shape, diagonal, &self.device()).unsqueeze();
+        self.mask_fill(mask, 0)
+    }
+
+    /// Returns the lower triangular part of a matrix (2-D tensor) or batch of matrices input,
+    /// the other elements of the result tensor out are set to 0.
+    ///
+    /// See also [`tril_mask`](Tensor::tril_mask).
+    ///
+    /// # Arguments
+    ///
+    /// * `diagonal` - The offset from the diagonal, where 0 means the diagonal, and positive values shift
+    ///   towards the upper triangle.
+    ///
+    /// # Example
+    /// ```rust
+    /// use burn_tensor::backend::Backend;
+    /// use burn_tensor::{Int, Tensor};
+    ///
+    /// fn example<B: Backend>() {
+    ///    let device = Default::default();
+    ///    let tensor = Tensor::<B, 2, Int>::from_ints(
+    ///        [
+    ///          [1, 2, 3],
+    ///          [4, 5, 6],
+    ///          [7, 8, 9]
+    ///        ],
+    ///        &device
+    ///    );
+    ///
+    ///    let tensor = tensor.tril(-1);
+    ///    println!("{tensor}");
+    ///    // [
+    ///    //   [0, 0, 0],
+    ///    //   [4, 0, 0],
+    ///    //   [7, 8, 0]
+    ///    // ]
+    /// }
+    /// ```
+    pub fn tril(self, diagonal: i64) -> Self {
+        check!(TensorCheck::tri::<{ D }>());
+
+        // last two dimensions
+        let shape = &self.shape()[D - 2..].to_owned();
+        let mask = Tensor::<B, 2, Bool>::tril_mask(shape, diagonal, &self.device()).unsqueeze();
+
+        self.mask_fill(mask, 0)
+    }
+}
 impl<B, K> Tensor<B, 1, K>
 where
     B: Backend,
@@ -998,7 +1006,7 @@ where
 macro_rules! impl_tensor_scalar_add {
     ($($t:ty),*) => {
         $(
-            impl<const D: usize, B: Backend, K: Numeric<B>> core::ops::Add<Tensor<B, D, K>> for $t
+            impl<const D: usize, B: BackendTypes, K: Numeric<B>> core::ops::Add<Tensor<B, D, K>> for $t
             where
                 K::Elem: Element,
             {
@@ -1026,7 +1034,7 @@ where
 }
 
 // Tensor - scalar
-impl<E: ElementConversion, const D: usize, B: Backend, K: Numeric<B>> core::ops::Sub<E>
+impl<E: ElementConversion, const D: usize, B: BackendTypes, K: Numeric<B>> core::ops::Sub<E>
     for Tensor<B, D, K>
 where
     K::Elem: Element,
@@ -1042,7 +1050,7 @@ where
 macro_rules! impl_tensor_scalar_sub {
     ($($t:ty),*) => {
         $(
-            impl<const D: usize, B: Backend, K: Numeric<B>> core::ops::Sub<Tensor<B, D, K>> for $t
+            impl<const D: usize, B: BackendTypes, K: Numeric<B>> core::ops::Sub<Tensor<B, D, K>> for $t
             where
                 K::Elem: Element,
             {
@@ -1058,7 +1066,7 @@ macro_rules! impl_tensor_scalar_sub {
 impl_tensor_scalar_sub!(f32, f64, i32, i64, u32, u64);
 
 // Tensor / tensor
-impl<B: Backend, const D: usize, K: Numeric<B>> core::ops::Div<Self> for Tensor<B, D, K>
+impl<B: BackendTypes, const D: usize, K: Numeric<B>> core::ops::Div<Self> for Tensor<B, D, K>
 where
     K::Elem: Element,
 {
@@ -1101,7 +1109,7 @@ macro_rules! impl_tensor_scalar_div {
 impl_tensor_scalar_div!(f32, f64);
 
 // Tensor % tensor.
-impl<const D: usize, B: Backend, K: Numeric<B>> core::ops::Rem<Self> for Tensor<B, D, K>
+impl<const D: usize, B: BackendTypes, K: Numeric<B>> core::ops::Rem<Self> for Tensor<B, D, K>
 where
     K::Elem: Element,
 {
@@ -1126,7 +1134,7 @@ where
 }
 
 // Tensor * tensor.
-impl<B: Backend, const D: usize, K: Numeric<B>> core::ops::Mul<Self> for Tensor<B, D, K>
+impl<B: BackendTypes, const D: usize, K: Numeric<B>> core::ops::Mul<Self> for Tensor<B, D, K>
 where
     K::Elem: Element,
 {
@@ -1153,7 +1161,7 @@ where
 macro_rules! impl_tensor_scalar_mul {
     ($($t:ty),*) => {
         $(
-            impl<const D: usize, B: Backend, K: Numeric<B>> core::ops::Mul<Tensor<B, D, K>> for $t
+            impl<const D: usize, B: BackendTypes, K: Numeric<B>> core::ops::Mul<Tensor<B, D, K>> for $t
             where
                 K::Elem: Element,
             {

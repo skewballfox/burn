@@ -112,7 +112,7 @@ impl<T: TensorMetadata + 'static> TensorMetadata for SplitComplexTensor<T> {
         }
     }
 }
-
+#[derive(Debug, Clone)]
 /// A newtype that wraps a real backend B and exposes a split-layout complex backend.
 pub struct SplitBackend<B: Backend>(core::marker::PhantomData<B>);
 impl<B: Backend> CBT for SplitBackend<B> {

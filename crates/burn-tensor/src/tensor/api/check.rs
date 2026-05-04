@@ -3,6 +3,7 @@ use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec;
 use alloc::vec::Vec;
+use burn_backend::BackendTypes;
 use burn_backend::tensor::Ordered;
 use burn_std::DType;
 
@@ -40,7 +41,7 @@ pub(crate) enum TensorCheck {
 
 impl TensorCheck {
     /// Checks device and shape compatibility for element wise binary operations.
-    pub(crate) fn binary_ops_ew<B: Backend, const D: usize, K: BasicOps<B>>(
+    pub(crate) fn binary_ops_ew<B: BackendTypes, const D: usize, K: BasicOps<B>>(
         ops: &str,
         lhs: &Tensor<B, D, K>,
         rhs: &Tensor<B, D, K>,
@@ -103,7 +104,7 @@ impl TensorCheck {
         check
     }
 
-    pub(crate) fn narrow<B: Backend, const D: usize, K: BasicOps<B>>(
+    pub(crate) fn narrow<B: BackendTypes, const D: usize, K: BasicOps<B>>(
         tensor: &Tensor<B, D, K>,
         dim: usize,
         start: usize,
@@ -531,7 +532,7 @@ impl TensorCheck {
         check
     }
 
-    pub(crate) fn matmul<B: Backend, const D: usize, K>(
+    pub(crate) fn matmul<B: BackendTypes, const D: usize, K>(
         lhs: &Tensor<B, D, K>,
         rhs: &Tensor<B, D, K>,
     ) -> Self
@@ -625,7 +626,7 @@ impl TensorCheck {
         check
     }
 
-    pub(crate) fn stack<B: Backend, const D1: usize, K: BasicOps<B>, const D2: usize>(
+    pub(crate) fn stack<B: BackendTypes, const D1: usize, K: BasicOps<B>, const D2: usize>(
         tensors: &[Tensor<B, D1, K>],
         dim: usize,
     ) -> Self {
@@ -679,7 +680,7 @@ impl TensorCheck {
         check
     }
 
-    pub(crate) fn cat<B: Backend, const D: usize, K: BasicOps<B>>(
+    pub(crate) fn cat<B: BackendTypes, const D: usize, K: BasicOps<B>>(
         tensors: &[Tensor<B, D, K>],
         dim: usize,
     ) -> Self {

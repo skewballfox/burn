@@ -1,5 +1,5 @@
 use burn_backend::{
-    Backend, Element, get_device_settings,
+    BackendTypes, Element, get_device_settings,
     tensor::{BasicOps, Device},
 };
 use burn_std::DType;
@@ -9,7 +9,7 @@ use burn_std::DType;
 /// This struct allows specifying the `device` and overriding the data type when creating a tensor.
 /// When the `dtype` is not specified, the [device's default policy](crate::set_default_dtypes) is used.
 #[derive(Debug, Clone)]
-pub struct TensorCreationOptions<B: Backend> {
+pub struct TensorCreationOptions<B: BackendTypes> {
     /// Device where the tensor will be created.
     pub device: Device<B>,
     /// Optional data type.
@@ -17,14 +17,14 @@ pub struct TensorCreationOptions<B: Backend> {
     pub dtype: Option<DType>,
 }
 
-impl<B: Backend> Default for TensorCreationOptions<B> {
+impl<B: BackendTypes> Default for TensorCreationOptions<B> {
     /// Returns new options with the backend's default device.
     fn default() -> Self {
         Self::new(Default::default())
     }
 }
 
-impl<B: Backend> TensorCreationOptions<B> {
+impl<B: BackendTypes> TensorCreationOptions<B> {
     /// Create new options with a specific device.
     ///
     /// Data type will follow the [device policy](crate::set_default_dtypes) on tensor creation.
@@ -91,15 +91,15 @@ impl<B: Backend> TensorCreationOptions<B> {
     }
 }
 
-impl<B: Backend> From<&Device<B>> for TensorCreationOptions<B> {
+impl<B: BackendTypes> From<&Device<B>> for TensorCreationOptions<B> {
     /// Convenience conversion from a reference to a device.
     ///
     /// Example:
     /// ```rust
-    /// use burn_tensor::backend::Backend;
+    /// use burn_tensor::backend::BackendTypes;
     /// use burn_tensor::TensorCreationOptions;
     ///
-    /// fn example<B: Backend>(device: B::Device) {
+    /// fn example<B: BackendTypes>(device: B::Device) {
     ///     let options: TensorCreationOptions<B> = (&device).into();
     /// }
     /// ```
@@ -108,7 +108,7 @@ impl<B: Backend> From<&Device<B>> for TensorCreationOptions<B> {
     }
 }
 
-impl<B: Backend> From<(&Device<B>, DType)> for TensorCreationOptions<B> {
+impl<B: BackendTypes> From<(&Device<B>, DType)> for TensorCreationOptions<B> {
     /// Convenience conversion for a specified `(&device, dtype)` tuple.
     fn from(args: (&Device<B>, DType)) -> Self {
         TensorCreationOptions::new(args.0.clone()).with_dtype(args.1)
