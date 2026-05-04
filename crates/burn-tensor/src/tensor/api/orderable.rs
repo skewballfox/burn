@@ -257,8 +257,8 @@ where
     /// }
     /// ```
     pub fn topk(self, k: usize, dim: usize) -> Self {
-        let k_indices = Tensor::arange(0..k as i64, &self.device());
-        self.sort_descending(dim).select(dim, k_indices)
+        assert!(self.shape()[dim] > k);
+        Tensor::new(K::topk(self.primitive, dim, k))
     }
 
     /// Returns the `k` largest elements of the given input tensor along a given dimension.
@@ -641,7 +641,7 @@ where
     ///     println!("{:?}", tensor.shape());
     /// }
     /// ```
-    pub fn argtopk(self, dim: usize, k: usize) -> Tensor<B, D, Int> {
+    pub fn argtopk(self, k: usize, dim: usize) -> Tensor<B, D, Int> {
         assert!(self.shape()[dim] > k);
         Tensor::new(K::argtopk(self.primitive, dim, k))
     }

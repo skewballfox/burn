@@ -558,6 +558,11 @@ pub enum NumericOperationIr {
     ArgTopK(ReduceDimOpIr),
     /// Operation corresponding to:
     ///
+    /// Float => [topk](burn_backend::ops::FloatTensorOps::float_topk).
+    /// Int => [topk](burn_backend::ops::IntTensorOps::int_topk).
+    TopK(ReduceDimOpIr),
+    /// Operation corresponding to:
+    ///
     /// Float => [argmin](burn_backend::ops::FloatTensorOps::float_argmin).
     /// Int => [argmin](burn_backend::ops::IntTensorOps::int_argmin).
     ArgMin(ReduceDimOpIr),
@@ -2203,6 +2208,7 @@ impl NumericOperationIr {
             NumericOperationIr::LowerEqual(repr) => Box::new([&repr.lhs, &repr.rhs].into_iter()),
             NumericOperationIr::ArgMax(repr) => Box::new([&repr.input].into_iter()),
             NumericOperationIr::ArgTopK(repr) => Box::new([&repr.input].into_iter()),
+            NumericOperationIr::TopK(repr) => Box::new([&repr.input].into_iter()),
             NumericOperationIr::ArgMin(repr) => Box::new([&repr.input].into_iter()),
             NumericOperationIr::Clamp(repr) => Box::new([&repr.tensor].into_iter()),
             NumericOperationIr::Abs(repr) => Box::new([&repr.input].into_iter()),
@@ -2253,6 +2259,7 @@ impl NumericOperationIr {
             NumericOperationIr::LowerEqual(repr) => Box::new([&repr.out].into_iter()),
             NumericOperationIr::ArgMax(repr) => Box::new([&repr.out].into_iter()),
             NumericOperationIr::ArgTopK(repr) => Box::new([&repr.out].into_iter()),
+            NumericOperationIr::TopK(repr) => Box::new([&repr.out].into_iter()),
             NumericOperationIr::ArgMin(repr) => Box::new([&repr.out].into_iter()),
             NumericOperationIr::Clamp(repr) => Box::new([&repr.out].into_iter()),
             NumericOperationIr::Abs(repr) => Box::new([&repr.out].into_iter()),
@@ -2355,6 +2362,9 @@ impl NumericOperationIr {
                 repr.input.mark_read_only(nodes, &mut output);
             }
             NumericOperationIr::ArgTopK(repr) => {
+                repr.input.mark_read_only(nodes, &mut output);
+            }
+            NumericOperationIr::TopK(repr) => {
                 repr.input.mark_read_only(nodes, &mut output);
             }
             NumericOperationIr::ArgMin(repr) => {
