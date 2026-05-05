@@ -1,4 +1,6 @@
-use crate::base::{CBT, ComplexTensor, ComplexTensorBackend};
+use crate::base::{
+    CBT, ComplexTensor, ComplexTensorBackend, InterleavedLayout, Layout, SplitLayout,
+};
 use alloc::vec::Vec;
 use burn_std::{DType, FloatDType, Shape, Slice};
 use burn_tensor::{
@@ -10,10 +12,19 @@ use burn_tensor::{
 
 /// A type-level representation of the kind of a complex tensor.
 #[derive(Clone, Debug)]
-pub struct ComplexKind;
+pub struct ComplexK<L>
+where
+    L: Layout + Clone + core::fmt::Debug,
+{
+    _marker: core::marker::PhantomData<L>,
+}
 
 #[allow(unused_variables)]
-impl<C: ComplexTensorBackend> BasicOps<C> for ComplexKind {
+impl<C, L> BasicOps<C> for ComplexK<L>
+where
+    C: ComplexTensorBackend<Layout = L>,
+    L: Layout,
+{
     type Elem = C::ComplexScalar;
 
     fn empty(shape: Shape, device: &C::Device, dtype: DType) -> Self::Primitive {
@@ -253,8 +264,10 @@ pub trait ComplexOnlyOps<C: ComplexTensorBackend> {
     fn log(self) -> C::ComplexTensorPrimitive;
 }
 
-impl<C: ComplexTensorBackend + Backend, const D: usize> ComplexOnlyOps<C>
-    for Tensor<C, D, ComplexKind>
+impl<C, const D: usize, L> ComplexOnlyOps<C> for Tensor<C, D, ComplexK<L>>
+where
+    C: ComplexTensorBackend<Layout = L>,
+    L: Layout,
 {
     fn conj(self) -> C::ComplexTensorPrimitive {
         C::conj(self.into_primitive())
@@ -266,7 +279,7 @@ impl<C: ComplexTensorBackend + Backend, const D: usize> ComplexOnlyOps<C>
     fn from_interleaved_data(
         data: TensorData,
         device: &C::Device,
-    ) -> burn_tensor::Tensor<C, D, ComplexKind> {
+    ) -> burn_tensor::Tensor<C, D, ComplexK<L>> {
         Tensor::from_primitive(C::complex_from_interleaved_data(data, device))
     }
 
@@ -313,9 +326,10 @@ impl<C: ComplexTensorBackend + Backend, const D: usize> ComplexOnlyOps<C>
 }
 
 #[allow(unused_variables)]
-impl<C: ComplexTensorBackend> Numeric<C> for ComplexKind
+impl<C, L> Numeric<C> for ComplexK<L>
 where
-    C: CBT + core::fmt::Debug + Clone,
+    C: ComplexTensorBackend<Layout = L> + CBT + core::fmt::Debug + Clone,
+    L: Layout,
 {
     type IntTensor = Int;
     fn add(lhs: Self::Primitive, rhs: Self::Primitive) -> Self::Primitive {
@@ -441,8 +455,10 @@ where
         C::complex_add(lhs, scalar_tensor)
     }
 }
+pub type ComplexKind = ComplexK<InterleavedLayout>;
+pub type SplitComplexKind = ComplexK<SplitLayout>;
 
-impl<B: ComplexTensorBackend> TensorKind<B> for ComplexKind {
+impl<B: ComplexTensorBackend> TensorKind<B> for ComplexK<B::Layout> {
     type Primitive = ComplexTensor<B>;
     fn name() -> &'static str {
         "Complex"

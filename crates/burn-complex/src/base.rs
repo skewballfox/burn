@@ -17,7 +17,7 @@ pub trait CBT: BackendTypes {
 
 /// The layout of the complex tensor. Used to define shared behavior only meant
 /// to be used for a specific layout (such as butterfly operations).
-pub trait Layout {
+pub trait Layout: alloc::fmt::Debug + Clone {
     // /// The complex Tensor primitive type for this layout. For interleaved, this will be
     // /// a tensor of Complex\<E\>,for split this will be a tuple tensor Complex\<FloatTensorPrimitive\<E\>, FloatTensorPrimitive\<E\>\>.
     // type ComplexTensorPrimitive: TensorMetadata + 'static;
@@ -119,11 +119,12 @@ pub trait ComplexTensorBackend: ComplexTensorOps<Self> + Sized + CBT {
 
 //Note: changing to adopt terminology used in fftw doc
 
+#[derive(Clone, Debug)]
 /// Indicates that the underlying implementation has separate real and imaginary tensors.
 pub struct SplitLayout {
     //_marker: core::marker::PhantomData<T>,
 }
-
+#[derive(Clone, Debug)]
 /// Indicates that the underlying implementation uses a complex primitive type \[float,float\] like that found in the
 /// num_complex trait.
 pub struct InterleavedLayout {

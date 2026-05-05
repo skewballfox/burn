@@ -1,4 +1,5 @@
 use alloc::vec::Vec;
+use burn_backend::BackendTypes;
 use core::ops::Range;
 
 use crate::{Element, ElementConversion, Tensor, backend::Backend, ops::PadMode};
@@ -246,7 +247,7 @@ fn pad_reflect_dim<B, const D: usize, K>(
     pad_after: usize,
 ) -> Tensor<B, D, K>
 where
-    B: Backend,
+    B: BackendTypes,
     K: Numeric<B>,
     K::Elem: Element,
 {

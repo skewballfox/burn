@@ -3,6 +3,7 @@ mod common;
 use burn_tensor::Tolerance;
 use burn_tensor::{Complex, Distribution, Int, Tensor, TensorData};
 use common::*;
+use burn_complex::kind::ComplexOnlyOps;
 
 #[test]
 fn test_complex_add() {
@@ -20,7 +21,7 @@ fn test_complex_add() {
         &Default::default(),
     );
 
-    let tensor2 = TestTensor::<2>::from_data(
+    let tensor2 = TestTensor::<2>::from_interleaved_data(
         TensorData::from([[
             Complex::<f32> {
                 real: 5.0,

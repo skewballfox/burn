@@ -2,8 +2,8 @@
 use crate::backend::ExecutionError;
 use crate::check::unwrap_shape_reshape;
 
-use burn_backend::Scalar;
 pub use burn_backend::tensor::BasicOps;
+use burn_backend::{BackendTypes, Scalar};
 
 use alloc::vec::Vec;
 
@@ -75,7 +75,7 @@ use serde::{Serialize, Serializer};
 #[derive(new, Clone, Debug)]
 pub struct Tensor<B, const D: usize, K = Float>
 where
-    B: Backend,
+    B: BackendTypes,
     K: TensorKind<B>,
 {
     pub(crate) primitive: K::Primitive,
@@ -83,7 +83,7 @@ where
 
 impl<B, const D: usize, K, T> From<T> for Tensor<B, D, K>
 where
-    B: Backend,
+    B: BackendTypes,
     K: BasicOps<B>,
     T: Into<TensorData>,
 {
@@ -94,7 +94,7 @@ where
 
 impl<B, const D: usize, K> Tensor<B, D, K>
 where
-    B: Backend,
+    B: BackendTypes,
     K: BasicOps<B>,
     K::Elem: Element,
 {
@@ -333,10 +333,10 @@ where
     ///
     /// # Example
     /// ```rust
-    /// use burn_tensor::backend::Backend;
+    /// use burn_tensor::backend::BackendTypes;
     /// use burn_tensor::Tensor;
     ///
-    /// fn example<B: Backend>() {
+    /// fn example<B: BackendTypes>() {
     ///    let device = Default::default();
     ///    let tensor = Tensor::<B, 3>::ones([2, 3, 4], &device);
     ///    // Shape { dims: [2, 3, 4] }
@@ -1680,8 +1680,8 @@ where
         let dim = dim.expect_dim_index(D);
         check!(TensorCheck::select_assign::<D>(
             dim,
-            &indices.shape(),
-            &values.shape()
+            &indices.primitive.shape(),
+            &values.primitive.shape()
         ));
 
         Self::new(K::select_assign(
@@ -1766,8 +1766,8 @@ where
     pub fn gather(self, dim: usize, indices: Tensor<B, D, Int>) -> Self {
         check!(TensorCheck::gather::<D>(
             dim,
-            &self.shape(),
-            &indices.shape()
+            &self.primitive.shape(),
+            &indices.primitive.shape()
         ));
 
         Self::new(K::gather(dim, self.primitive, indices.primitive))
@@ -1810,9 +1810,9 @@ where
     ) -> Self {
         check!(TensorCheck::scatter::<D>(
             dim,
-            &self.shape(),
-            &indices.shape(),
-            &values.shape()
+            &self.primitive.shape(),
+            &indices.primitive.shape(),
+            &values.primitive.shape()
         ));
 
         Self::new(K::scatter(
@@ -1852,9 +1852,9 @@ where
         update: IndexingUpdateOp,
     ) -> Self {
         check!(TensorCheck::scatter_nd::<D, M, DV>(
-            &self.shape(),
-            &indices.shape(),
-            &values.shape()
+            &self.primitive.shape(),
+            &indices.primitive.shape(),
+            &values.primitive.shape()
         ));
         Self::new(K::scatter_nd(
             self.primitive,
@@ -1879,7 +1879,9 @@ where
         self,
         indices: Tensor<B, M, Int>,
     ) -> Tensor<B, DV, K> {
-        check!(TensorCheck::gather_nd::<D, M, DV>(&indices.shape()));
+        check!(TensorCheck::gather_nd::<D, M, DV>(
+            &indices.primitive.shape()
+        ));
         Tensor::new(K::gather_nd(self.primitive, indices.primitive))
     }
 
@@ -2162,7 +2164,7 @@ where
     /// use burn_tensor::backend::Backend;
     /// use burn_tensor::Tensor;
     ///
-    /// fn example<B: Backend>() {
+    /// fn example<B: BackendTypes>() {
     ///     let device = Default::default();
     ///     let t1 = Tensor::<B, 2>::from_data([[3.0, 4.9, 2.0, 1.0], [2.0, 1.9, 3.0, 1.0]], &device);
     ///     let t2 = Tensor::<B, 2>::from_data([[4.0, 5.9, 8.0], [1.4, 5.8, 6.0]], &device);
@@ -2210,10 +2212,10 @@ where
     /// # Example
     ///
     /// ```rust
-    /// use burn_tensor::backend::Backend;
+    /// use burn_tensor::backend::BackendTypes;
     /// use burn_tensor::Tensor;
     ///
-    /// fn example<B: Backend>() {
+    /// fn example<B: BackendTypes>() {
     ///     let device = Default::default();
     ///     let t1 = Tensor::<B, 2>::from_data([[3.0, 4.9, 2.0], [2.0, 1.9, 3.0]], &device);
     ///     let t2 = Tensor::<B, 2>::from_data([[4.0, 5.9, 8.0], [1.4, 5.8, 6.0]], &device);
@@ -2780,7 +2782,7 @@ where
 /// Iterator given by (Tensor::iter_dim).
 pub struct DimIter<B, const D: usize, K>
 where
-    B: Backend,
+    B: BackendTypes,
     K: BasicOps<B>,
 {
     start: usize,
@@ -2790,7 +2792,7 @@ where
     tensor: Tensor<B, D, K>,
 }
 
-impl<B: Backend, const D: usize, K: BasicOps<B>> Iterator for DimIter<B, D, K> {
+impl<B: BackendTypes, const D: usize, K: BasicOps<B>> Iterator for DimIter<B, D, K> {
     type Item = Tensor<B, D, K>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -2808,7 +2810,7 @@ impl<B: Backend, const D: usize, K: BasicOps<B>> Iterator for DimIter<B, D, K> {
     }
 }
 
-impl<B: Backend, const D: usize, K: BasicOps<B>> DoubleEndedIterator for DimIter<B, D, K> {
+impl<B: BackendTypes, const D: usize, K: BasicOps<B>> DoubleEndedIterator for DimIter<B, D, K> {
     fn next_back(&mut self) -> Option<Self::Item> {
         if self.start >= self.end {
             return None;
@@ -2824,7 +2826,7 @@ impl<B: Backend, const D: usize, K: BasicOps<B>> DoubleEndedIterator for DimIter
     }
 }
 
-impl<B: Backend, const D: usize, K: BasicOps<B>> DimIter<B, D, K> {
+impl<B: BackendTypes, const D: usize, K: BasicOps<B>> DimIter<B, D, K> {
     fn new(tensor: Tensor<B, D, K>, dim: usize) -> Self {
         let dims = tensor.dims();
         let ranges = dims
@@ -2844,7 +2846,7 @@ impl<B: Backend, const D: usize, K: BasicOps<B>> DimIter<B, D, K> {
 
 impl<B, const D: usize, K> Tensor<B, D, K>
 where
-    B: Backend,
+    B: BackendTypes,
     K: BasicOps<B>,
     <K as BasicOps<B>>::Elem: Debug,
 {
