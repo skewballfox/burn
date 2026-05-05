@@ -778,7 +778,7 @@ impl<B: Backend> Ordered<B> for Float {
 #[cfg_attr(doc, doc = crate::doc_tensor!())]
 #[cfg_attr(not(doc), doc = "`Tensor`")]
 /// struct.
-pub trait FloatMathOps<B: Backend>: Numeric<B> {
+pub trait FloatMathOps<B: BackendTypes>: Numeric<B> {
     /// Applies element wise square operation
     ///
     #[cfg_attr(doc, doc = "$y_i = x^{2}$")]

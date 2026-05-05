@@ -1,334 +1,490 @@
-// impl<B> SplitComplexTensor<B::FloatTensorPrimitive>
-// where
-//     B: Backend,
-// {
+use alloc::vec::Vec;
+use burn_std::{DType, Shape, Slice, SliceArg};
+use burn_tensor::{
+    Device, IndexingUpdateOp, TensorCreationOptions, TensorData, TensorMetadata,
+    backend::{Backend, BackendTypes, ExecutionError},
+    get_device_settings, try_read_sync,
+};
 
-//     fn empty(shape: Shape, device: &B::Device, dtype: DType) -> Self {
-//         // should I check then pass the dtype?
-//         SplitBackend::<B>::complex_zeros(shape, device)
-//     }
+use crate::{
+    base::{ComplexTensorBackend, ComplexTensorOps},
+    split::{SplitBackend, SplitComplexTensor},
+};
+//BasicOps
+impl<B, F> SplitComplexTensor<B, F>
+where
+    B: Backend,
+    B: BackendTypes<FloatTensorPrimitive = F>,
+    F: TensorMetadata + 'static,
+{
 
-//     fn reshape(tensor: Self, shape: Shape) -> Self {
-//         SplitBackend::<B>::complex_reshape(tensor, shape)
-//     }
+    pub fn select(
+        self,
+        dim: usize,
+        indices: B::IntTensorPrimitive,
+    ) -> Self {
+        // Uses your existing `select` name.
+        SplitBackend::<B>::complex_select(self, dim, indices)
+    }
 
-//     fn transpose(tensor: Self) -> Self {
-//         SplitBackend::<B>::complex_transpose(tensor)
-//     }
+    pub fn select_assign(
+        self,
+        dim: usize,
+        indices: B::IntTensorPrimitive,
+        values: Self,
+        update: IndexingUpdateOp,
+    ) -> Self {
+        match update {
+            IndexingUpdateOp::Add => SplitBackend::<B>::complex_select_add(self, dim, indices, values),
+            _ => unimplemented!(),
+        }
+    }
+    pub fn empty(shape: Shape, device: &B::Device, dtype: DType) -> Self {
+        // should I check then pass the dtype?
+        SplitBackend::<B>::complex_zeros(shape, device)
+    }
 
-//     fn swap_dims(tensor: Self, dim1: usize, dim2: usize) -> Self {
-//         SplitBackend::<B>::complex_swap_dims(tensor, dim1, dim2)
-//     }
+    pub fn reshape(self, shape: Shape) -> Self {
+        SplitBackend::<B>::complex_reshape(self, shape)
+    }
 
-//     fn slice(tensor: Self, ranges: &[Slice]) -> Self {
-//         //TensorPrimitive::Complex(B::complex_slice(tensor, ranges))
-//         SplitBackend::<B>::complex_slice(tensor, ranges)
-//     }
+    pub fn transpose(self) -> Self {
+        SplitBackend::<B>::complex_transpose(self)
+    }
 
-//     fn device(tensor: &Self) -> Device<B> {
-//         SplitBackend::<B>::complex_device(tensor)
-//     }
+    pub fn swap_dims(self, dim1: usize, dim2: usize) -> Self {
+        SplitBackend::<B>::complex_swap_dims(self, dim1, dim2)
+    }
 
-//     fn to_device(tensor: Self, device: &B::Device) -> Self {
-//         SplitBackend::<B>::complex_to_device(tensor, device)
-//     }
+    pub fn device(&self) -> B::Device {
+        SplitBackend::<B>::complex_device(self)
+    }
 
-//     async fn into_data_async(tensor: Self) -> Result<TensorData, ExecutionError> {
-//         SplitBackend::<B>::complex_into_interleaved_data(tensor).await
-//     }
+    pub fn slice<S>(self, slices: S) -> Self
+    where
+        S: SliceArg,
+    {
+        let shape = self.shape();
+        let slices = slices.into_slices(&shape);
 
-//     fn from_data(data: TensorData, device: &B::Device, dtype: DType) -> Self {
-//         SplitBackend::<B>::complex_from_interleaved_data(data.convert::<<SplitBackend<B> as ComplexTensorBackend>::ComplexScalar>(), device)
-//     }
+        // Validate slices
+        //check!(TensorCheck::slice::<D>(&shape, &slices));
 
-//     fn repeat_dim(tensor: Self, dim: usize, times: usize) -> Self {
-//         SplitBackend::<B>::complex_repeat_dim(tensor, dim, times)
-//     }
-//     fn equal(lhs: Self, rhs: Self) -> B::BoolTensorPrimitive {
-//         let out_dtype = get_device_settings::<B>(&SplitBackend::<B>::complex_device(&lhs)).bool_dtype;
-//         SplitBackend::<B>::complex_equal(lhs, rhs, out_dtype)
-//     }
+        // Calculate output shape and check for empty slices
+        let mut output_dims = shape.clone();
+        for (dim, slice) in slices.iter().enumerate() {
+            output_dims[dim] = slice.output_size(shape[dim]);
+        }
 
-//     fn not_equal(lhs: Self, rhs: Self) -> B::BoolTensorPrimitive {
-//         let out_dtype = get_device_settings::<B>(&SplitBackend::<B>::complex_device(&lhs)).bool_dtype;
-//         SplitBackend::<B>::complex_not_equal(lhs, rhs, out_dtype)
-//     }
+        // Return empty tensor if any dimension is 0 (empty slice)
+        if output_dims.contains(&0) {
+            return Self::zeros(output_dims, &self.device(), self.dtype());
+        }
+        SplitBackend::<B>::complex_slice(self, &slices)
+    }
 
-//     fn cat(tensors: Vec<Self>, dim: usize) -> Self {
-//         SplitBackend::<B>::complex_cat(tensors, dim)
-//     }
+    
 
-//     fn any(tensor: Self) -> B::BoolTensorPrimitive {
-//         let out_dtype = get_device_settings::<B>(&SplitBackend::<B>::complex_device(&tensor)).bool_dtype;
-//         SplitBackend::<B>::complex_any(tensor, out_dtype)
-//     }
+    pub fn to_device(self, device: &B::Device) -> Self {
+        SplitBackend::<B>::complex_to_device(self, device)
+    }
 
-//     fn any_dim(tensor: Self, dim: usize) -> B::BoolTensorPrimitive {
-//         let out_dtype = get_device_settings::<B>(&SplitBackend::<B>::complex_device(&tensor)).bool_dtype;
-//         SplitBackend::<B>::complex_any_dim(tensor, dim, out_dtype)
-//     }
+     pub async fn into_data_async(self) -> Result<TensorData, ExecutionError> {
+        SplitBackend::<B>::complex_into_interleaved_data(self).await
+    }
 
-//     fn all(tensor: Self) -> B::BoolTensorPrimitive {
-//         let out_dtype = get_device_settings::<B>(&SplitBackend::<B>::complex_device(&tensor)).bool_dtype;
-//         SplitBackend::<B>::complex_all(tensor, out_dtype)
-//     }
+    pub fn from_data<T>(data: T, options: impl Into<TensorCreationOptions<B>>) -> Self
+    where
+        T: Into<TensorData>,
+    {
+        let data = data.into();
+        let opt = options.into();
+        SplitBackend::<B>::complex_from_interleaved_data(
+            data.convert::<<SplitBackend<B> as ComplexTensorBackend>::ComplexScalar>(),
+            &opt.device,
+        )
+    }
 
-//     fn all_dim(tensor: Self, dim: usize) -> B::BoolTensorPrimitive {
-//         let out_dtype = get_device_settings::<B>(&SplitBackend::<B>::complex_device(&tensor)).bool_dtype;
-//         SplitBackend::<B>::complex_all_dim(tensor, dim, out_dtype)
-//     }
+    pub fn repeat_dim(self, dim: usize, times: usize) -> Self {
+        SplitBackend::<B>::complex_repeat_dim(self, dim, times)
+    }
+    pub fn equal(self, rhs: Self) -> B::BoolTensorPrimitive {
+        let out_dtype =
+            get_device_settings::<B>(&SplitBackend::<B>::complex_device(&self)).bool_dtype;
+        SplitBackend::<B>::complex_equal(self, rhs, out_dtype)
+    }
 
-//     fn permute(tensor: Self, axes: &[usize]) -> Self {
-//         SplitBackend::<B>::complex_permute(tensor, axes)
-//     }
+    pub fn not_equal(self, rhs: Self) -> B::BoolTensorPrimitive {
+        let out_dtype =
+            get_device_settings::<B>(&SplitBackend::<B>::complex_device(&self)).bool_dtype;
+        SplitBackend::<B>::complex_not_equal(self, rhs, out_dtype)
+    }
 
-//     fn expand(tensor: Self, shape: Shape) -> Self {
-//         SplitBackend::<B>::complex_expand(tensor, shape)
-//     }
+    pub fn cat(tensors: Vec<Self>, dim: usize) -> Self {
+        SplitBackend::<B>::complex_cat(tensors, dim)
+    }
 
-//     fn flip(tensor: Self, axes: &[usize]) -> Self {
-//         SplitBackend::<B>::complex_flip(tensor, axes)
-//     }
+    pub fn any(self) -> B::BoolTensorPrimitive {
+        let out_dtype =
+            get_device_settings::<B>(&SplitBackend::<B>::complex_device(&self)).bool_dtype;
+        SplitBackend::<B>::complex_any(self, out_dtype)
+    }
 
-//     fn unfold(tensor: Self, dim: usize, size: usize, step: usize) -> Self {
-//         SplitBackend::<B>::complex_unfold(tensor, dim, size, step)
-//     }
+    pub fn any_dim(self, dim: usize) -> B::BoolTensorPrimitive {
+        let out_dtype =
+            get_device_settings::<B>(&SplitBackend::<B>::complex_device(&self)).bool_dtype;
+        SplitBackend::<B>::complex_any_dim(self, dim, out_dtype)
+    }
 
-//     fn slice_assign(
-//         tensor: Self,
-//         ranges: &[Slice],
-//         value: Self,
-//     ) -> Self {
-//         SplitBackend::<B>::complex_slice_assign(tensor, ranges, value)
-//     }
+    pub fn all(self) -> B::BoolTensorPrimitive {
+        let out_dtype =
+            get_device_settings::<B>(&SplitBackend::<B>::complex_device(&self)).bool_dtype;
+        SplitBackend::<B>::complex_all(self, out_dtype)
+    }
 
-//     fn select(
-//         tensor: Self,
-//         dim: usize,
-//         indices: B::IntTensorPrimitive,
-//     ) -> Self {
-//         // Uses your existing `select` name.
-//         SplitBackend::<B>::complex_select(tensor, dim, indices)
-//     }
+    pub fn all_dim(self, dim: usize) -> B::BoolTensorPrimitive {
+        let out_dtype =
+            get_device_settings::<B>(&SplitBackend::<B>::complex_device(&self)).bool_dtype;
+        SplitBackend::<B>::complex_all_dim(self, dim, out_dtype)
+    }
 
-//     fn select_assign(
-//         tensor: Self,
-//         dim: usize,
-//         indices: B::IntTensorPrimitive,
-//         values: Self,
-//         update: IndexingUpdateOp,
-//     ) -> Self {
-//         match update {
-//             IndexingUpdateOp::Add => SplitBackend::<B>::complex_select_add(tensor, dim, indices, values),
-//             _ => unimplemented!(),
-//         }
-//     }
+    pub fn permute(self, axes: &[usize]) -> Self {
+        SplitBackend::<B>::complex_permute(self, axes)
+    }
 
-//     fn zeros(shape: Shape, device: &B::Device, dtype: DType) -> Self {
-//         match dtype {
-//             DType::Complex32 | DType::Complex64 => SplitBackend::<B>::complex_zeros(shape, device),
-//             _ => panic!("Unsupported complex dtype"),
-//         }
-//     }
+    pub fn expand(self, shape: Shape) -> Self {
+        SplitBackend::<B>::complex_expand(self, shape)
+    }
 
-//     fn ones(shape: Shape, device: &B::Device, dtype: DType) -> Self {
-//         match dtype {
-//             DType::Complex32 | DType::Complex64 => SplitBackend::<B>::complex_ones(shape, device),
-//             _ => panic!("Unsupported complex dtype"),
-//         }
-//     }
+    pub fn flip(self, axes: &[usize]) -> Self {
+        SplitBackend::<B>::complex_flip(self, axes)
+    }
 
-//     fn mask_where(
-//         tensor: Self,
-//         mask: B::BoolTensorPrimitive,
-//         source: Self,
-//     ) -> Self {
-//         SplitBackend::<B>::complex_mask_where(tensor, mask, source)
-//     }
+    pub fn unfold(self, dim: usize, size: usize, step: usize) -> Self {
+        SplitBackend::<B>::complex_unfold(self, dim, size, step)
+    }
 
-//     fn mask_fill(
-//         tensor: Self,
-//         mask: B::BoolTensorPrimitive,
-//         value: burn_tensor::Scalar,
-//     ) -> Self {
-//         SplitBackend::<B>::complex_mask_fill(tensor, mask, value.elem())
-//     }
+    pub fn slice_assign<S>(self, slices: S, values: Self) -> Self  
+    where
+        S: SliceArg,
+    {
+        let shape = self.shape();
+        let slices = slices.into_slices(&shape);
 
-//     fn gather(
-//         dim: usize,
-//         tensor: Self,
-//         indices: B::IntTensorPrimitive,
-//     ) -> Self {
-//         SplitBackend::<B>::complex_gather(dim, tensor, indices)
-//     }
+        // Check if any slice produces 0 elements (empty assignment).
+        // Empty assignments are no-ops and would cause issues in backend implementations.
+        let is_empty_assignment = slices
+            .iter()
+            .enumerate()
+            .any(|(i, slice)| slice.output_size(shape[i]) == 0);
 
-//     fn scatter(
-//         dim: usize,
-//         tensor: Self,
-//         indices: B::IntTensorPrimitive,
-//         values: Self,
-//         update: burn_tensor::IndexingUpdateOp,
-//     ) -> Self {
-//         match update {
-//             IndexingUpdateOp::Add => SplitBackend::<B>::complex_scatter_add(dim, tensor, indices, values),
-//             _ => unimplemented!(),
-//         }
-//     }
+        if is_empty_assignment {
+            return self;
+        }
 
-//     fn equal_elem(
-//         lhs: Self,
-//         rhs: burn_tensor::Scalar,
-//     ) -> B::BoolTensorPrimitive {
-//         let out_dtype = get_device_settings::<B>(&SplitBackend::<B>::complex_device(&lhs)).bool_dtype;
-//         SplitBackend::<B>::complex_equal_elem(lhs, rhs.elem(), out_dtype)
-//     }
+        let values_shape = SplitBackend::<B>::complex_shape(&values);
+        for (i, slice) in slices.iter().enumerate().take(slices.len().min(shape.num_dims())) {
+            let range = slice.to_range(shape[i]);
+            assert!(
+                range.end <= shape[i],
+                "slice_assign: range ({}..{}) exceeds tensor size {} at dim {}",
+                range.start, range.end, shape[i], i,
+            );
+            let expected = range.end - range.start;
+            assert_eq!(
+                values_shape[i], expected,
+                "slice_assign: values shape {} does not match slice length {} at dim {}",
+                values_shape[i], expected, i,
+            );
+        }
 
-//     fn not_equal_elem(
-//         lhs: Self,
-//         rhs: burn_tensor::Scalar,
-//     ) -> B::BoolTensorPrimitive {
-//         let out_dtype = get_device_settings::<SplitBackend::<B>>(&SplitBackend::<B>::complex_device(&lhs)).bool_dtype;
-//         SplitBackend::<B>::complex_not_equal_elem(lhs, rhs.elem(), out_dtype)
-//     }
+        SplitBackend::<B>::complex_slice_assign(self, &slices, values)
+    }
 
-//     fn full(
-//         shape: Shape,
-//         fill_value: burn_tensor::Scalar,
-//         device: &SplitBackend::<B>::Device,
-//         dtype: DType,
-//     ) -> Self {
-//         // Enforce complex dtype for clarity (mirrors from_data_dtype below).
-//         if !dtype.is_complex() {
-//             panic!("Expected complex dtype, got {dtype:?}");
-//         }
-//         // `elem()` should yield something convertible to `B::ComplexElem`.
-//         SplitBackend::<B>::complex_full(shape, fill_value.elem(), device)
-//     }
 
-//     fn scatter_nd(
-//         data: Self,
-//         indices: B::IntTensorPrimitive,
-//         values: Self,
-//         reduction: IndexingUpdateOp,
-//     ) -> Self {
-//         SplitBackend::<B>::complex_scatter_nd(data, indices, values, reduction)
-//     }
+    pub fn zeros<S: Into<Shape>>(shape: S, options: impl Into<TensorCreationOptions<B>>) -> Self {
+        let options = options.into();
+        let shape = shape.into();
+        let device = options.device;
+        let dtype = options.resolve_dtype::<SplitBackend<B>>();
+        todo!()
+        match dtype {
+            DType::Complex32 | DType::Complex64 => SplitBackend::<B>::complex_zeros(shape, device),
+            _ => panic!("Unsupported complex dtype"),
+        }
+    }
 
-//     fn gather_nd(
-//         data: Self,
-//         indices: B::IntTensorPrimitive,
-//     ) -> Self {
-//         todo!()
-//     }
-// }
-// impl<B, F> Numeric<B> for SplitComplexTensor<F>
-// where
-//     B: ComplexTensorBackend<
-//         FloatTensorPrimitive = F,
-//         ComplexTensorPrimitive = SplitComplexTensor<F>,
-//     >,
-//     F: TensorMetadata,
-// {
-//     type IntTensor = burn_tensor::Int;
+    pub fn ones(shape: Shape, device: &B::Device, dtype: DType) -> Self {
+        match dtype {
+            DType::Complex32 | DType::Complex64 => SplitBackend::<B>::complex_ones(shape, device),
+            _ => panic!("Unsupported complex dtype"),
+        }
+    }
 
-//     fn add(lhs: Self, rhs: Self) -> Self {
-//         todo!()
-//     }
+    pub fn mask_where(self, mask: B::BoolTensorPrimitive, source: Self) -> Self {
+        SplitBackend::<B>::complex_mask_where(self, mask, source)
+    }
 
-//     fn add_scalar(lhs: Self, rhs: burn_tensor::Scalar) -> Self {
-//         todo!()
-//     }
+    pub fn mask_fill(self, mask: B::BoolTensorPrimitive, value: burn_tensor::Scalar) -> Self {
+        SplitBackend::<B>::complex_mask_fill(self, mask, value.elem())
+    }
 
-//     fn sub(lhs: Self, rhs: Self) -> Self {
-//         todo!()
-//     }
+    pub fn gather(self, dim: usize, indices: B::IntTensorPrimitive) -> Self {
+        SplitBackend::<B>::complex_gather(dim, self, indices)
+    }
 
-//     fn sub_scalar(lhs: Self, rhs: burn_tensor::Scalar) -> Self {
-//         todo!()
-//     }
+    pub fn scatter(
+        self,
+        dim: usize,
+        indices: B::IntTensorPrimitive,
+        values: Self,
+        update: burn_tensor::IndexingUpdateOp,
+    ) -> Self {
+        match update {
+            IndexingUpdateOp::Add => {
+                SplitBackend::<B>::complex_scatter_add(dim, self, indices, values)
+            }
+            _ => unimplemented!(),
+        }
+    }
 
-//     fn div(lhs: Self, rhs: Self) -> Self {
-//         todo!()
-//     }
+    pub fn equal_elem(self, rhs: burn_tensor::Scalar) -> B::BoolTensorPrimitive {
+        let out_dtype =
+            get_device_settings::<B>(&SplitBackend::<B>::complex_device(&self)).bool_dtype;
+        SplitBackend::<B>::complex_equal_elem(self, rhs.elem(), out_dtype)
+    }
 
-//     fn div_scalar(lhs: Self, rhs: burn_tensor::Scalar) -> Self {
-//         todo!()
-//     }
+    pub fn not_equal_elem(self, rhs: burn_tensor::Scalar) -> B::BoolTensorPrimitive {
+        let out_dtype =
+            get_device_settings::<SplitBackend<B>>(&SplitBackend::<B>::complex_device(&self))
+                .bool_dtype;
+        SplitBackend::<B>::complex_not_equal_elem(self, rhs.elem(), out_dtype)
+    }
 
-//     fn remainder(lhs: Self, rhs: Self) -> Self {
-//         todo!()
-//     }
+    pub fn full(
+        shape: Shape,
+        fill_value: burn_tensor::Scalar,
+        device: &Device<B>,
+        dtype: DType,
+    ) -> Self {
+        // Enforce complex dtype for clarity (mirrors from_data_dtype below).
+        if !dtype.is_complex() {
+            panic!("Expected complex dtype, got {dtype:?}");
+        }
+        // `elem()` should yield something convertible to `B::ComplexElem`.
+        SplitBackend::<B>::complex_full(shape, fill_value.elem(), device)
+    }
 
-//     fn remainder_scalar(lhs: Self, rhs: burn_tensor::Scalar) -> Self {
-//         todo!()
-//     }
+    pub fn scatter_nd(
+        self,
+        indices: B::IntTensorPrimitive,
+        values: Self,
+        reduction: IndexingUpdateOp,
+    ) -> Self {
+        SplitBackend::<B>::complex_scatter_nd(self, indices, values, reduction)
+    }
 
-//     fn mul(lhs: Self, rhs: Self) -> Self {
-//         todo!()
-//     }
+    pub fn gather_nd(self, indices: B::IntTensorPrimitive) -> Self {
+        todo!()
+    }
+}
+//impl<B, F> Numeric<B> for SplitComplexTensor<F>
+impl<B: Backend, F> SplitComplexTensor<B, F>
+where
+    B: BackendTypes<FloatTensorPrimitive = F>,
+    F: TensorMetadata + 'static,
+{
+    pub fn add(self, rhs: Self) -> Self {
+        SplitBackend::<B>::complex_add(self, rhs)
+    }
 
-//     fn mul_scalar(lhs: Self, rhs: burn_tensor::Scalar) -> Self {
-//         todo!()
-//     }
+    pub fn add_scalar(self, rhs: burn_tensor::Scalar) -> Self {
+        let device = SplitBackend::<B>::complex_device(&self);
+        let shape = SplitBackend::<B>::complex_shape(&self);
+        let scalar_complex = rhs.elem();
+        let scalar_tensor = SplitBackend::<B>::complex_full(shape, scalar_complex, &device);
+        SplitBackend::<B>::complex_add(self, scalar_tensor)
+    }
 
-//     fn neg(tensor: Self) -> Self {
-//         todo!()
-//     }
+    pub fn sub(self, rhs: Self) -> Self {
+        SplitBackend::<B>::complex_sub(self, rhs)
+    }
 
-//     fn sign(tensor: Self) -> Self {
-//         todo!()
-//     }
+    pub fn sub_scalar(self, rhs: burn_tensor::Scalar) -> Self {
+        let device = SplitBackend::<B>::complex_device(&self);
+        let shape = SplitBackend::<B>::complex_shape(&self);
+        let scalar_complex = rhs.elem();
+        let scalar_tensor = SplitBackend::<B>::complex_full(shape, scalar_complex, &device);
+        SplitBackend::<B>::complex_sub(self, scalar_tensor)
+    }
 
-//     fn sum(tensor: Self) -> Self {
-//         todo!()
-//     }
+    pub fn div(self, rhs: Self) -> Self {
+        SplitBackend::<B>::complex_div(self, rhs)
+    }
 
-//     fn sum_dim(tensor: Self, dim: usize) -> Self {
-//         todo!()
-//     }
+    pub fn div_scalar(self, rhs: burn_tensor::Scalar) -> Self {
+        let device = SplitBackend::<B>::complex_device(&self);
+        let shape = SplitBackend::<B>::complex_shape(&self);
+        let scalar_complex = rhs.elem();
+        let scalar_tensor = SplitBackend::<B>::complex_full(shape, scalar_complex, &device);
+        SplitBackend::<B>::complex_div(self, scalar_tensor)
+    }
 
-//     fn prod(tensor: Self) -> Self {
-//         todo!()
-//     }
+    pub fn remainder(self, rhs: Self) -> Self {
+        SplitBackend::<B>::complex_remainder(self, rhs)
+    }
 
-//     fn prod_dim(tensor: Self, dim: usize) -> Self {
-//         todo!()
-//     }
+    pub fn remainder_scalar(self, rhs: burn_tensor::Scalar) -> Self {
+        SplitBackend::<B>::complex_remainder_scalar(self, rhs.elem())
+    }
 
-//     fn mean(tensor: Self) -> Self {
-//         todo!()
-//     }
+    pub fn mul(self, rhs: Self) -> Self {
+        SplitBackend::<B>::complex_mul(self, rhs)
+    }
 
-//     fn mean_dim(tensor: Self, dim: usize) -> Self {
-//         todo!()
-//     }
+    pub fn mul_scalar(self, rhs: burn_tensor::Scalar) -> Self {
+        let device = SplitBackend::<B>::complex_device(&self);
+        let shape = SplitBackend::<B>::complex_shape(&self);
+        let scalar_complex = rhs.elem();
+        let scalar_tensor = SplitBackend::<B>::complex_full(shape, scalar_complex, &device);
+        SplitBackend::<B>::complex_mul(self, scalar_tensor)
+    }
 
-//     fn cumsum(tensor: Self, dim: usize) -> Self {
-//         todo!()
-//     }
+    pub fn neg(self) -> Self {
+        SplitBackend::<B>::complex_neg(self)
+    }
 
-//     fn cumprod(tensor: Self, dim: usize) -> Self {
-//         todo!()
-//     }
+    pub fn sign(self) -> Self {
+        SplitBackend::<B>::complex_sign(self)
+    }
 
-//     fn powi(lhs: Self, rhs: B::IntTensorPrimitive) -> Self {
-//         todo!()
-//     }
+    pub fn sum(self) -> Self {
+        SplitBackend::<B>::complex_sum(self)
+    }
 
-//     fn powi_scalar(lhs: Self, rhs: burn_tensor::Scalar) -> Self {
-//         todo!()
-//     }
+    pub fn sum_dim(self, dim: usize) -> Self {
+        SplitBackend::<B>::complex_sum_dim(self, dim)
+    }
 
-//     fn random(
-//         shape: burn_std::Shape,
-//         distribution: burn_tensor::Distribution,
-//         device: &B::Device,
-//         dtype: burn_std::DType,
-//     ) -> Self {
-//         todo!()
-//     }
+    pub fn prod(self) -> Self {
+        SplitBackend::<B>::complex_prod(self)
+    }
 
-//     fn matmul(lhs: Self, rhs: Self) -> Self {
-//         todo!()
-//     }
-// }
+    pub fn prod_dim(self, dim: usize) -> Self {
+        SplitBackend::<B>::complex_prod_dim(self, dim)
+    }
+
+    pub fn mean(self) -> Self {
+        SplitBackend::<B>::complex_mean(self)
+    }
+
+    pub fn mean_dim(self, dim: usize) -> Self {
+        SplitBackend::<B>::complex_mean_dim(self, dim)
+    }
+
+    pub fn cumsum(self, dim: usize) -> Self {
+        SplitBackend::<B>::complex_cumsum(self, dim)
+    }
+
+    pub fn cumprod(self, dim: usize) -> Self {
+        SplitBackend::<B>::complex_cumprod(self, dim)
+    }
+
+    pub fn powi(self, rhs: B::IntTensorPrimitive) -> Self {
+        SplitBackend::<B>::complex_powi(self, rhs)
+    }
+
+    pub fn powi_scalar(self, rhs: burn_tensor::Scalar) -> Self {
+        SplitBackend::<B>::complex_powi_scalar(self, rhs)
+    }
+
+    pub fn random(
+        shape: burn_std::Shape,
+        distribution: burn_tensor::Distribution,
+        device: &B::Device,
+        dtype: burn_std::DType,
+    ) -> Self {
+        SplitBackend::<B>::complex_random(
+            shape,
+            distribution,
+            device,
+            burn_std::FloatDType::from(crate::utils::complex_to_real_dtype(dtype)),
+        )
+    }
+
+
+    /// Converts the data of the current tensor.
+    ///
+    /// # Note
+    ///
+    /// For better performance, prefer using a [Transaction](crate::Transaction) when reading multiple
+    /// tensors at once. This may improve laziness, especially if executed on a different
+    /// thread in native environments.
+    pub fn into_data(self) -> TensorData {
+        self.try_into_data().expect(
+            "Error while reading data: use `try_into_data` instead to catch the error at runtime",
+        )
+    }
+    /// Converts the data of the current tensor and returns any error that might have occurred since the
+    /// last time the device was synchronized.
+    ///
+    /// # Note
+    ///
+    /// For better performance, prefer using a [Transaction](crate::Transaction) when reading multiple
+    /// tensors at once. This may improve laziness, especially if executed on a different
+    /// thread in native environments.
+    pub fn try_into_data(self) -> Result<TensorData, ExecutionError> {
+        try_read_sync(self.into_data_async()).expect(
+            "Failed to read tensor data synchronously.
+        This can happen on platforms that don't support blocking futures like WASM.
+        If possible, try using into_data_async instead.",
+        )
+    }
+
+    /// Converts the data of the current tensor.
+    ///
+    /// # Note
+    ///
+    /// For better performance, prefer using a [Transaction](crate::Transaction) when reading multiple
+    /// tensors at once. This may improve laziness, especially if executed on a different
+    /// thread in native environments.
+    pub fn to_data(&self) -> TensorData {
+        self.clone().into_data()
+    }
+
+    pub fn matmul(self, rhs: Self) -> Self {
+        SplitBackend::<B>::complex_matmul(self, rhs)
+    }
+}
+
+// ComplexOnlyOps
+impl<B, F> SplitComplexTensor<B, F>
+where
+    B: Backend,
+    B: BackendTypes<FloatTensorPrimitive = F>,
+    F: TensorMetadata + 'static,
+{
+    pub fn conj(self) -> Self {
+        SplitBackend::<B>::conj(self)
+    }
+
+    pub fn phase(self) -> F {
+        SplitBackend::<B>::complex_arg(self)
+    }
+
+    pub fn magnitude(self) -> F {
+        SplitBackend::<B>::abs(self)
+    }
+
+    pub fn from_parts<T: Into<TensorData>>(real: T, imag: T) -> Self {
+        SplitBackend::<B>::complex_from_parts(real.into(), imag.into())
+    }
+
+    pub fn from_interleaved_data(data: TensorData, device: &B::Device) -> Self {
+        SplitBackend::<B>::complex_from_interleaved_data(data, device)
+    }
+
+    pub fn from_polar(magnitude: F, phase: F) -> Self {
+        SplitBackend::<B>::complex_from_polar(magnitude, phase)
+    }
+}

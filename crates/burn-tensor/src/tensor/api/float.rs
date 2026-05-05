@@ -18,7 +18,7 @@ use burn_backend::TensorMetadata;
 #[cfg(feature = "distributed")]
 use burn_backend::distributed::DistributedParamId;
 use burn_backend::get_device_settings;
-use burn_backend::tensor::FloatMathOps;
+pub use burn_backend::tensor::FloatMathOps;
 use burn_backend::tensor::quantization::QuantizationParametersPrimitive;
 use core::f32;
 

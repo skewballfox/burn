@@ -72,7 +72,7 @@ impl<B: Backend> TensorCreationOptions<B> {
     }
 
     /// Returns the tensor data type, or the default from the [device settings](crate::set_default_dtypes).
-    pub(crate) fn resolve_dtype<K: BasicOps<B>>(&self) -> DType {
+    pub fn resolve_dtype<K: BasicOps<B>>(&self) -> DType {
         let dtype = K::Elem::dtype();
         let kind_name = K::name();
         // TODO: tensor kind enum?
