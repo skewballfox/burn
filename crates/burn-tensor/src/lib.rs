@@ -38,8 +38,11 @@ extern crate derive_new;
 extern crate alloc;
 
 mod bridge;
+
+mod split;
 mod tensor;
 
+pub use split::*;
 pub(crate) use tensor::check::macros::check;
 pub use tensor::*;
 

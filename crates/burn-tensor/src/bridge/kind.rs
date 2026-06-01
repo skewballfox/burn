@@ -80,6 +80,30 @@ impl Kind {
     }
 }
 
+#[allow(dead_code)]
+/// A type-level representation of a compound tensor kind
+/// Metadata access is lazy.
+pub trait CompoundTensorKind {
+    type Inner: TensorKind;
+    const COMPONENTS: usize;
+    type ComponentsArray: AsRef<[BridgeTensor]> + AsMut<[BridgeTensor]> + Clone;
+    const INNER_KIND_ID: Kind;
+    fn inner_name() -> &'static str {
+        Self::INNER_KIND_ID.as_str()
+    }
+}
+impl CompoundTensorKind for Complex {
+    type Inner = Float;
+    type ComponentsArray = [BridgeTensor; Self::COMPONENTS];
+    const INNER_KIND_ID: Kind = Kind::Float;
+
+    fn inner_name() -> &'static str {
+        Self::INNER_KIND_ID.as_str()
+    }
+
+    const COMPONENTS: usize = 2;
+}
+
 /// A type-tagged tensor at the bridge layer between the high-level tensor API
 /// and the dispatch system.
 ///
