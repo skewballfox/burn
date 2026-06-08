@@ -23,7 +23,7 @@ tracing = [
 ]
 
 [dependencies]
-burn-backend = { workspace = true }
+burn-backend = { workspace = true, features = ["tch"] }
 
 libc = { workspace = true }
 log = { workspace = true }

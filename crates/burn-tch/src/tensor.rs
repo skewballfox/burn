@@ -1,5 +1,7 @@
 use crate::{LibTorchDevice, TchElement};
-use burn_backend::{BoolStore, DType, FloatDType, IntDType, Shape, TensorData, TensorMetadata};
+use burn_backend::{
+    BoolStore, ComplexDType, DType, FloatDType, IntDType, Shape, TensorData, TensorMetadata,
+};
 use libc::c_void;
 use std::sync::Arc;
 
@@ -121,6 +123,13 @@ impl IntoKind for FloatDType {
     }
 }
 
+impl IntoKind for ComplexDType {
+    fn try_into_kind(self) -> Result<tch::Kind, tch::TchError> {
+        let dtype: DType = self.into();
+        dtype.try_into_kind()
+    }
+}
+
 impl IntoKind for DType {
     fn try_into_kind(self) -> Result<tch::Kind, tch::TchError> {
         match self {
@@ -136,6 +145,8 @@ impl IntoKind for DType {
             // DType::I8 => Ok(tch::Kind::Int8),
             // DType::U8 => Ok(tch::Kind::Uint8),
             DType::Bool(BoolStore::Native) => Ok(tch::Kind::Bool),
+            DType::Complex32 => Ok(tch::Kind::ComplexFloat),
+            DType::Complex64 => Ok(tch::Kind::ComplexDouble),
             other => Err(tch::TchError::Kind(format!("Unsupported dtype {other:?}"))),
         }
     }

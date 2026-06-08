@@ -1,5 +1,5 @@
-use burn_backend::Element;
 use burn_backend::element::ElementComparison;
+use burn_backend::{ComplexScalar, Element};
 
 use burn_backend::{bf16, f16};
 
@@ -29,6 +29,9 @@ impl TchElement for bf16 {
         kind
     }
 }
+
+impl TchElement for ComplexScalar<f32> {}
+impl TchElement for ComplexScalar<f64> {}
 impl FloatTchElement for bf16 {}
 
 impl TchElement for i64 {}
