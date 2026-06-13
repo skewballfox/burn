@@ -178,8 +178,6 @@ pub trait AutodiffBackend: Backend {
     /// The inner backend type.
     type InnerBackend: Backend<Device = Self::Device>;
 
-    /// Gradients type.
-    type Gradients: Send;
 
     /// Backward pass.
     ///
@@ -190,8 +188,7 @@ pub trait AutodiffBackend: Backend {
     /// # Returns
     ///
     /// The gradients.
-    fn backward(tensor: FloatTensor<Self>) -> Self::Gradients;
-
+    fn backward<T: AutodiffTensor>(tensor: T) -> T::Gradients;
     /// Returns the gradients of a tensor.
     ///
     /// # Arguments
@@ -201,10 +198,10 @@ pub trait AutodiffBackend: Backend {
     /// # Returns
     ///
     /// An optional tensor containing the gradient.
-    fn grad(
-        tensor: &FloatTensor<Self>,
-        grads: &Self::Gradients,
-    ) -> Option<FloatTensor<Self::InnerBackend>>;
+    fn grad<T: AutodiffTensor>(
+        tensor: &T,
+        grads: &T::Gradients,
+    ) -> Option<T::Primitive>;
 
     /// Pops the gradients of a tensor and returns them.
     ///
@@ -216,10 +213,10 @@ pub trait AutodiffBackend: Backend {
     /// # Returns
     ///
     /// An optional tensor containing the given gradients.
-    fn grad_remove(
-        tensor: &FloatTensor<Self>,
-        grads: &mut Self::Gradients,
-    ) -> Option<FloatTensor<Self::InnerBackend>>;
+    fn grad_remove<T: AutodiffTensor>(
+        tensor: &T,
+        grads: &mut T::Gradients,
+    ) -> Option<T::Primitive>;
 
     /// Replace the gradients of a tensor with the one provided.
     ///
@@ -230,10 +227,10 @@ pub trait AutodiffBackend: Backend {
     /// * `tensor` - The tensor to pop the gradients from.
     /// * `grads` - The gradients.
     /// * `grad` - The updated grad tensor.
-    fn grad_replace(
-        tensor: &FloatTensor<Self>,
-        grads: &mut Self::Gradients,
-        grad: FloatTensor<Self::InnerBackend>,
+    fn grad_replace<T: AutodiffTensor>(
+        tensor: &T,
+        grads: &mut T::Gradients,
+        grad: T::Primitive,
     );
 
     /// Returns the tensor with inner backend type.
@@ -245,7 +242,9 @@ pub trait AutodiffBackend: Backend {
     /// # Returns
     ///
     /// The inner backend tensor.
-    fn inner(tensor: FloatTensor<Self>) -> FloatTensor<Self::InnerBackend>;
+    fn inner<T: AutodiffTensor>(tensor: T) -> T::Primitive {
+        tensor.inner()
+    }
 
     /// Returns the tensor with inner backend type.
     ///
@@ -290,7 +289,9 @@ pub trait AutodiffBackend: Backend {
     /// # Returns
     ///
     /// The autodiff backend tensor.
-    fn from_inner(tensor: FloatTensor<Self::InnerBackend>) -> FloatTensor<Self>;
+    fn from_inner<T: AutodiffTensor>(tensor: T::Primitive) -> T {
+        T::from_inner(tensor)
+    }
 
     /// Converts the inner backend tensor to the autodiff backend tensor.
     ///
@@ -353,6 +354,16 @@ pub trait AutodiffBackend: Backend {
     }
 }
 
+pub trait AutodiffTensor: TensorMetadata {
+    type Primitive: TensorMetadata;
+    type Gradients: Send;
+    fn backward(self) -> Self::Gradients;
+    fn grad(&self, grads: &Self::Gradients) -> Option<Self::Primitive>;
+    fn inner(self) -> Self::Primitive;
+    fn from_inner(tensor: Self::Primitive) -> Self;
+    fn grad_remove(&self, grads: &mut Self::Gradients) -> Option<Self::Primitive>;
+    fn grad_replace(&self, grads: &mut Self::Gradients, grad: Self::Primitive);
+}
 /// Describes how a data type can be used on a given device.
 ///
 /// A data type may be supported for different classes of operations. Not all

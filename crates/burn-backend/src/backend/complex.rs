@@ -39,12 +39,7 @@ pub trait ComplexTensorBackend: ComplexTensorOps<Self> + Sized + BackendTypes {
     ///
     /// Must share all primitive types and device with `Self` so that operations
     /// can delegate directly without any type-level conversion.
-    type InnerBackend: Backend<
-            Device = Self::Device,
-            FloatTensorPrimitive = Self::FloatTensorPrimitive,
-            IntTensorPrimitive = Self::IntTensorPrimitive,
-            BoolTensorPrimitive = Self::BoolTensorPrimitive,
-        >;
+    type InnerBackend: Backend;
 
     /// Creates a complex tensor from real-valued data, padding the imaginary part with zeros.
     ///

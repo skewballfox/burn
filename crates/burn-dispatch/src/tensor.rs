@@ -4,14 +4,15 @@ use crate::backends::*;
 use burn_autodiff::checkpoint::strategy::{
     BalancedCheckpointing, CheckpointStrategy, NoCheckpointing,
 };
-use burn_backend::{Backend, ComplexTensorBackend, DType, Shape, TensorMetadata};
+use burn_autodiff::AutodiffTensorTrait as _;
+use burn_backend::{AutodiffTensor, Backend, BackendTypes, ComplexTensorBackend, DType, Shape, TensorMetadata};
 
 
 use crate::CheckpointingStrategy;
 #[cfg(feature = "autodiff")]
 use alloc::boxed::Box;
 #[cfg(feature = "autodiff")]
-use burn_backend::tensor::FloatTensor;
+use burn_backend::tensor::{ComplexTensor, FloatTensor};
 
 use alloc::{format, string::String};
 
@@ -20,7 +21,7 @@ use alloc::{format, string::String};
 
 /// Tensor which points to a backend tensor primitive kind.
 #[derive(Clone, Debug)]
-pub enum BackendTensor<B: Backend> {
+pub enum BackendTensor<B: BackendTypes> {
     /// Float tensor handle.
     Float(B::FloatTensorPrimitive),
     /// Int tensor handle.
@@ -38,6 +39,23 @@ pub enum BackendTensor<B: Backend> {
     //#[cfg(feature = "complex")]
     /// Complex tensor handle.
     Complex(B::ComplexTensorPrimitive),
+}
+
+impl<B: BackendTypes> BackendTensor<B> {
+    /// Returns the tensor primitive kind name.
+    pub fn name(&self) -> &'static str {
+        match self {
+            BackendTensor::Float(_) => "Float",
+            BackendTensor::Int(_) => "Int",
+            BackendTensor::Bool(_) => "Bool",
+            BackendTensor::Quantized(_) => "Quantized",
+            #[cfg(feature = "autodiff")]
+            BackendTensor::Autodiff(_) => "Autodiff",
+            #[cfg(feature = "autodiff")]
+            BackendTensor::AutodiffComplex(_) => "AutodiffComplex",
+            BackendTensor::Complex(_) => "Complex",
+        }
+    }
 }
 
 impl<B: Backend + ComplexTensorBackend> BackendTensor<B> {
@@ -185,18 +203,6 @@ impl<B: Backend + ComplexTensorBackend> BackendTensor<B> {
             BackendTensor::Complex(tensor) => B::complex_device(tensor),
         }
     }
-
-    /// Returns the tensor primitive kind name.
-    pub fn name(&self) -> &'static str {
-        match self {
-            BackendTensor::Float(_) => "Float",
-            BackendTensor::Int(_) => "Int",
-            BackendTensor::Bool(_) => "Bool",
-            BackendTensor::Quantized(_) => "Quantized",
-            #[cfg(feature = "autodiff")]
-            BackendTensor::Autodiff(_) => "Autodiff",
-        }
-    }
 }
 
 impl<B: Backend> TensorMetadata for BackendTensor<B> {
@@ -210,7 +216,6 @@ impl<B: Backend> TensorMetadata for BackendTensor<B> {
             BackendTensor::Autodiff(tensor) => tensor.dtype(),
             #[cfg(feature = "autodiff")]
             BackendTensor::AutodiffComplex(tensor) => tensor.dtype(),
-            //#[cfg(feature = "complex")]
             BackendTensor::Complex(tensor) => tensor.dtype(),
         }
     }
@@ -225,11 +230,12 @@ impl<B: Backend> TensorMetadata for BackendTensor<B> {
             BackendTensor::Autodiff(tensor) => tensor.shape(),
             #[cfg(feature = "autodiff")]
             BackendTensor::AutodiffComplex(tensor) => tensor.shape(),
-            //#[cfg(feature = "complex")]
             BackendTensor::Complex(tensor) => tensor.shape(),
         }
     }
 }
+
+
 
 /// A tensor that can dispatch operations to any enabled backend at runtime.
 ///
@@ -503,6 +509,13 @@ macro_rules! impl_dispatch_conversion {
                         // Re-apply the outer Autodiff dispatch wrapper
                         DispatchTensorKind::Autodiff(Box::new(inner_dispatch))
                     }
+                    BackendTensor::Complex(t) => {
+                        let ad_tensor = BackendTensor::AutodiffComplex(t);
+                        // Wrap in the concrete backend's dispatch container
+                        let inner_dispatch = DispatchTensorKind::$backend(ad_tensor);
+                        // Re-apply the outer Autodiff dispatch wrapper
+                        DispatchTensorKind::Autodiff(Box::new(inner_dispatch))
+                    }
 
                     // Pass-throughs for non-differentiable types
                     BackendTensor::Int(t) => DispatchTensorKind::$backend(BackendTensor::Int(t)),
@@ -513,6 +526,9 @@ macro_rules! impl_dispatch_conversion {
 
                     BackendTensor::Autodiff(_) => {
                         panic!("Unexpected Autodiff variant provided to `from_backend`",)
+                    }
+                    BackendTensor::AutodiffComplex(_) => {
+                        panic!("Unexpected AutodiffComplex variant provided to `from_backend`",)
                     }
                 };
 

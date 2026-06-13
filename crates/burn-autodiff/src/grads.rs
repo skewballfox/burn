@@ -5,7 +5,7 @@ use burn_std::tensor::container::TensorContainer;
 use crate::{
     NodeId,
     graph::{NodeRef, Requirement},
-    tensor::AutodiffTensor,
+    tensor::{AutodiffTensor, AutodiffTensorTrait},
 };
 
 #[cfg(feature = "distributed")]
@@ -51,27 +51,23 @@ pub struct Gradients {
 
 impl Gradients {
     /// Creates a new gradients container.
-    pub fn new<B: Backend>(root_node: NodeRef, root_tensor: FloatTensor<B>) -> Self {
-        Self::new_with_hook::<B>(root_node, root_tensor, None)
+    pub fn new<T: AutodiffTensorTrait>(root_node: NodeRef, root_tensor: T::Primitive) -> Self {
+        Self::new_with_hook::<T>(root_node, root_tensor, None)
     }
 
     /// Creates a new gradients container.
-    fn new_with_hook<B: Backend>(
+    fn new_with_hook<T: AutodiffTensorTrait>(
         root_node: NodeRef,
-        root_tensor: FloatTensor<B>,
+        root_tensor: T::Primitive,
         on_register: Option<OnRegisterHook>,
     ) -> Self {
         let mut gradients = Self {
             container: TensorContainer::new(),
             on_register,
         };
-        gradients.register::<B>(
+        gradients.register::<T>(
             root_node.id,
-            B::float_ones(
-                root_tensor.shape(),
-                &B::float_device(&root_tensor),
-                root_tensor.dtype().into(),
-            ),
+            T::ones_like(&root_tensor),
         );
         gradients
     }
@@ -93,34 +89,34 @@ impl Gradients {
     ///
     /// Each tensor should be consumed exactly 1 time if its gradients are only required during the
     /// backward pass, otherwise, it may be consume multiple times.
-    pub fn consume<B: Backend>(&mut self, node: &NodeRef) -> FloatTensor<B> {
+    pub fn consume<T: AutodiffTensorTrait>(&mut self, node: &NodeRef) -> T::Primitive {
         match node.requirement {
             Requirement::Grad => self
                 .container
-                .get::<TensorPrimitive<B>>(&node.id.value)
-                .map(|tensor| tensor.tensor())
+                .get::<T::PrimitivePlaceholder>(&node.id.value)
+                .map(|tensor| T::placeholder_primitive(tensor))
                 .expect("Can't consume the gradients before they are registered at least once."),
             Requirement::GradInBackward => self
                 .container
-                .remove::<TensorPrimitive<B>>(&node.id.value)
-                .map(|tensor| tensor.tensor())
+                .remove::<T::PrimitivePlaceholder>(&node.id.value)
+                .map(|tensor| T::placeholder_primitive(tensor))
                 .expect("Can't consume the gradients before they are registered at least once."),
             Requirement::None => panic!("Trying to consume the gradients for an untracked tensor"),
         }
     }
 
     /// Removes a grad tensor from the container.
-    pub fn remove<B: Backend>(&mut self, tensor: &AutodiffTensor<B>) -> Option<FloatTensor<B>> {
+    pub fn remove< T: AutodiffTensorTrait>(&mut self, tensor: &T) -> Option<T::Primitive> {
         self.container
-            .remove::<TensorPrimitive<B>>(&tensor.node.id.value)
-            .map(|tensor| tensor.tensor())
+            .remove::<T::PrimitivePlaceholder>(&tensor.node().id.value)
+            .map(|tensor| T::placeholder_primitive(tensor))
     }
 
     /// Gets a grad tensor from the container.
-    pub fn get<B: Backend>(&self, tensor: &AutodiffTensor<B>) -> Option<FloatTensor<B>> {
+    pub fn get<T: AutodiffTensorTrait>(&self, tensor: &T) -> Option<T::Primitive> {
         self.container
-            .get::<TensorPrimitive<B>>(&tensor.node.id.value)
-            .map(|tensor| tensor.tensor())
+            .get::<T::PrimitivePlaceholder>(&tensor.node().id.value)
+            .map(|tensor| T::placeholder_primitive(tensor))
     }
 
     /// Register a grad tensor in the container.
@@ -128,16 +124,16 @@ impl Gradients {
     /// If the tensor already exists, add both tensors together before saving the result.
     ///
     /// If the registered tensor is distributed, launches a syncing operation on the gradients.
-    pub fn register<B: Backend>(&mut self, node_id: NodeId, value: FloatTensor<B>) {
+    pub fn register<T: AutodiffTensorTrait>(&mut self, node_id: NodeId, value: T::Primitive) {
         let out =
-            if let Some(tensor_old) = self.container.remove::<TensorPrimitive<B>>(&node_id.value) {
-                B::float_add(value, tensor_old.tensor())
+            if let Some(tensor_old) = self.container.remove::<T::PrimitivePlaceholder>(&node_id.value) {
+                T::add(value, T::placeholder_primitive(tensor_old))
             } else {
                 value
             };
 
         self.container
-            .register::<TensorPrimitive<B>>(node_id.value, TensorPrimitive::Float(out));
+            .register::<T::PrimitivePlaceholder>(node_id.value, T::primitive_to_placeholder(out));
 
         if let Some(hook) = &mut self.on_register {
             hook(&node_id, &mut self.container);

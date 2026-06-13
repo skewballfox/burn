@@ -9,6 +9,7 @@ use crate::{
     grads::Gradients,
     graph::NodeId,
     ops::{Backward, Ops, OpsKind, unary},
+    tensor::AutodiffTensor,
     retro_unary,
 };
 use burn_backend::{Backend, ops::ActivationOps, tensor::FloatTensor};
@@ -31,7 +32,7 @@ impl<B: Backend, C: CheckpointStrategy> ActivationOps<Autodiff<B, C>> for Autodi
             ) {
                 let input = checkpointer.retrieve_node_output(ops.state);
 
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     B::gelu_backward(input, grad)
                 });
             }
@@ -68,7 +69,7 @@ impl<B: Backend, C: CheckpointStrategy> ActivationOps<Autodiff<B, C>> for Autodi
                 checkpointer: &mut Checkpointer,
             ) {
                 let state = checkpointer.retrieve_node_output(ops.state);
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     B::relu_backward(state, grad)
                 });
             }
@@ -106,7 +107,7 @@ impl<B: Backend, C: CheckpointStrategy> ActivationOps<Autodiff<B, C>> for Autodi
             ) {
                 let input = checkpointer.retrieve_node_output(ops.state);
                 let output = B::sigmoid(input);
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     B::sigmoid_backward(output, grad)
                 });
             }
@@ -144,7 +145,7 @@ impl<B: Backend, C: CheckpointStrategy> ActivationOps<Autodiff<B, C>> for Autodi
             ) {
                 let input = checkpointer.retrieve_node_output(ops.state);
 
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     B::log_sigmoid_backward(input, grad)
                 });
             }

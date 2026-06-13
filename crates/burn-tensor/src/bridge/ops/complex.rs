@@ -1,8 +1,8 @@
 use alloc::vec::Vec;
-use burn_backend::ops::ComplexTensorOps;
+use burn_backend::ops::{ComplexTensorOps, IntTensorOps};
 use burn_backend::{ComplexTensorBackend, Distribution, Scalar, TensorData, TensorMetadata};
 use burn_dispatch::Dispatch;
-use burn_std::{DType, ExecutionError, IndexingUpdateOp, Shape, Slice};
+use burn_std::{DType, ExecutionError, FloatDType, IndexingUpdateOp, Shape, Slice};
 
 use crate::Device;
 use crate::bridge::{BasicOps, Numeric};
@@ -585,7 +585,10 @@ impl Numeric for Complex {
     }
 
     fn powi(lhs: BridgeTensor, rhs: BridgeTensor) -> BridgeTensor {
-        BridgeTensor::complex(Dispatch::complex_powi(lhs.into_complex(), rhs.into()))
+        BridgeTensor::complex(Dispatch::complex_powi(
+            lhs.into_complex(),
+            rhs.into_complex(),
+        ))
     }
 
     fn powi_scalar(lhs: BridgeTensor, rhs: Scalar) -> BridgeTensor {

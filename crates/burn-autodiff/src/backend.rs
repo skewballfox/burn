@@ -1,16 +1,20 @@
+#[cfg(not(feature = "distributed"))]
+use crate::tensor::AutodiffTensorTrait;
 use crate::{
     checkpoint::strategy::{CheckpointStrategy, NoCheckpointing},
     grads::Gradients,
-    tensor::AutodiffTensor,
+    tensor::{AutodiffTensor, ComplexAutodiffTensor},
 };
 use alloc::{format, string::String};
 use core::marker::PhantomData;
 
 use burn_backend::{
     UnimplementedTensorPrimitive,
-    backend::{AutodiffBackend, Backend, BackendTypes, ExecutionError},
+    backend::{AutodiffBackend, Backend, BackendTypes, ExecutionError, AutodiffTensor as BackendAutodiffTensor},
     tensor::{BoolTensor, IntTensor, QuantizedTensor},
 };
+
+
 
 #[cfg(feature = "distributed")]
 use burn_backend::distributed::{DistributedBackend, DistributedParamId, DistributedParams};
@@ -25,7 +29,7 @@ pub struct Autodiff<B, C = NoCheckpointing> {
     _checkpoint_strategy: PhantomData<C>,
 }
 
-impl<B: Backend, C: CheckpointStrategy> BackendTypes for Autodiff<B, C> {
+impl<B: BackendTypes, C: CheckpointStrategy> BackendTypes for Autodiff<B, C> {
     type Device = B::Device;
 
     type FloatTensorPrimitive = AutodiffTensor<B>;
@@ -36,7 +40,7 @@ impl<B: Backend, C: CheckpointStrategy> BackendTypes for Autodiff<B, C> {
 
     type QuantizedTensorPrimitive = B::QuantizedTensorPrimitive;
 
-    type ComplexTensorPrimitive = UnimplementedTensorPrimitive<B::ComplexTensorPrimitive>;
+    type ComplexTensorPrimitive = ComplexAutodiffTensor<B>;
 }
 
 impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
@@ -95,34 +99,26 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
 #[cfg(not(feature = "distributed"))]
 impl<B: Backend, C: CheckpointStrategy> AutodiffBackend for Autodiff<B, C> {
     type InnerBackend = B;
-    type Gradients = Gradients;
 
-    fn backward(tensor: AutodiffTensor<B>) -> Gradients {
+    fn backward<T: BackendAutodiffTensor>(tensor: T) -> T::Gradients {
         tensor.backward()
     }
 
-    fn grad(tensor: &AutodiffTensor<B>, grads: &Gradients) -> Option<B::FloatTensorPrimitive> {
+    fn grad<T: BackendAutodiffTensor>(tensor: &T, grads: &T::Gradients) -> Option<T::Primitive> {
         tensor.grad(grads)
     }
 
-    fn grad_remove(
-        tensor: &AutodiffTensor<B>,
-        grads: &mut Gradients,
-    ) -> Option<B::FloatTensorPrimitive> {
+    fn grad_remove<T: BackendAutodiffTensor>(
+        tensor: &T,
+        grads: &mut T::Gradients,
+    ) -> Option<T::Primitive> {
         tensor.grad_remove(grads)
     }
-    fn inner(tensor: AutodiffTensor<B>) -> B::FloatTensorPrimitive {
-        tensor.primitive
-    }
 
-    fn from_inner(tensor: B::FloatTensorPrimitive) -> AutodiffTensor<B> {
-        AutodiffTensor::new(tensor)
-    }
-
-    fn grad_replace(
-        tensor: &AutodiffTensor<B>,
-        grads: &mut Self::Gradients,
-        grad: B::FloatTensorPrimitive,
+    fn grad_replace<T: BackendAutodiffTensor>(
+        tensor: &T,
+        grads: &mut T::Gradients,
+        grad: T::Primitive,
     ) {
         tensor.grad_replace(grads, grad);
     }

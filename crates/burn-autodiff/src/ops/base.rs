@@ -8,7 +8,7 @@ use crate::{
     },
     grads::Gradients,
     graph::{ComputingProperty, NodeId, NodeRef, Parent, Requirement, Step},
-    tensor::AutodiffTensor,
+    tensor::{AutodiffTensor, AutodiffTensorTrait},
 };
 use alloc::boxed::Box;
 use burn_backend::{Backend, TensorMetadata, tensor::FloatTensor};

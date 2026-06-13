@@ -15,7 +15,7 @@ use crate::{
     graph::{ComputingProperty, NodeId, NodeRef, Parent, Requirement, Step},
     ops::{Backward, Ops, OpsKind, binary, broadcast_shape, unary},
     retro_binary, retro_unary, retro_unary_scalar,
-    tensor::AutodiffTensor,
+    tensor::{AutodiffTensor, AutodiffTensorTrait},
     utils::duplicate,
 };
 
@@ -114,7 +114,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 grads: &mut Gradients,
                 _checkpointer: &mut Checkpointer,
             ) {
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     B::float_to_device(grad, &ops.state)
                 });
             }
@@ -154,7 +154,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
             ) {
                 let (shape_lhs, shape_rhs) = ops.state;
 
-                binary::<B, _, _>(
+                binary::<AutodiffTensor<B>, _, _>(
                     ops.parents,
                     ops.node,
                     grads,
@@ -194,7 +194,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 grads: &mut Gradients,
                 _checkpointer: &mut Checkpointer,
             ) {
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| grad);
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| grad);
             }
         }
 
@@ -223,7 +223,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
             ) {
                 let (shape_lhs, shape_rhs) = ops.state;
 
-                binary::<B, _, _>(
+                binary::<AutodiffTensor<B>, _, _>(
                     ops.parents,
                     ops.node,
                     grads,
@@ -263,7 +263,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 grads: &mut Gradients,
                 _checkpointer: &mut Checkpointer,
             ) {
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| grad);
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| grad);
             }
         }
 
@@ -294,7 +294,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 let lhs = lhs.map(|lhs| checkpointer.retrieve_node_output(lhs));
                 let rhs = rhs.map(|rhs| checkpointer.retrieve_node_output(rhs));
 
-                binary::<B, _, _>(
+                binary::<AutodiffTensor<B>, _, _>(
                     ops.parents,
                     ops.node,
                     grads,
@@ -349,7 +349,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 grads: &mut Gradients,
                 _checkpointer: &mut Checkpointer,
             ) {
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     B::float_mul_scalar(grad, ops.state)
                 });
             }
@@ -387,7 +387,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 let rhs = rhs.map(|rhs| checkpointer.retrieve_node_output(rhs));
                 let [rhs_4lhs, rhs_4rhs] = duplicate(&ops.parents, rhs);
 
-                binary::<B, _, _>(
+                binary::<AutodiffTensor<B>, _, _>(
                     ops.parents,
                     ops.node,
                     grads,
@@ -450,7 +450,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 grads: &mut Gradients,
                 _checkpointer: &mut Checkpointer,
             ) {
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     let tmp = 1.0 / ops.state.elem::<f32>();
                     B::float_mul_scalar(grad, tmp.into())
                 });
@@ -488,7 +488,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 let lhs = lhs.map(|lhs| checkpointer.retrieve_node_output(lhs));
                 let rhs = rhs.map(|rhs| checkpointer.retrieve_node_output(rhs));
 
-                binary::<B, _, _>(
+                binary::<AutodiffTensor<B>, _, _>(
                     ops.parents,
                     ops.node,
                     grads,
@@ -550,7 +550,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 grads: &mut Gradients,
                 _checkpointer: &mut Checkpointer,
             ) {
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| grad);
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| grad);
             }
         }
 
@@ -579,7 +579,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 let lhs = lhs.map(|lhs| checkpointer.retrieve_node_output(lhs));
                 let rhs = rhs.map(|rhs| checkpointer.retrieve_node_output(rhs));
 
-                binary::<B, _, _>(
+                binary::<AutodiffTensor<B>, _, _>(
                     ops.parents,
                     ops.node,
                     grads,
@@ -641,7 +641,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 let lhs = lhs_id.map(|id| checkpointer.retrieve_node_output(id));
                 let rhs = rhs_id.map(|id| checkpointer.retrieve_node_output(id));
 
-                binary::<B, _, _>(
+                binary::<AutodiffTensor<B>, _, _>(
                     ops.parents,
                     ops.node,
                     grads,
@@ -688,7 +688,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 grads: &mut Gradients,
                 _checkpointer: &mut Checkpointer,
             ) {
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| B::float_neg(grad));
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| B::float_neg(grad));
             }
         }
 
@@ -715,7 +715,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 checkpointer: &mut Checkpointer,
             ) {
                 let tensor = checkpointer.retrieve_node_output(ops.state);
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     let tmp = B::float_powi_scalar(tensor, (-2).into());
                     let value = B::float_neg(tmp);
 
@@ -770,7 +770,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
             ) {
                 let (dim1, dim2) = ops.state;
 
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     B::float_swap_dims(grad, dim2, dim1)
                 });
             }
@@ -828,7 +828,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                     .enumerate()
                     .for_each(|(i, &axis)| inverse[axis] = i);
 
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     B::float_permute(grad, &inverse)
                 });
             }
@@ -878,7 +878,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
             ) {
                 let axes = ops.state;
 
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     B::float_flip(grad, &axes)
                 });
             }
@@ -929,7 +929,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 let (shape_original, shape) = ops.state;
                 let ndims_out = shape.num_dims();
 
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     let shape_grad = grad.shape();
                     let mut grad = grad;
 
@@ -978,7 +978,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
             ) {
                 let (dim, indices, shape, device) = ops.state;
 
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     let zeros = B::float_zeros(shape, &device, grad.dtype().into());
                     B::float_scatter_add(dim, zeros, indices, grad)
                 });
@@ -1026,7 +1026,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 let (dim, indices) = ops.state;
                 let [_, indices_4rhs] = duplicate(&ops.parents, Some(indices));
 
-                binary::<B, _, _>(
+                binary::<AutodiffTensor<B>, _, _>(
                     ops.parents,
                     ops.node,
                     grads,
@@ -1079,7 +1079,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                         let indices = ops.state;
                         let [_, indices_4rhs] = duplicate(&ops.parents, Some(indices));
 
-                        binary::<B, _, _>(
+                        binary::<AutodiffTensor<B>, _, _>(
                             ops.parents,
                             ops.node,
                             grads,
@@ -1127,7 +1127,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                         let (indices, values_shape, device) = ops.state;
                         let [indices_4lhs, indices_4rhs] = duplicate(&ops.parents, Some(indices));
 
-                        binary::<B, _, _>(
+                        binary::<AutodiffTensor<B>, _, _>(
                             ops.parents,
                             ops.node,
                             grads,
@@ -1193,7 +1193,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                         let (data_state, values_state, indices) = ops.state;
                         let [indices_4lhs, indices_4rhs] = duplicate(&ops.parents, Some(indices));
 
-                        binary::<B, _, _>(
+                        binary::<AutodiffTensor<B>, _, _>(
                             ops.parents,
                             ops.node,
                             grads,
@@ -1316,7 +1316,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                             IndexingUpdateOp::Assign,
                         );
 
-                        binary::<B, _, _>(
+                        binary::<AutodiffTensor<B>, _, _>(
                             ops.parents,
                             ops.node,
                             grads,
@@ -1371,7 +1371,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
             ) {
                 let (indices, data_shape, device) = ops.state;
 
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     let zeros = B::float_zeros(data_shape, &device, grad.dtype().into());
                     B::float_scatter_nd(
                         zeros,
@@ -1434,7 +1434,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
             ) {
                 let (dim, indices, shape, device) = ops.state;
 
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     let zeros = B::float_zeros(shape, &device, grad.dtype().into());
                     B::float_select_add(zeros, dim, indices, grad)
                 });
@@ -1500,7 +1500,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
             ) {
                 let (dim, indices) = ops.state;
 
-                binary::<B, _, _>(
+                binary::<AutodiffTensor<B>, _, _>(
                     ops.parents,
                     ops.node,
                     grads,
@@ -1565,7 +1565,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
             ) {
                 let (slices, shape, device) = ops.state;
 
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     let zeros = B::float_zeros(shape, &device, grad.dtype().into());
                     B::float_slice_assign(zeros, &slices, grad)
                 });
@@ -1628,7 +1628,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 let (slices, shape_rhs, device) = ops.state;
                 let [slices_4lhs, slices_4rhs] = duplicate(&ops.parents, Some(slices));
 
-                binary::<B, _, _>(
+                binary::<AutodiffTensor<B>, _, _>(
                     ops.parents,
                     ops.node,
                     grads,
@@ -1688,7 +1688,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 let (mask, shape_lhs, shape_rhs, device) = ops.state;
                 let [mask_4lhs, mask_4rhs] = duplicate(&ops.parents, Some(mask));
 
-                binary::<B, _, _>(
+                binary::<AutodiffTensor<B>, _, _>(
                     ops.parents,
                     ops.node,
                     grads,
@@ -1747,7 +1747,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 grads: &mut Gradients,
                 _checkpointer: &mut Checkpointer,
             ) {
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     B::float_mask_fill(grad, ops.state, 0f32.into())
                 });
             }
@@ -1901,7 +1901,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 grads: &mut Gradients,
                 _checkpointer: &mut Checkpointer,
             ) {
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     let shape = ops.state;
                     let val = 1_f64 / shape.num_elements() as f64;
                     let ones = B::float_ones(shape, &B::float_device(&grad), grad.dtype().into());
@@ -1934,7 +1934,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 grads: &mut Gradients,
                 _checkpointer: &mut Checkpointer,
             ) {
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     let val =
                         B::float_ones(ops.state, &B::float_device(&grad), grad.dtype().into());
 
@@ -1967,7 +1967,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
             ) {
                 let (shape, dim) = ops.state;
 
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     let val = 1_f64 / shape[dim] as f64;
                     let ones = B::float_ones(shape, &B::float_device(&grad), grad.dtype().into());
                     let val = B::float_mul_scalar(ones, val.into());
@@ -2006,7 +2006,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
             ) {
                 let (shape, dim) = ops.state;
 
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     let ones = B::float_ones(shape, &B::float_device(&grad), grad.dtype().into());
                     let grad = B::float_sum_dim(grad, dim);
 
@@ -2043,7 +2043,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
             ) {
                 let (_shape, dim) = ops.state;
 
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     // Gradient of cumsum is cumsum of gradient in reverse
                     let grad_reversed = B::float_flip(grad.clone(), &[dim]);
                     let grad_cumsum = B::float_cumsum(grad_reversed, dim);
@@ -2081,7 +2081,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 let (input, dim) = ops.state;
                 let output = B::float_cumprod(input.clone(), dim);
 
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     // Gradient of cumprod using negative step slicing
                     // Formula: grad_input[i] = sum_{j>=i}(grad_output[j] * output[j] / input[i])
                     //        = (1 / input[i]) * sum_{j>=i}(grad_output[j] * output[j])
@@ -2139,7 +2139,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 let (input, dim) = ops.state;
                 let output = B::float_cummin(input.clone(), dim);
 
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     // Gradient flows to the input positions that produced each output
                     // Use scatter to accumulate gradients (scatter does sum reduction)
 
@@ -2206,7 +2206,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 let (input, dim) = ops.state;
                 let output = B::float_cummax(input.clone(), dim);
 
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     // Gradient flows to the input positions that produced each output
                     // Use scatter to accumulate gradients (scatter does sum reduction)
 
@@ -2295,7 +2295,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
             ) {
                 let input = checkpointer.retrieve_node_output(ops.state);
                 let output = B::float_exp(input);
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     B::float_mul(grad, output)
                 });
             }
@@ -2332,7 +2332,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 checkpointer: &mut Checkpointer,
             ) {
                 let input = checkpointer.retrieve_node_output(ops.state);
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     let value = B::float_recip(input);
                     B::float_mul(grad, value)
                 });
@@ -2370,7 +2370,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 checkpointer: &mut Checkpointer,
             ) {
                 let input = checkpointer.retrieve_node_output(ops.state);
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     let value = B::float_add_scalar(input, 1f32.into());
                     let value = B::float_recip(value);
 
@@ -2425,7 +2425,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 let (tensor_id, value) = ops.state;
                 let tensor = checkpointer.retrieve_node_output(tensor_id);
 
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     let tmp = B::float_powf_scalar(tensor, (value - 1.).into());
                     let value = B::float_mul_scalar(tmp, value.into());
 
@@ -2465,7 +2465,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 checkpointer: &mut Checkpointer,
             ) {
                 let input = checkpointer.retrieve_node_output(ops.state);
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     let value = B::float_div_scalar(
                         B::float_powf_scalar(input, (-0.5).into()),
                         2f32.into(),
@@ -2508,7 +2508,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
             ) {
                 let tensor: B::FloatTensorPrimitive = checkpointer.retrieve_node_output(ops.state);
                 let state = B::float_sign(tensor);
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     B::float_mul(grad, state)
                 });
             }
@@ -2545,7 +2545,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 checkpointer: &mut Checkpointer,
             ) {
                 let input = checkpointer.retrieve_node_output(ops.state);
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     let value = B::float_neg(B::float_sin(input));
 
                     B::float_mul(grad, value)
@@ -2584,7 +2584,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 checkpointer: &mut Checkpointer,
             ) {
                 let state = checkpointer.retrieve_node_output(ops.state);
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     let value = B::float_cos(state);
                     B::float_mul(grad, value)
                 });
@@ -2623,7 +2623,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
             ) {
                 let input = checkpointer.retrieve_node_output(ops.state);
                 let state = B::float_tanh(input);
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     let value = B::float_add_scalar(
                         B::float_neg(B::float_powi_scalar(state, 2.into())),
                         1f32.into(),
@@ -2664,7 +2664,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 checkpointer: &mut Checkpointer,
             ) {
                 let input = checkpointer.retrieve_node_output(ops.state);
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     B::float_mul(grad, B::float_sinh(input))
                 });
             }
@@ -2701,7 +2701,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 checkpointer: &mut Checkpointer,
             ) {
                 let input = checkpointer.retrieve_node_output(ops.state);
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     B::float_mul(grad, B::float_cosh(input))
                 });
             }
@@ -2739,7 +2739,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
             ) {
                 let input = checkpointer.retrieve_node_output(ops.state);
                 let tan_x = B::float_tan(input);
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     // d/dx tan(x) = 1 + tan^2(x)
                     let tan_sq = B::float_powi_scalar(tan_x, 2.into());
                     B::float_mul(grad, B::float_add_scalar(tan_sq, 1f32.into()))
@@ -2778,7 +2778,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 checkpointer: &mut Checkpointer,
             ) {
                 let input = checkpointer.retrieve_node_output(ops.state);
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     // d/dx asin(x) = 1/sqrt(1 - x^2)
                     let x_sq = B::float_powi_scalar(input, 2.into());
                     let denom = B::float_sqrt(B::float_add_scalar(B::float_neg(x_sq), 1f32.into()));
@@ -2818,7 +2818,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 checkpointer: &mut Checkpointer,
             ) {
                 let input = checkpointer.retrieve_node_output(ops.state);
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     // d/dx acos(x) = -1/sqrt(1 - x^2)
                     let x_sq = B::float_powi_scalar(input, 2.into());
                     let denom = B::float_sqrt(B::float_add_scalar(B::float_neg(x_sq), 1f32.into()));
@@ -2859,7 +2859,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 checkpointer: &mut Checkpointer,
             ) {
                 let input = checkpointer.retrieve_node_output(ops.state);
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     // d/dx atan(x) = 1/(1 + x^2)
                     let x_sq = B::float_powi_scalar(input, 2.into());
                     let value = B::float_recip(B::float_add_scalar(x_sq, 1f32.into()));
@@ -2899,7 +2899,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 checkpointer: &mut Checkpointer,
             ) {
                 let input = checkpointer.retrieve_node_output(ops.state);
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     // d/dx asinh(x) = 1/sqrt(x^2 + 1)
                     let x_sq = B::float_powi_scalar(input, 2.into());
                     let value =
@@ -2940,7 +2940,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 checkpointer: &mut Checkpointer,
             ) {
                 let input = checkpointer.retrieve_node_output(ops.state);
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     // d/dx acosh(x) = 1/sqrt(x^2 - 1)
                     let x_sq = B::float_powi_scalar(input, 2.into());
                     let value =
@@ -2981,7 +2981,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 checkpointer: &mut Checkpointer,
             ) {
                 let input = checkpointer.retrieve_node_output(ops.state);
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     // d/dx atanh(x) = 1/(1 - x^2)
                     let x_sq = B::float_powi_scalar(input, 2.into());
                     let value =
@@ -3027,7 +3027,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 let [y_4y, y_4x] = duplicate(&ops.parents, y);
                 let [x_4y, x_4x]: [Option<FloatTensor<B>>; 2] = duplicate(&ops.parents, x);
 
-                binary::<B, _, _>(
+                binary::<AutodiffTensor<B>, _, _>(
                     ops.parents,
                     ops.node,
                     grads,
@@ -3099,7 +3099,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 _checkpointer: &mut Checkpointer,
             ) {
                 let (shape, device) = ops.state;
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     B::float_zeros(shape, &device, grad.dtype().into())
                 })
             }
@@ -3135,7 +3135,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 _checkpointer: &mut Checkpointer,
             ) {
                 let (shape, device) = ops.state;
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     B::float_zeros(shape, &device, grad.dtype().into())
                 })
             }
@@ -3171,7 +3171,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 _checkpointer: &mut Checkpointer,
             ) {
                 let (shape, device) = ops.state;
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     B::float_zeros(shape, &device, grad.dtype().into())
                 })
             }
@@ -3207,7 +3207,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 _checkpointer: &mut Checkpointer,
             ) {
                 let (shape, device) = ops.state;
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     B::float_zeros(shape, &device, grad.dtype().into())
                 })
             }
@@ -3243,7 +3243,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 grads: &mut Gradients,
                 checkpointer: &mut Checkpointer,
             ) {
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     let ops = checkpointer.retrieve_node_output(ops.state);
                     let exponent = B::float_neg(B::float_powi_scalar(ops, 2.into()));
                     let numerator = B::float_mul_scalar(B::float_exp(exponent), 2.0.into());
@@ -3285,7 +3285,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
 
         impl<B: Backend> Step for CatStep<B> {
             fn step(self: Box<Self>, grads: &mut Gradients, _checkpointer: &mut Checkpointer) {
-                let grad = grads.consume::<B>(&self.output);
+                let grad = grads.consume::<AutodiffTensor<B>>(&self.output);
                 let ranges_template: Vec<_> = grad.shape().iter().map(|&v| 0..v).collect();
 
                 self.nodes
@@ -3306,7 +3306,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                             .iter()
                             .map(|r| Slice::new(r.start as isize, Some(r.end as isize), 1))
                             .collect();
-                        grads.register::<B>(node.id, B::float_slice(grad.clone(), &slices));
+                        grads.register::<AutodiffTensor<B>>(node.id, B::float_slice(grad.clone(), &slices));
                     });
             }
 
@@ -3485,7 +3485,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 let [rhs_4lhs, rhs_4rhs] = duplicate(&ops.parents, Some(rhs));
                 let [lhs_4lhs, lhs_4rhs] = duplicate(&ops.parents, Some(lhs));
 
-                binary::<B, _, _>(
+                binary::<AutodiffTensor<B>, _, _>(
                     ops.parents,
                     ops.node,
                     grads,
@@ -3552,7 +3552,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 grads: &mut Gradients,
                 _checkpointer: &mut Checkpointer,
             ) {
-                unary::<B, _>(ops.parents, ops.node, grads, |grad|
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad|
                         // Always return 0 because the derivative of the sign function
                         // does not contribute to gradient updates in a meaningful way.
                         B::float_mul_scalar(grad, 0f32.into()));
@@ -3607,7 +3607,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                     shape_expanded[i + (ndims_out - ndims_in)] = shape_in[i];
                 }
 
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     let shape_grad = grad.shape();
                     let mut grad = grad;
 
@@ -3730,7 +3730,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
             ) {
                 let (dim, times) = ops.state;
 
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     let mut dims = grad.shape();
                     let orig_dim_size = dims[dim] / times;
                     if orig_dim_size > 1 {
@@ -3779,7 +3779,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
             ) {
                 let dtype = ops.state;
 
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     B::float_cast(grad, dtype)
                 });
             }
@@ -3822,7 +3822,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 let (shape_in, dim, size, step) = ops.state;
                 let windows = calculate_unfold_windows(shape_in[dim], size, step);
 
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     let device = B::float_device(&grad);
                     let mut grad_input =
                         B::float_zeros(shape_in.clone(), &device, grad.dtype().into());
