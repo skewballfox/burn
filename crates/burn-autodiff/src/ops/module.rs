@@ -80,7 +80,7 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                 checkpointer: &mut Checkpointer,
             ) {
                 let [node_x, node_weight, node_bias] = ops.parents;
-                let grad = grads.consume::<AutodiffTensor<B>>(&ops.node);
+                let grad = grads.consume_typed::<AutodiffTensor<B>>(&ops.node);
 
                 let (x_state, weight_state) = ops.state;
                 let x = x_state
@@ -90,15 +90,15 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
 
                 if let Some(node) = node_x {
                     let grad = B::linear_x_backward(weight.unwrap(), grad.clone());
-                    grads.register::<AutodiffTensor<B>>(node.id, grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad)
                 }
                 if let Some(node) = node_weight {
                     let grad = B::linear_weight_backward(x.unwrap(), grad.clone());
-                    grads.register::<AutodiffTensor<B>>(node.id, grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad)
                 }
                 if let Some(node) = node_bias {
                     let grad = B::linear_bias_backward(grad);
-                    grads.register::<AutodiffTensor<B>>(node.id, grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad)
                 }
             }
         }
@@ -113,7 +113,7 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                 checkpointer: &mut Checkpointer,
             ) {
                 let [node_x, node_weight] = ops.parents;
-                let grad = grads.consume::<AutodiffTensor<B>>(&ops.node);
+                let grad = grads.consume_typed::<AutodiffTensor<B>>(&ops.node);
 
                 let (x_state, weight_state) = ops.state;
                 let x = x_state
@@ -123,11 +123,11 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
 
                 if let Some(node) = node_x {
                     let grad = B::linear_x_backward(weight.unwrap(), grad.clone());
-                    grads.register::<AutodiffTensor<B>>(node.id, grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad)
                 }
                 if let Some(node) = node_weight {
                     let grad = B::linear_weight_backward(x.unwrap(), grad);
-                    grads.register::<AutodiffTensor<B>>(node.id, grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad)
                 }
             }
         }
@@ -215,7 +215,7 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                 checkpointer: &mut Checkpointer,
             ) {
                 let [node_x, node_weight, node_bias] = ops.parents;
-                let grad = grads.consume::<AutodiffTensor<B>>(&ops.node);
+                let grad = grads.consume_typed::<AutodiffTensor<B>>(&ops.node);
 
                 let (x_state, weight_state, bias_state, options) = ops.state;
                 let x = checkpointer.retrieve_node_output::<B::FloatTensorPrimitive>(x_state);
@@ -230,15 +230,15 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                         grad.clone(),
                         options.clone(),
                     );
-                    grads.register::<AutodiffTensor<B>>(node.id, grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad)
                 }
                 if let Some(node) = node_weight {
                     let grad = B::conv1d_weight_backward(x.clone(), weight, grad.clone(), options);
-                    grads.register::<AutodiffTensor<B>>(node.id, grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad)
                 }
                 if let Some(node) = node_bias {
                     let grad = B::conv1d_bias_backward(x, bias, grad);
-                    grads.register::<AutodiffTensor<B>>(node.id, grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad)
                 }
             }
         }
@@ -253,7 +253,7 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                 checkpointer: &mut Checkpointer,
             ) {
                 let [node_x, node_weight] = ops.parents;
-                let grad = grads.consume::<AutodiffTensor<B>>(&ops.node);
+                let grad = grads.consume_typed::<AutodiffTensor<B>>(&ops.node);
 
                 let (x_state, weight_state, options) = ops.state;
                 let x = checkpointer.retrieve_node_output::<B::FloatTensorPrimitive>(x_state);
@@ -267,11 +267,11 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                         grad.clone(),
                         options.clone(),
                     );
-                    grads.register::<AutodiffTensor<B>>(node.id, grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad)
                 }
                 if let Some(node) = node_weight {
                     let grad = B::conv1d_weight_backward(x, weight, grad, options);
-                    grads.register::<AutodiffTensor<B>>(node.id, grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad)
                 }
             }
         }
@@ -338,7 +338,7 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                 checkpointer: &mut Checkpointer,
             ) {
                 let [node_x, node_weight, node_bias] = ops.parents;
-                let grad = grads.consume::<AutodiffTensor<B>>(&ops.node);
+                let grad = grads.consume_typed::<AutodiffTensor<B>>(&ops.node);
 
                 let (x_state, weight_state, bias_state, options) = ops.state;
                 let x = checkpointer.retrieve_node_output::<B::FloatTensorPrimitive>(x_state);
@@ -352,7 +352,7 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                         grad.clone(),
                         options.clone(),
                     );
-                    grads.register::<AutodiffTensor<B>>(node.id, grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad)
                 }
                 if let Some(node) = node_weight {
                     let grad = B::conv_transpose1d_weight_backward(
@@ -361,11 +361,11 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                         grad.clone(),
                         options,
                     );
-                    grads.register::<AutodiffTensor<B>>(node.id, grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad)
                 }
                 if let Some(node) = node_bias {
                     let grad = B::conv_transpose1d_bias_backward(x, bias, grad);
-                    grads.register::<AutodiffTensor<B>>(node.id, grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad)
                 }
             }
         }
@@ -380,7 +380,7 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                 checkpointer: &mut Checkpointer,
             ) {
                 let [node_x, node_weight] = ops.parents;
-                let grad = grads.consume::<AutodiffTensor<B>>(&ops.node);
+                let grad = grads.consume_typed::<AutodiffTensor<B>>(&ops.node);
 
                 let (x_state, weight_state, options) = ops.state;
                 let x = checkpointer.retrieve_node_output::<B::FloatTensorPrimitive>(x_state);
@@ -393,11 +393,11 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                         grad.clone(),
                         options.clone(),
                     );
-                    grads.register::<AutodiffTensor<B>>(node.id, grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad)
                 }
                 if let Some(node) = node_weight {
                     let grad = B::conv_transpose1d_weight_backward(x, weight, grad, options);
-                    grads.register::<AutodiffTensor<B>>(node.id, grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad)
                 }
             }
         }
@@ -473,7 +473,7 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                 checkpointer: &mut Checkpointer,
             ) {
                 let [node_x, node_weight, node_bias] = ops.parents;
-                let grad = grads.consume::<AutodiffTensor<B>>(&ops.node);
+                let grad = grads.consume_typed::<AutodiffTensor<B>>(&ops.node);
 
                 let (x_state, weight_state, bias_state, options) = ops.state;
                 let x = checkpointer.retrieve_node_output::<B::FloatTensorPrimitive>(x_state);
@@ -488,16 +488,16 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                         grad.clone(),
                         options.clone(),
                     );
-                    grads.register::<AutodiffTensor<B>>(node.id, grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad)
                 }
                 if let Some(node) = node_weight {
                     let grad =
                         B::conv2d_weight_backward(x.clone(), weight.clone(), grad.clone(), options);
-                    grads.register::<AutodiffTensor<B>>(node.id, grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad)
                 }
                 if let Some(node) = node_bias {
                     let grad = B::conv2d_bias_backward(x, bias, grad);
-                    grads.register::<AutodiffTensor<B>>(node.id, grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad)
                 }
             }
         }
@@ -512,7 +512,7 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                 checkpointer: &mut Checkpointer,
             ) {
                 let [node_x, node_weight] = ops.parents;
-                let grad = grads.consume::<AutodiffTensor<B>>(&ops.node);
+                let grad = grads.consume_typed::<AutodiffTensor<B>>(&ops.node);
 
                 let (x_state, weight_state, options) = ops.state;
                 let x = checkpointer.retrieve_node_output::<B::FloatTensorPrimitive>(x_state);
@@ -526,11 +526,11 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                         grad.clone(),
                         options.clone(),
                     );
-                    grads.register::<AutodiffTensor<B>>(node.id, grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad)
                 }
                 if let Some(node) = node_weight {
                     let grad = B::conv2d_weight_backward(x, weight, grad, options);
-                    grads.register::<AutodiffTensor<B>>(node.id, grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad)
                 }
             }
         }
@@ -605,7 +605,7 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                 checkpointer: &mut Checkpointer,
             ) {
                 let [node_x, node_offset, node_weight, node_mask, node_bias] = ops.parents;
-                let grad = grads.consume::<AutodiffTensor<B>>(&ops.node);
+                let grad = grads.consume_typed::<AutodiffTensor<B>>(&ops.node);
 
                 let (x_state, offset_state, weight_state, mask_state, bias_state, options) =
                     ops.state;
@@ -619,19 +619,19 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                     B::deform_conv2d_backward(x, offset, weight, mask, bias, grad, options);
 
                 if let Some(node) = node_x {
-                    grads.register::<AutodiffTensor<B>>(node.id, backward.x_grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, backward.x_grad)
                 }
                 if let Some(node) = node_offset {
-                    grads.register::<AutodiffTensor<B>>(node.id, backward.offset_grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, backward.offset_grad)
                 }
                 if let Some(node) = node_weight {
-                    grads.register::<AutodiffTensor<B>>(node.id, backward.weight_grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, backward.weight_grad)
                 }
                 if let Some(node) = node_mask {
-                    grads.register::<AutodiffTensor<B>>(node.id, backward.mask_grad.unwrap())
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, backward.mask_grad.unwrap())
                 }
                 if let Some(node) = node_bias {
-                    grads.register::<AutodiffTensor<B>>(node.id, backward.bias_grad.unwrap())
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, backward.bias_grad.unwrap())
                 }
             }
         }
@@ -646,7 +646,7 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                 checkpointer: &mut Checkpointer,
             ) {
                 let [node_x, node_offset, node_weight, node_mask] = ops.parents;
-                let grad = grads.consume::<AutodiffTensor<B>>(&ops.node);
+                let grad = grads.consume_typed::<AutodiffTensor<B>>(&ops.node);
 
                 let (x_state, offset_state, weight_state, mask_state, options) = ops.state;
                 let x = checkpointer.retrieve_node_output(x_state);
@@ -658,16 +658,16 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                     B::deform_conv2d_backward(x, offset, weight, mask, None, grad, options);
 
                 if let Some(node) = node_x {
-                    grads.register::<AutodiffTensor<B>>(node.id, backward.x_grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, backward.x_grad)
                 }
                 if let Some(node) = node_offset {
-                    grads.register::<AutodiffTensor<B>>(node.id, backward.offset_grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, backward.offset_grad)
                 }
                 if let Some(node) = node_weight {
-                    grads.register::<AutodiffTensor<B>>(node.id, backward.weight_grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, backward.weight_grad)
                 }
                 if let Some(node) = node_mask {
-                    grads.register::<AutodiffTensor<B>>(node.id, backward.mask_grad.unwrap())
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, backward.mask_grad.unwrap())
                 }
             }
         }
@@ -682,7 +682,7 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                 checkpointer: &mut Checkpointer,
             ) {
                 let [node_x, node_offset, node_weight, node_bias] = ops.parents;
-                let grad = grads.consume::<AutodiffTensor<B>>(&ops.node);
+                let grad = grads.consume_typed::<AutodiffTensor<B>>(&ops.node);
 
                 let (x_state, offset_state, weight_state, bias_state, options) = ops.state;
                 let x = checkpointer.retrieve_node_output(x_state);
@@ -694,16 +694,16 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                     B::deform_conv2d_backward(x, offset, weight, None, bias, grad, options);
 
                 if let Some(node) = node_x {
-                    grads.register::<AutodiffTensor<B>>(node.id, backward.x_grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, backward.x_grad)
                 }
                 if let Some(node) = node_offset {
-                    grads.register::<AutodiffTensor<B>>(node.id, backward.offset_grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, backward.offset_grad)
                 }
                 if let Some(node) = node_weight {
-                    grads.register::<AutodiffTensor<B>>(node.id, backward.weight_grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, backward.weight_grad)
                 }
                 if let Some(node) = node_bias {
-                    grads.register::<AutodiffTensor<B>>(node.id, backward.bias_grad.unwrap())
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, backward.bias_grad.unwrap())
                 }
             }
         }
@@ -718,7 +718,7 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                 checkpointer: &mut Checkpointer,
             ) {
                 let [node_x, node_offset, node_weight] = ops.parents;
-                let grad = grads.consume::<AutodiffTensor<B>>(&ops.node);
+                let grad = grads.consume_typed::<AutodiffTensor<B>>(&ops.node);
 
                 let (x_state, offset_state, weight_state, options) = ops.state;
                 let x = checkpointer.retrieve_node_output(x_state);
@@ -729,13 +729,13 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                     B::deform_conv2d_backward(x, offset, weight, None, None, grad, options);
 
                 if let Some(node) = node_x {
-                    grads.register::<AutodiffTensor<B>>(node.id, backward.x_grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, backward.x_grad)
                 }
                 if let Some(node) = node_offset {
-                    grads.register::<AutodiffTensor<B>>(node.id, backward.offset_grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, backward.offset_grad)
                 }
                 if let Some(node) = node_weight {
-                    grads.register::<AutodiffTensor<B>>(node.id, backward.weight_grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, backward.weight_grad)
                 }
             }
         }
@@ -936,7 +936,7 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                 checkpointer: &mut Checkpointer,
             ) {
                 let [node_x, node_weight, node_bias] = ops.parents;
-                let grad = grads.consume::<AutodiffTensor<B>>(&ops.node);
+                let grad = grads.consume_typed::<AutodiffTensor<B>>(&ops.node);
 
                 let (x_state, weight_state, bias_state, options) = ops.state;
                 let x = checkpointer.retrieve_node_output::<B::FloatTensorPrimitive>(x_state);
@@ -950,7 +950,7 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                         grad.clone(),
                         options.clone(),
                     );
-                    grads.register::<AutodiffTensor<B>>(node.id, grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad)
                 }
                 if let Some(node) = node_weight {
                     let grad = B::conv_transpose2d_weight_backward(
@@ -959,11 +959,11 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                         grad.clone(),
                         options,
                     );
-                    grads.register::<AutodiffTensor<B>>(node.id, grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad)
                 }
                 if let Some(node) = node_bias {
                     let grad = B::conv_transpose2d_bias_backward(x, bias, grad);
-                    grads.register::<AutodiffTensor<B>>(node.id, grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad)
                 }
             }
         }
@@ -978,7 +978,7 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                 checkpointer: &mut Checkpointer,
             ) {
                 let [node_x, node_weight] = ops.parents;
-                let grad = grads.consume::<AutodiffTensor<B>>(&ops.node);
+                let grad = grads.consume_typed::<AutodiffTensor<B>>(&ops.node);
 
                 let (x_state, weight_state, options) = ops.state;
                 let x = checkpointer.retrieve_node_output::<B::FloatTensorPrimitive>(x_state);
@@ -991,11 +991,11 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                         grad.clone(),
                         options.clone(),
                     );
-                    grads.register::<AutodiffTensor<B>>(node.id, grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad)
                 }
                 if let Some(node) = node_weight {
                     let grad = B::conv_transpose2d_weight_backward(x, weight, grad, options);
-                    grads.register::<AutodiffTensor<B>>(node.id, grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad)
                 }
             }
         }
@@ -1073,7 +1073,7 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                 checkpointer: &mut Checkpointer,
             ) {
                 let [node_x, node_weight, node_bias] = ops.parents;
-                let grad = grads.consume::<AutodiffTensor<B>>(&ops.node);
+                let grad = grads.consume_typed::<AutodiffTensor<B>>(&ops.node);
 
                 let (x_state, weight_state, bias_state, options) = ops.state;
                 let x = checkpointer.retrieve_node_output::<B::FloatTensorPrimitive>(x_state);
@@ -1088,16 +1088,16 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                         grad.clone(),
                         options.clone(),
                     );
-                    grads.register::<AutodiffTensor<B>>(node.id, grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad)
                 }
                 if let Some(node) = node_weight {
                     let grad =
                         B::conv3d_weight_backward(x.clone(), weight.clone(), grad.clone(), options);
-                    grads.register::<AutodiffTensor<B>>(node.id, grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad)
                 }
                 if let Some(node) = node_bias {
                     let grad = B::conv3d_bias_backward(x, bias, grad);
-                    grads.register::<AutodiffTensor<B>>(node.id, grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad)
                 }
             }
         }
@@ -1112,7 +1112,7 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                 checkpointer: &mut Checkpointer,
             ) {
                 let [node_x, node_weight] = ops.parents;
-                let grad = grads.consume::<AutodiffTensor<B>>(&ops.node);
+                let grad = grads.consume_typed::<AutodiffTensor<B>>(&ops.node);
 
                 let (x_state, weight_state, options) = ops.state;
                 let x = checkpointer.retrieve_node_output::<B::FloatTensorPrimitive>(x_state);
@@ -1126,11 +1126,11 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                         grad.clone(),
                         options.clone(),
                     );
-                    grads.register::<AutodiffTensor<B>>(node.id, grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad)
                 }
                 if let Some(node) = node_weight {
                     let grad = B::conv3d_weight_backward(x, weight, grad, options);
-                    grads.register::<AutodiffTensor<B>>(node.id, grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad)
                 }
             }
         }
@@ -1199,7 +1199,7 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                 checkpointer: &mut Checkpointer,
             ) {
                 let [node_x, node_weight, node_bias] = ops.parents;
-                let grad = grads.consume::<AutodiffTensor<B>>(&ops.node);
+                let grad = grads.consume_typed::<AutodiffTensor<B>>(&ops.node);
 
                 let (x_state, weight_state, bias_state, options) = ops.state;
                 let x = checkpointer.retrieve_node_output::<B::FloatTensorPrimitive>(x_state);
@@ -1213,7 +1213,7 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                         grad.clone(),
                         options.clone(),
                     );
-                    grads.register::<AutodiffTensor<B>>(node.id, grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad)
                 }
                 if let Some(node) = node_weight {
                     let grad = B::conv_transpose3d_weight_backward(
@@ -1222,11 +1222,11 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                         grad.clone(),
                         options,
                     );
-                    grads.register::<AutodiffTensor<B>>(node.id, grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad)
                 }
                 if let Some(node) = node_bias {
                     let grad = B::conv_transpose3d_bias_backward(x, bias, grad);
-                    grads.register::<AutodiffTensor<B>>(node.id, grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad)
                 }
             }
         }
@@ -1241,7 +1241,7 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                 checkpointer: &mut Checkpointer,
             ) {
                 let [node_x, node_weight] = ops.parents;
-                let grad = grads.consume::<AutodiffTensor<B>>(&ops.node);
+                let grad = grads.consume_typed::<AutodiffTensor<B>>(&ops.node);
 
                 let (x_state, weight_state, options) = ops.state;
                 let x = checkpointer.retrieve_node_output::<B::FloatTensorPrimitive>(x_state);
@@ -1254,11 +1254,11 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                         grad.clone(),
                         options.clone(),
                     );
-                    grads.register::<AutodiffTensor<B>>(node.id, grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad)
                 }
                 if let Some(node) = node_weight {
                     let grad = B::conv_transpose3d_weight_backward(x, weight, grad, options);
-                    grads.register::<AutodiffTensor<B>>(node.id, grad)
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad)
                 }
             }
         }
@@ -1351,7 +1351,7 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                 checkpointer: &mut Checkpointer,
             ) {
                 let [node_parent] = ops.parents;
-                let grad = grads.consume::<AutodiffTensor<B>>(&ops.node);
+                let grad = grads.consume_typed::<AutodiffTensor<B>>(&ops.node);
                 let (x_state, kernel_size, stride, padding, count_include_pad, ceil_mode) =
                     ops.state;
                 let x = checkpointer.retrieve_node_output(x_state);
@@ -1366,7 +1366,7 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                         count_include_pad,
                         ceil_mode,
                     );
-                    grads.register::<AutodiffTensor<B>>(node.id, grad);
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad);
                 }
             }
         }
@@ -1429,7 +1429,7 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                 checkpointer: &mut Checkpointer,
             ) {
                 let [node_parent] = ops.parents;
-                let grad = grads.consume::<AutodiffTensor<B>>(&ops.node);
+                let grad = grads.consume_typed::<AutodiffTensor<B>>(&ops.node);
                 let (x_state, kernel_size, stride, padding, count_include_pad, ceil_mode) =
                     ops.state;
                 let x = checkpointer.retrieve_node_output(x_state);
@@ -1444,7 +1444,7 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                         count_include_pad,
                         ceil_mode,
                     );
-                    grads.register::<AutodiffTensor<B>>(node.id, grad);
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad);
                 }
             }
         }
@@ -1762,12 +1762,12 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                 checkpointer: &mut Checkpointer,
             ) {
                 let [node_parent] = ops.parents;
-                let grad = grads.consume::<AutodiffTensor<B>>(&ops.node);
+                let grad = grads.consume_typed::<AutodiffTensor<B>>(&ops.node);
                 let state = checkpointer.retrieve_node_output(ops.state);
 
                 if let Some(node) = node_parent {
                     let grad = B::adaptive_avg_pool1d_backward(state, grad);
-                    grads.register::<AutodiffTensor<B>>(node.id, grad);
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad);
                 }
             }
         }
@@ -1801,12 +1801,12 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                 checkpointer: &mut Checkpointer,
             ) {
                 let [node_parent] = ops.parents;
-                let grad = grads.consume::<AutodiffTensor<B>>(&ops.node);
+                let grad = grads.consume_typed::<AutodiffTensor<B>>(&ops.node);
                 let state = checkpointer.retrieve_node_output(ops.state);
 
                 if let Some(node) = node_parent {
                     let grad = B::adaptive_avg_pool2d_backward(state, grad);
-                    grads.register::<AutodiffTensor<B>>(node.id, grad);
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad);
                 }
             }
         }
@@ -1850,14 +1850,14 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                 checkpointer: &mut Checkpointer,
             ) {
                 let [node_parent] = ops.parents;
-                let grad = grads.consume::<AutodiffTensor<B>>(&ops.node);
+                let grad = grads.consume_typed::<AutodiffTensor<B>>(&ops.node);
 
                 let (x_state, output_size, options) = ops.state;
                 let state = checkpointer.retrieve_node_output(x_state);
 
                 if let Some(node) = node_parent {
                     let grad = B::interpolate_backward(state, grad, output_size, options);
-                    grads.register::<AutodiffTensor<B>>(node.id, grad);
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad);
                 }
             }
         }
@@ -1931,7 +1931,7 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                 checkpointer: &mut Checkpointer,
             ) {
                 let [node_parent] = ops.parents;
-                let grad_loss = grads.consume::<AutodiffTensor<B>>(&ops.node);
+                let grad_loss = grads.consume_typed::<AutodiffTensor<B>>(&ops.node);
 
                 let (log_probs_state, targets, input_lengths, target_lengths, blank) = ops.state;
                 let log_probs: B::FloatTensorPrimitive =
@@ -1946,7 +1946,7 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                         grad_loss,
                         blank,
                     );
-                    grads.register::<AutodiffTensor<B>>(node.id, grad);
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad);
                 }
             }
         }
@@ -2084,7 +2084,7 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
             ) {
                 let (dim, n, input_len, n_fft) = ops.state;
                 let [node_re, node_im] = ops.parents;
-                let grad = grads.consume::<AutodiffTensor<B>>(&ops.node);
+                let grad = grads.consume_typed::<AutodiffTensor<B>>(&ops.node);
 
                 let grad = B::float_div_scalar(grad, (n_fft as f64).into());
 
@@ -2097,10 +2097,10 @@ impl<B: Backend, C: CheckpointStrategy> ModuleOps<Autodiff<B, C>> for Autodiff<B
                 let grad_im = pad_to_length::<B>(grad_im, dim, input_len);
 
                 if let Some(node) = node_re {
-                    grads.register::<AutodiffTensor<B>>(node.id, grad_re);
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad_re);
                 }
                 if let Some(node) = node_im {
-                    grads.register::<AutodiffTensor<B>>(node.id, grad_im);
+                    grads.register_typed::<AutodiffTensor<B>>(node.id, grad_im);
                 }
             }
         }
@@ -2188,7 +2188,7 @@ impl<B: Backend> Backward<B, 1> for MaxPool1D {
         checkpointer: &mut Checkpointer,
     ) {
         let [node_parent] = ops.parents;
-        let grad = grads.consume::<AutodiffTensor<B>>(&ops.node);
+        let grad = grads.consume_typed::<AutodiffTensor<B>>(&ops.node);
         let (x_state, indices, kernel_size, stride, padding, dilation, ceil_mode) = ops.state;
         let x = checkpointer.retrieve_node_output(x_state);
 
@@ -2204,7 +2204,7 @@ impl<B: Backend> Backward<B, 1> for MaxPool1D {
                 indices,
             );
 
-            grads.register::<AutodiffTensor<B>>(node.id, grad.x_grad);
+            grads.register_typed::<AutodiffTensor<B>>(node.id, grad.x_grad);
         }
     }
 }
@@ -2230,7 +2230,7 @@ impl<B: Backend> Backward<B, 1> for MaxPool2D {
         checkpointer: &mut Checkpointer,
     ) {
         let [node_parent] = ops.parents;
-        let grad = grads.consume::<AutodiffTensor<B>>(&ops.node);
+        let grad = grads.consume_typed::<AutodiffTensor<B>>(&ops.node);
         let (x_state, indices, kernel_size, stride, padding, dilation, ceil_mode) = ops.state;
         let x = checkpointer.retrieve_node_output(x_state);
 
@@ -2246,7 +2246,7 @@ impl<B: Backend> Backward<B, 1> for MaxPool2D {
                 indices,
             );
 
-            grads.register::<AutodiffTensor<B>>(node.id, grad.x_grad);
+            grads.register_typed::<AutodiffTensor<B>>(node.id, grad.x_grad);
         }
     }
 }

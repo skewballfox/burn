@@ -345,14 +345,24 @@ pub trait AutodiffBackend: Backend {
     }
 }
 
+/// Trait implemented by all autodiff tensors, providing the necessary interface for the backward pass and gradient management.
 pub trait AutodiffTensor: TensorMetadata {
+    /// The underlying primitive type that is being differentiated
     type Primitive: TensorMetadata;
+    /// Gradients type associated with this tensor, used in the backward pass.
     type Gradients: Send;
+    /// Backward pass for this tensor, which will compute the gradients for all tracked tensors in the computational graph.
     fn backward(self) -> Self::Gradients;
+    /// Get the gradients for this tensor from the gradients container, if they exist.
     fn grad(&self, grads: &Self::Gradients) -> Option<Self::Primitive>;
+
+    /// Get the inner primitive tensor.
     fn inner(self) -> Self::Primitive;
+    /// Construct a tensor of this type from the inner primitive tensor.
     fn from_inner(tensor: Self::Primitive) -> Self;
+    /// Remove the gradients for this tensor from the gradients container and return them, if they exist.
     fn grad_remove(&self, grads: &mut Self::Gradients) -> Option<Self::Primitive>;
+    /// Replace the gradients for this tensor in the gradients container with the provided gradients.
     fn grad_replace(&self, grads: &mut Self::Gradients, grad: Self::Primitive);
 }
 /// Describes how a data type can be used on a given device.

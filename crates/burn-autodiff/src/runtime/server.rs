@@ -77,9 +77,9 @@ impl AutodiffServer {
             #[cfg(feature = "std")]
             BackwardMode::Distributed(factory) if tape_result.distributed.is_some() => {
                 let on_register = factory(tape_result.distributed.clone().unwrap());
-                Gradients::new_distributed::<T>(root_node, root_tensor, on_register)
+                Gradients::new_distributed_typed::<T>(root_node, root_tensor, on_register)
             }
-            _ => Gradients::new::<T>(root_node, root_tensor),
+            _ => Gradients::new_with_hook::<T>(root_node, root_tensor, None),
         };
 
         let gradients = Self::execute_steps(tape_result.tape, grads, tape_result.checkpointer);

@@ -1,5 +1,5 @@
 use super::{Backward, Ops, unary};
-use crate::{Autodiff, checkpoint::base::Checkpointer, grads::Gradients, tensor::AutodiffTensor};
+use crate::{checkpoint::base::Checkpointer, grads::Gradients, tensor::AutodiffTensor};
 use burn_backend::{Backend, TensorMetadata};
 use burn_std::Shape;
 

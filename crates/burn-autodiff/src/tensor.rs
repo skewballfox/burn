@@ -9,7 +9,7 @@ use crate::{distributed::DistributedGradientRegistration, grads::GradSyncContext
 use alloc::{boxed::Box, vec};
 use burn_backend::{
     AutodiffTensor as BackendAutodiffTensor, Backend, BackendTypes, ComplexTensorBackend,
-    TensorMetadata, TensorPrimitive,
+    TensorMetadata, TensorPrimitive, distributed::DistributedOps,
 };
 
 #[cfg(target_has_atomic = "ptr")]
@@ -34,18 +34,28 @@ pub struct ComplexAutodiffTensor<B: BackendTypes> {
     pub rc: NodeRefCount,
 }
 
+/// Trait implemented by all autodiff tensors, providing the necessary interface for the backward pass and gradient management.
 pub trait AutodiffTensorTrait: BackendAutodiffTensor {
     /// wraps the enum used for gets until I can figure out whether it should be used
     /// as the primitive associated type for float autodiff
     type PrimitivePlaceholder: Clone + Send + Sync + 'static;
+    /// Maps to the underlying tensor primitive's "ones_like" function, used during the backward pass to create gradient tensors with the same shape and device as the original tensor.
     fn ones_like(tensor: &Self::Primitive) -> Self::Primitive;
+    /// Create a tensor from parent infos.
     fn new_with_node(primitive: Self::Primitive, node: NodeRef) -> Self;
+    /// Get a mutable reference to the tensor's node.
     fn node_mut(&mut self) -> &mut NodeRef;
+    /// Get a reference to the tensor's node.
     fn node(&self) -> &NodeRef;
+    /// Get a reference to the tensor's reference count.
     fn ref_count(&self) -> &NodeRefCount;
+    /// Get the primitive value of the tensor.
     fn primitive(&self) -> &Self::Primitive;
+    /// Consume the tensor and return its primitive value.
     fn into_primitive(self) -> Self::Primitive;
+    /// Break the tensor into its primitive, node, and reference count components.
     fn destructure(self) -> (Self::Primitive, NodeRef, NodeRefCount);
+    /// Add two primitives together, used during the backward pass to accumulate gradients.
     fn add(lhs: Self::Primitive, rhs: Self::Primitive) -> Self::Primitive;
     /// Register a step into a graph for that tensor.
     ///
@@ -64,22 +74,27 @@ pub trait AutodiffTensorTrait: BackendAutodiffTensor {
         );
         self
     }
+    /// Check if the tensor is tracked, meaning it requires gradients and will be part of the backward pass.
     fn is_tracked(&self) -> bool {
         !self.node().requirement.is_none()
     }
+    /// TODO: figure out what to name placeholder
     fn placeholder_primitive(placeholder: Self::PrimitivePlaceholder) -> Self::Primitive;
+
+    /// TODO: figure out what to name placeholder
     fn primitive_to_placeholder(primitive: Self::Primitive) -> Self::PrimitivePlaceholder;
+    /// Get the gradients for this tensor from the gradients container, if they exist.
     fn grad(&self, grads: &Gradients) -> Option<Self::Primitive> {
         grads.get::<Self>(self)
     }
-
+    /// Remove the gradients for this tensor from the gradients container and return them, if they exist.
     fn grad_remove(&self, grads: &mut Gradients) -> Option<Self::Primitive> {
-        grads.remove::<Self>(self)
+        grads.remove_inner::<Self>(self)
     }
-
+    /// Replace the gradients for this tensor in the gradients container with the provided gradients.
     fn grad_replace(&self, grads: &mut Gradients, grad: Self::Primitive) {
-        grads.remove::<Self>(self);
-        grads.register::<Self>(self.node().id, grad);
+        grads.remove_inner::<Self>(self);
+        grads.register_typed::<Self>(self.node().id, grad);
     }
 
     /// Mark the tensor as distributed across multiple devices.
@@ -205,7 +220,7 @@ impl<B: ComplexTensorBackend> BackendAutodiffTensor for ComplexAutodiffTensor<B>
     type Gradients = Gradients;
 
     fn backward(self) -> Self::Gradients {
-        self.backward()
+        ComplexAutodiffTensor::<B>::backward(self)
     }
     fn grad(&self, grads: &Self::Gradients) -> Option<Self::Primitive> {
         <Self as AutodiffTensorTrait>::grad(self, grads)
@@ -465,7 +480,7 @@ impl<B: BackendTypes> ComplexAutodiffTensor<B> {
     }
 }
 
-impl<B: Backend + ComplexTensorBackend> ComplexAutodiffTensor<B> {
+impl<B: ComplexTensorBackend> ComplexAutodiffTensor<B> {
     #[cfg(not(feature = "std"))]
     pub fn backward(self) -> Gradients {
         let client = self.node.client.clone();
@@ -479,7 +494,7 @@ impl<B: Backend + ComplexTensorBackend> ComplexAutodiffTensor<B> {
         let client = self.node.client.clone();
 
         let mode = BackwardMode::Distributed(Box::new(|ctx: GradSyncContext| {
-            let registration = DistributedGradientRegistration::<B>::new(
+            let registration = DistributedGradientRegistration::<B::InnerBackend>::new(
                 ctx.n_required_map,
                 ctx.distributed_params,
                 device_cloned,
@@ -488,7 +503,7 @@ impl<B: Backend + ComplexTensorBackend> ComplexAutodiffTensor<B> {
         }));
 
         let grads = AutodiffClient::backward::<Self>(&client, self, mode);
-        B::submit_sync_collective(&device);
+        B::InnerBackend::submit_sync_collective(&device);
         grads
     }
 }

@@ -44,7 +44,7 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
                 // Get the nodes of each variable.
                 let [node_lhs, node_rhs, node_bias] = ops.parents;
                 // Fetch the gradient for the current node.
-                let grad = grads.consume::<_>(&ops.node);
+                let grad = grads.consume::<B>(&ops.node);
 
                 // Set our state.
                 let (lhs_state, rhs_state, output, shape_bias) = ops.state;
@@ -78,13 +78,13 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
                 // Register the gradient for each variable based on whether they are marked as
                 // `tracked`.
                 if let Some(node) = node_bias {
-                    grads.register::<_>(node.id, grad_bias);
+                    grads.register::<B>(node.id, grad_bias);
                 }
                 if let Some(node) = node_lhs {
-                    grads.register::<_  >(node.id, grad_lhs);
+                    grads.register::<B>(node.id, grad_lhs);
                 }
                 if let Some(node) = node_rhs {
-                    grads.register::<_>(node.id, grad_rhs);
+                    grads.register::<B>(node.id, grad_rhs);
                 }
             }
         }

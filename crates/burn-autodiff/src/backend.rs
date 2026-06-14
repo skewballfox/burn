@@ -1,23 +1,17 @@
-#[cfg(not(feature = "distributed"))]
-use crate::tensor::AutodiffTensorTrait;
 use crate::{
     checkpoint::strategy::{CheckpointStrategy, NoCheckpointing},
-    grads::Gradients,
     tensor::{AutodiffTensor, ComplexAutodiffTensor},
 };
 use alloc::{format, string::String};
 use core::marker::PhantomData;
 
 use burn_backend::{
-    UnimplementedTensorPrimitive,
     backend::{
         AutodiffBackend, AutodiffTensor as BackendAutodiffTensor, Backend, BackendTypes,
         ExecutionError,
     },
     tensor::{BoolTensor, IntTensor, QuantizedTensor},
 };
-
-use burn_backend::distributed::{DistributedParamId, DistributedParams};
 
 /// Enable auto-differentiation on a backend.
 ///

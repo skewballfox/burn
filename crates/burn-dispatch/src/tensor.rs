@@ -5,9 +5,7 @@ use burn_autodiff::AutodiffTensorTrait as _;
 use burn_autodiff::checkpoint::strategy::{
     BalancedCheckpointing, CheckpointStrategy, NoCheckpointing,
 };
-use burn_backend::{
-    Backend, BackendTypes, ComplexTensorBackend, DType, Shape, TensorMetadata,
-};
+use burn_backend::{Backend, BackendTypes, ComplexTensorBackend, DType, Shape, TensorMetadata};
 
 use crate::CheckpointingStrategy;
 #[cfg(feature = "autodiff")]

@@ -10,7 +10,7 @@ use alloc::vec::Vec;
 ))]
 use alloc::vec;
 
-use burn_backend::distributed::{DistributedParamId, DistributedParams};
+use burn_backend::distributed::DistributedParams;
 #[cfg(feature = "autodiff")]
 use burn_backend::{AutodiffBackend, AutodiffTensor, Backend, BackendTypes, DType, ExecutionError};
 

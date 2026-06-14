@@ -3284,7 +3284,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
 
         impl<B: Backend> Step for CatStep<B> {
             fn step(self: Box<Self>, grads: &mut Gradients, _checkpointer: &mut Checkpointer) {
-                let grad = grads.consume::<AutodiffTensor<B>>(&self.output);
+                let grad = grads.consume_typed::<AutodiffTensor<B>>(&self.output);
                 let ranges_template: Vec<_> = grad.shape().iter().map(|&v| 0..v).collect();
 
                 self.nodes
@@ -3305,7 +3305,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                             .iter()
                             .map(|r| Slice::new(r.start as isize, Some(r.end as isize), 1))
                             .collect();
-                        grads.register::<AutodiffTensor<B>>(
+                        grads.register_typed::<AutodiffTensor<B>>(
                             node.id,
                             B::float_slice(grad.clone(), &slices),
                         );

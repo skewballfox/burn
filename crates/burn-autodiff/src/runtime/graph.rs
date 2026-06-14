@@ -5,7 +5,7 @@ use crate::{
     grads::{BackwardMode, Gradients},
     graph::{Parent, StepBoxed},
     runtime::server::NodeCleaner,
-    tensor::{AutodiffTensor, AutodiffTensorTrait, NodeRefCount},
+    tensor::{AutodiffTensorTrait, NodeRefCount},
 };
 use alloc::vec::Vec;
 
@@ -14,8 +14,6 @@ use alloc::sync::Arc;
 
 #[cfg(not(target_has_atomic = "ptr"))]
 use portable_atomic_util::Arc;
-
-use burn_backend::Backend;
 
 use hashbrown::{HashMap, HashSet};
 

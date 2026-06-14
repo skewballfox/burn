@@ -6,7 +6,7 @@ use crate::{
     tensor::AutodiffTensorTrait,
     utils::duplicate,
 };
-use burn_backend::{Backend, BackendTypes};
+use burn_backend::BackendTypes;
 
 /// Trait for all operations.
 ///
@@ -58,17 +58,17 @@ pub fn binary<T: AutodiffTensorTrait, FLhs, FRhs>(
     FLhs: FnOnce(T::Primitive) -> T::Primitive,
     FRhs: FnOnce(T::Primitive) -> T::Primitive,
 {
-    let [grad_4lhs, grad_4rhs] = duplicate(&parents, Some(grads.consume::<T>(&node)));
+    let [grad_4lhs, grad_4rhs] = duplicate(&parents, Some(grads.consume_typed::<T>(&node)));
     let [node_lhs, node_rhs] = parents;
 
     if let Some(node) = node_lhs {
         let grad = func_lhs(grad_4lhs.unwrap());
-        grads.register::<T>(node.id, grad)
+        grads.register_typed::<T>(node.id, grad)
     }
 
     if let Some(node) = node_rhs {
         let grad = func_rhs(grad_4rhs.unwrap());
-        grads.register::<T>(node.id, grad)
+        grads.register_typed::<T>(node.id, grad)
     }
 }
 
@@ -79,10 +79,10 @@ where
     F: FnOnce(T::Primitive) -> T::Primitive,
 {
     let [parent_node] = parents;
-    let grad = grads.consume::<T>(&node);
+    let grad = grads.consume_typed::<T>(&node);
 
     if let Some(node) = parent_node {
         let grad = func(grad);
-        grads.register::<T>(node.id, grad)
+        grads.register_typed::<T>(node.id, grad)
     }
 }
