@@ -1,15 +1,27 @@
-use burn_backend::{AutodiffBackend, Backend, ComplexTensorBackend, ops::ComplexTensorOps, tensor::{BoolTensor, ComplexTensor, Device, IntTensor}};
+use burn_backend::{
+    AutodiffBackend, Backend, ComplexTensorBackend,
+    ops::ComplexTensorOps,
+    tensor::{BoolTensor, ComplexTensor, Device, IntTensor},
+};
 
 use crate::{Autodiff, checkpoint::strategy::CheckpointStrategy, tensor::ComplexAutodiffTensor};
 
-impl<B: ComplexTensorBackend+ Backend, C: CheckpointStrategy> ComplexTensorBackend for Autodiff<B, C> {
-    type InnerBackend=Self;
+impl<B: ComplexTensorBackend + Backend, C: CheckpointStrategy> ComplexTensorBackend
+    for Autodiff<B, C>
+{
+    type InnerBackend = Self;
 
-    fn complex_from_real_data(data: burn_std::TensorData, device: &Self::Device) -> ComplexTensor<Self> {
+    fn complex_from_real_data(
+        data: burn_std::TensorData,
+        device: &Self::Device,
+    ) -> ComplexTensor<Self> {
         ComplexAutodiffTensor::new(B::complex_from_real_data(data, device))
     }
 
-    fn complex_from_imag_data(data: burn_std::TensorData, device: &Self::Device) -> ComplexTensor<Self> {
+    fn complex_from_imag_data(
+        data: burn_std::TensorData,
+        device: &Self::Device,
+    ) -> ComplexTensor<Self> {
         ComplexAutodiffTensor::new(B::complex_from_imag_data(data, device))
     }
 
@@ -29,7 +41,9 @@ impl<B: ComplexTensorBackend+ Backend, C: CheckpointStrategy> ComplexTensorBacke
     }
 }
 
-impl<B: ComplexTensorBackend+Backend, C: CheckpointStrategy> ComplexTensorOps<Self> for Autodiff<B, C> {
+impl<B: ComplexTensorBackend + Backend, C: CheckpointStrategy> ComplexTensorOps<Self>
+    for Autodiff<B, C>
+{
     fn complex_device(tensor: &ComplexTensor<Self>) -> Device<Self> {
         B::complex_device(&tensor.primitive)
     }
@@ -46,7 +60,9 @@ impl<B: ComplexTensorBackend+Backend, C: CheckpointStrategy> ComplexTensorOps<Se
         B::complex_into_split_data(tensor.primitive).await
     }
 
-    fn complex_squared_norm(tensor: ComplexTensor<Self>) -> burn_backend::tensor::FloatTensor<Self> {
+    fn complex_squared_norm(
+        tensor: ComplexTensor<Self>,
+    ) -> burn_backend::tensor::FloatTensor<Self> {
         todo!()
     }
 
@@ -59,11 +75,19 @@ impl<B: ComplexTensorBackend+Backend, C: CheckpointStrategy> ComplexTensorOps<Se
         todo!()
     }
 
-    fn complex_zeros(shape: burn_std::Shape, device: &burn_backend::tensor::Device<Self>, dtype: burn_std::ComplexDType) -> ComplexTensor<Self> {
+    fn complex_zeros(
+        shape: burn_std::Shape,
+        device: &burn_backend::tensor::Device<Self>,
+        dtype: burn_std::ComplexDType,
+    ) -> ComplexTensor<Self> {
         todo!()
     }
 
-    fn complex_ones(shape: burn_std::Shape, device: &burn_backend::tensor::Device<Self>, dtype: burn_std::ComplexDType) -> ComplexTensor<Self> {
+    fn complex_ones(
+        shape: burn_std::Shape,
+        device: &burn_backend::tensor::Device<Self>,
+        dtype: burn_std::ComplexDType,
+    ) -> ComplexTensor<Self> {
         todo!()
     }
 
@@ -76,7 +100,10 @@ impl<B: ComplexTensorBackend+Backend, C: CheckpointStrategy> ComplexTensorOps<Se
         todo!()
     }
 
-    fn complex_to_device(tensor: ComplexTensor<Self>, device: &Device<Self>) -> ComplexTensor<Self> {
+    fn complex_to_device(
+        tensor: ComplexTensor<Self>,
+        device: &Device<Self>,
+    ) -> ComplexTensor<Self> {
         todo!()
     }
 
@@ -134,11 +161,17 @@ impl<B: ComplexTensorBackend+Backend, C: CheckpointStrategy> ComplexTensorOps<Se
         todo!()
     }
 
-    fn complex_into_float(tensor: ComplexTensor<Self>, dtype: burn_std::FloatDType) -> burn_backend::tensor::FloatTensor<Self> {
+    fn complex_into_float(
+        tensor: ComplexTensor<Self>,
+        dtype: burn_std::FloatDType,
+    ) -> burn_backend::tensor::FloatTensor<Self> {
         todo!()
     }
 
-    fn complex_into_int(tensor: ComplexTensor<Self>, dtype: burn_std::IntDType) -> burn_backend::tensor::IntTensor<Self> {
+    fn complex_into_int(
+        tensor: ComplexTensor<Self>,
+        dtype: burn_std::IntDType,
+    ) -> burn_backend::tensor::IntTensor<Self> {
         todo!()
     }
 
@@ -158,7 +191,10 @@ impl<B: ComplexTensorBackend+Backend, C: CheckpointStrategy> ComplexTensorOps<Se
         todo!()
     }
 
-    fn complex_from_polar(magnitude: burn_backend::tensor::FloatTensor<Self>, phase: burn_backend::tensor::FloatTensor<Self>) -> ComplexTensor<Self> {
+    fn complex_from_polar(
+        magnitude: burn_backend::tensor::FloatTensor<Self>,
+        phase: burn_backend::tensor::FloatTensor<Self>,
+    ) -> ComplexTensor<Self> {
         todo!()
     }
 
@@ -198,7 +234,10 @@ impl<B: ComplexTensorBackend+Backend, C: CheckpointStrategy> ComplexTensorOps<Se
         todo!()
     }
 
-    fn complex_cast(tensor: ComplexTensor<Self>, dtype: burn_std::ComplexDType) -> ComplexTensor<Self> {
+    fn complex_cast(
+        tensor: ComplexTensor<Self>,
+        dtype: burn_std::ComplexDType,
+    ) -> ComplexTensor<Self> {
         todo!()
     }
 
@@ -230,7 +269,10 @@ impl<B: ComplexTensorBackend+Backend, C: CheckpointStrategy> ComplexTensorOps<Se
         todo!()
     }
 
-    fn complex_slice(tensor: ComplexTensor<Self>, slices: &[burn_std::Slice]) -> ComplexTensor<Self> {
+    fn complex_slice(
+        tensor: ComplexTensor<Self>,
+        slices: &[burn_std::Slice],
+    ) -> ComplexTensor<Self> {
         todo!()
     }
 
@@ -251,11 +293,19 @@ impl<B: ComplexTensorBackend+Backend, C: CheckpointStrategy> ComplexTensorOps<Se
         todo!()
     }
 
-    fn complex_swap_dims(tensor: ComplexTensor<Self>, dim1: usize, dim2: usize) -> ComplexTensor<Self> {
+    fn complex_swap_dims(
+        tensor: ComplexTensor<Self>,
+        dim1: usize,
+        dim2: usize,
+    ) -> ComplexTensor<Self> {
         todo!()
     }
 
-    fn complex_repeat_dim(tensor: ComplexTensor<Self>, dim: usize, times: usize) -> ComplexTensor<Self> {
+    fn complex_repeat_dim(
+        tensor: ComplexTensor<Self>,
+        dim: usize,
+        times: usize,
+    ) -> ComplexTensor<Self> {
         todo!()
     }
 
@@ -275,7 +325,10 @@ impl<B: ComplexTensorBackend+Backend, C: CheckpointStrategy> ComplexTensorOps<Se
         todo!()
     }
 
-    fn complex_cat(tensors: alloc::vec::Vec<ComplexTensor<Self>>, dim: usize) -> ComplexTensor<Self> {
+    fn complex_cat(
+        tensors: alloc::vec::Vec<ComplexTensor<Self>>,
+        dim: usize,
+    ) -> ComplexTensor<Self> {
         todo!()
     }
 
@@ -363,11 +416,17 @@ impl<B: ComplexTensorBackend+Backend, C: CheckpointStrategy> ComplexTensorOps<Se
         todo!()
     }
 
-    fn complex_remainder(lhs: ComplexTensor<Self>, rhs: ComplexTensor<Self>) -> ComplexTensor<Self> {
+    fn complex_remainder(
+        lhs: ComplexTensor<Self>,
+        rhs: ComplexTensor<Self>,
+    ) -> ComplexTensor<Self> {
         todo!()
     }
 
-    fn complex_remainder_scalar(lhs: ComplexTensor<Self>, rhs: burn_std::Scalar) -> ComplexTensor<Self> {
+    fn complex_remainder_scalar(
+        lhs: ComplexTensor<Self>,
+        rhs: burn_std::Scalar,
+    ) -> ComplexTensor<Self> {
         todo!()
     }
 
@@ -428,11 +487,17 @@ impl<B: ComplexTensorBackend+Backend, C: CheckpointStrategy> ComplexTensorOps<Se
         todo!()
     }
 
-    fn complex_powf(lhs: ComplexTensor<Self>, rhs: burn_backend::tensor::FloatTensor<Self>) -> ComplexTensor<Self> {
+    fn complex_powf(
+        lhs: ComplexTensor<Self>,
+        rhs: burn_backend::tensor::FloatTensor<Self>,
+    ) -> ComplexTensor<Self> {
         todo!()
     }
 
-    fn complex_powi(lhs: ComplexTensor<Self>, rhs: burn_backend::tensor::IntTensor<Self>) -> ComplexTensor<Self> {
+    fn complex_powi(
+        lhs: ComplexTensor<Self>,
+        rhs: burn_backend::tensor::IntTensor<Self>,
+    ) -> ComplexTensor<Self> {
         todo!()
     }
 

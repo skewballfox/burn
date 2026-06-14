@@ -1,6 +1,7 @@
 use burn_std::DType;
 pub use burn_std::{ExecutionError, backtrace::BackTrace};
 
+use crate::distributed::DistributedOps;
 pub use crate::element::{ComplexElement, Element};
 use crate::ops::*;
 use crate::tensor::{BoolTensor, FloatTensor, IntTensor, QuantizedTensor};
@@ -8,7 +9,6 @@ use crate::{TensorData, TensorMetadata};
 use alloc::string::String;
 use enumset::{EnumSet, EnumSetType};
 
-#[cfg(feature = "distributed")]
 use crate::distributed::{DistributedParamId, DistributedParams};
 
 use super::DeviceOps;
@@ -92,6 +92,7 @@ pub trait Backend:
     + ActivationOps<Self>
     + QTensorOps<Self>
     + TransactionOps<Self>
+    + DistributedOps<Self>
     + Clone
     + Default
     + Sized
@@ -139,6 +140,9 @@ pub trait Backend:
         Ok(())
     }
 
+    /// Flush any pending operation of the backend.
+    fn flush(_device: &Self::Device);
+
     /// Marks the given data as being used as a staging buffer for transfer between CPU and
     /// accelerators like GPUs.
     ///
@@ -178,7 +182,6 @@ pub trait AutodiffBackend: Backend {
     /// The inner backend type.
     type InnerBackend: Backend<Device = Self::Device>;
 
-
     /// Backward pass.
     ///
     /// # Arguments
@@ -198,10 +201,7 @@ pub trait AutodiffBackend: Backend {
     /// # Returns
     ///
     /// An optional tensor containing the gradient.
-    fn grad<T: AutodiffTensor>(
-        tensor: &T,
-        grads: &T::Gradients,
-    ) -> Option<T::Primitive>;
+    fn grad<T: AutodiffTensor>(tensor: &T, grads: &T::Gradients) -> Option<T::Primitive>;
 
     /// Pops the gradients of a tensor and returns them.
     ///
@@ -213,10 +213,8 @@ pub trait AutodiffBackend: Backend {
     /// # Returns
     ///
     /// An optional tensor containing the given gradients.
-    fn grad_remove<T: AutodiffTensor>(
-        tensor: &T,
-        grads: &mut T::Gradients,
-    ) -> Option<T::Primitive>;
+    fn grad_remove<T: AutodiffTensor>(tensor: &T, grads: &mut T::Gradients)
+    -> Option<T::Primitive>;
 
     /// Replace the gradients of a tensor with the one provided.
     ///
@@ -227,11 +225,7 @@ pub trait AutodiffBackend: Backend {
     /// * `tensor` - The tensor to pop the gradients from.
     /// * `grads` - The gradients.
     /// * `grad` - The updated grad tensor.
-    fn grad_replace<T: AutodiffTensor>(
-        tensor: &T,
-        grads: &mut T::Gradients,
-        grad: T::Primitive,
-    );
+    fn grad_replace<T: AutodiffTensor>(tensor: &T, grads: &mut T::Gradients, grad: T::Primitive);
 
     /// Returns the tensor with inner backend type.
     ///
@@ -329,7 +323,6 @@ pub trait AutodiffBackend: Backend {
     /// The autodiff backend tensor.
     fn q_from_inner(tensor: QuantizedTensor<Self::InnerBackend>) -> QuantizedTensor<Self>;
 
-    #[cfg(feature = "distributed")]
     /// Mark the tensor as distributed across multiple devices.
     /// The gradients will be aggregated during the backward pass.
     ///
@@ -341,13 +334,11 @@ pub trait AutodiffBackend: Backend {
         tensor
     }
 
-    #[cfg(feature = "distributed")]
     /// Returns the distributed parameters if the tensor was marked as distributed.
     fn distributed_params(_tensor: &FloatTensor<Self>) -> Option<DistributedParams> {
         None
     }
 
-    #[cfg(feature = "distributed")]
     /// Returns true if the tensor was marked as distributed.
     fn is_distributed(_tensor: &FloatTensor<Self>) -> bool {
         false

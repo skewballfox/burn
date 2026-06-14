@@ -10,9 +10,6 @@ pub enum TensorPrimitive<B: BackendTypes> {
     QFloat(B::QuantizedTensorPrimitive),
 }
 
-
-
-
 /// a Placeholder primitive for tensor types that are not yet supported by a backend.
 #[derive(Clone)]
 pub struct UnimplementedTensorPrimitive<E: Clone + Send + Sync + 'static> {

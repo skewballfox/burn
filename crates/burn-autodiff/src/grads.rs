@@ -8,15 +8,15 @@ use crate::{
     tensor::{AutodiffTensor, AutodiffTensorTrait},
 };
 
-#[cfg(feature = "distributed")]
+#[cfg(feature = "std")]
 use crate::collections::HashMap;
-#[cfg(feature = "distributed")]
+#[cfg(feature = "std")]
 use burn_backend::distributed::DistributedParams;
 
 /// Gradient identifier.
 pub type GradID = u64;
 
-#[cfg(feature = "distributed")]
+#[cfg(feature = "std")]
 #[derive(Clone)]
 pub(crate) struct GradSyncContext {
     pub n_required_map: HashMap<NodeId, usize>,
@@ -37,7 +37,7 @@ pub(crate) enum BackwardMode {
     #[default]
     Standard,
     // Distributed registration hook.
-    #[cfg(feature = "distributed")]
+    #[cfg(feature = "std")]
     Distributed(Box<dyn FnOnce(GradSyncContext) -> Box<dyn DistributedRegistration>>),
 }
 
@@ -65,24 +65,21 @@ impl Gradients {
             container: TensorContainer::new(),
             on_register,
         };
-        gradients.register::<T>(
-            root_node.id,
-            T::ones_like(&root_tensor),
-        );
+        gradients.register::<T>(root_node.id, T::ones_like(&root_tensor));
         gradients
     }
 
     /// Creates a new gradients container with a registration hook for distributed gradients.
-    #[cfg(feature = "distributed")]
-    pub fn new_distributed<B: Backend>(
+    #[cfg(feature = "std")]
+    pub fn new_distributed<T: AutodiffTensorTrait>(
         root_node: NodeRef,
-        root_tensor: FloatTensor<B>,
+        root_tensor: T::Primitive,
         mut reg: Box<dyn DistributedRegistration>,
     ) -> Self {
         let on_register: Option<OnRegisterHook> = Some(Box::new(move |id, container| {
             reg.on_register(id, container);
         }));
-        Self::new_with_hook::<B>(root_node, root_tensor, on_register)
+        Self::new_with_hook::<T>(root_node, root_tensor, on_register)
     }
 
     /// Consumes the gradients for a given tensor.
@@ -106,7 +103,7 @@ impl Gradients {
     }
 
     /// Removes a grad tensor from the container.
-    pub fn remove< T: AutodiffTensorTrait>(&mut self, tensor: &T) -> Option<T::Primitive> {
+    pub fn remove<T: AutodiffTensorTrait>(&mut self, tensor: &T) -> Option<T::Primitive> {
         self.container
             .remove::<T::PrimitivePlaceholder>(&tensor.node().id.value)
             .map(|tensor| T::placeholder_primitive(tensor))
@@ -125,12 +122,14 @@ impl Gradients {
     ///
     /// If the registered tensor is distributed, launches a syncing operation on the gradients.
     pub fn register<T: AutodiffTensorTrait>(&mut self, node_id: NodeId, value: T::Primitive) {
-        let out =
-            if let Some(tensor_old) = self.container.remove::<T::PrimitivePlaceholder>(&node_id.value) {
-                T::add(value, T::placeholder_primitive(tensor_old))
-            } else {
-                value
-            };
+        let out = if let Some(tensor_old) = self
+            .container
+            .remove::<T::PrimitivePlaceholder>(&node_id.value)
+        {
+            T::add(value, T::placeholder_primitive(tensor_old))
+        } else {
+            value
+        };
 
         self.container
             .register::<T::PrimitivePlaceholder>(node_id.value, T::primitive_to_placeholder(out));

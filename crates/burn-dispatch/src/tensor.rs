@@ -1,12 +1,13 @@
 use crate::backends::*;
 
+use burn_autodiff::AutodiffTensorTrait as _;
 #[cfg(feature = "autodiff")]
 use burn_autodiff::checkpoint::strategy::{
     BalancedCheckpointing, CheckpointStrategy, NoCheckpointing,
 };
-use burn_autodiff::AutodiffTensorTrait as _;
-use burn_backend::{AutodiffTensor, Backend, BackendTypes, ComplexTensorBackend, DType, Shape, TensorMetadata};
-
+use burn_backend::{
+    Backend, BackendTypes, ComplexTensorBackend, DType, Shape, TensorMetadata,
+};
 
 use crate::CheckpointingStrategy;
 #[cfg(feature = "autodiff")]
@@ -235,8 +236,6 @@ impl<B: Backend> TensorMetadata for BackendTensor<B> {
     }
 }
 
-
-
 /// A tensor that can dispatch operations to any enabled backend at runtime.
 ///
 /// When the `autodiff` feature is enabled, tensors may carry a checkpointing
@@ -451,6 +450,7 @@ macro_rules! impl_dispatch_conversion {
             fn try_into_backend(tensor: DispatchTensor) -> Result<BackendTensor<$backend>, String> {
                 match tensor.kind {
                     DispatchTensorKind::$backend(t) => Ok(t),
+                    #[allow(unreachable_patterns)]
                     other => Err(format!(
                         "Expected {} tensor, got variant: {}",
                         stringify!($backend),
@@ -523,12 +523,17 @@ macro_rules! impl_dispatch_conversion {
                     BackendTensor::Quantized(t) => {
                         DispatchTensorKind::$backend(BackendTensor::Quantized(t))
                     }
+                    BackendTensor::Complex(t) => {
+                        let ad_tensor = BackendTensor::AutodiffComplex(t);
+                        let inner_dispatch = DispatchTensorKind::$backend(ad_tensor);
+                        DispatchTensorKind::Autodiff(Box::new(inner_dispatch))
+                    }
 
                     BackendTensor::Autodiff(_) => {
                         panic!("Unexpected Autodiff variant provided to `from_backend`",)
                     }
                     BackendTensor::AutodiffComplex(_) => {
-                        panic!("Unexpected AutodiffComplex variant provided to `from_backend`",)
+                        panic!("Unexpected Autodiff complex variant provided to `from_backend`",)
                     }
                 };
 

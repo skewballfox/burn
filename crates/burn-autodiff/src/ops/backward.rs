@@ -1,6 +1,10 @@
 use super::{Ops, OpsPrep};
 use crate::{
-    checkpoint::{base::Checkpointer, builder::CheckpointerBuilder, strategy::CheckpointStrategy}, grads::Gradients, graph::{ComputingProperty, NodeRef, Requirement}, tensor::AutodiffTensorTrait, utils::duplicate
+    checkpoint::{base::Checkpointer, builder::CheckpointerBuilder, strategy::CheckpointStrategy},
+    grads::Gradients,
+    graph::{ComputingProperty, NodeRef, Requirement},
+    tensor::AutodiffTensorTrait,
+    utils::duplicate,
 };
 use burn_backend::{Backend, BackendTypes};
 

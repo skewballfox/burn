@@ -10,14 +10,14 @@ use core::marker::PhantomData;
 
 use burn_backend::{
     UnimplementedTensorPrimitive,
-    backend::{AutodiffBackend, Backend, BackendTypes, ExecutionError, AutodiffTensor as BackendAutodiffTensor},
+    backend::{
+        AutodiffBackend, AutodiffTensor as BackendAutodiffTensor, Backend, BackendTypes,
+        ExecutionError,
+    },
     tensor::{BoolTensor, IntTensor, QuantizedTensor},
 };
 
-
-
-#[cfg(feature = "distributed")]
-use burn_backend::distributed::{DistributedBackend, DistributedParamId, DistributedParams};
+use burn_backend::distributed::{DistributedParamId, DistributedParams};
 
 /// Enable auto-differentiation on a backend.
 ///
@@ -94,9 +94,12 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
     fn device_count(type_id: u16) -> usize {
         B::device_count(type_id)
     }
+
+    fn flush(device: &Self::Device) {
+        B::flush(device)
+    }
 }
 
-#[cfg(not(feature = "distributed"))]
 impl<B: Backend, C: CheckpointStrategy> AutodiffBackend for Autodiff<B, C> {
     type InnerBackend = B;
 

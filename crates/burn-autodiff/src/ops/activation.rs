@@ -9,8 +9,8 @@ use crate::{
     grads::Gradients,
     graph::NodeId,
     ops::{Backward, Ops, OpsKind, unary},
-    tensor::AutodiffTensor,
     retro_unary,
+    tensor::AutodiffTensor,
 };
 use burn_backend::{Backend, ops::ActivationOps, tensor::FloatTensor};
 

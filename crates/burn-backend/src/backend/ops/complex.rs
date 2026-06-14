@@ -4,8 +4,7 @@ use burn_std::{
 };
 
 use crate::{
-    BackendTypes, ComplexTensor, ComplexTensorBackend, TensorMetadata,
-    ops::IntTensorOps,
+    ComplexTensor, ComplexTensorBackend, TensorMetadata,
     tensor::{Device, FloatTensor, IntTensor},
 };
 

@@ -2,19 +2,22 @@ use alloc::vec::Vec;
 use burn_backend::{
     DeviceId,
     distributed::{
-        CollectiveTensor, DistributedBackend, DistributedConfig, DistributedParams,
-        ReduceOperation, TensorRef,
+        CollectiveTensor, DistributedConfig, DistributedOps, DistributedParams, ReduceOperation,
+        TensorRef,
     },
     tensor::FloatTensor,
 };
+
+use burn_backend::Backend;
 
 use crate::{
     Autodiff,
     checkpoint::strategy::CheckpointStrategy,
     ops::{Backward, Ops, OpsKind, unary},
+    tensor::AutodiffTensor,
 };
 
-impl<B: DistributedBackend, C: CheckpointStrategy> DistributedBackend for Autodiff<B, C> {
+impl<B: Backend, C: CheckpointStrategy> DistributedOps<Self> for Autodiff<B, C> {
     fn start_communication_server(devices: &[B::Device], config: DistributedConfig) {
         B::start_communication_server(devices, config);
     }
@@ -44,7 +47,7 @@ impl<B: DistributedBackend, C: CheckpointStrategy> DistributedBackend for Autodi
         #[derive(Debug)]
         struct AllReduce;
 
-        impl<B: DistributedBackend> Backward<B, 1> for AllReduce {
+        impl<B: Backend> Backward<B, 1> for AllReduce {
             type State = (ReduceOperation, Vec<DeviceId>);
 
             fn backward(
@@ -56,7 +59,7 @@ impl<B: DistributedBackend, C: CheckpointStrategy> DistributedBackend for Autodi
                 // Backward uses the same reduce op: local gradients are synchronized via the backend, which handles
                 // scaling (e.g., ncclAvg for mean). This works for the reduce ops that are currently supported, but we
                 // might need to rework it if we add other ops such as ncclMax.
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     B::all_reduce(grad, ops.state.0, ops.state.1).resolve()
                 });
             }

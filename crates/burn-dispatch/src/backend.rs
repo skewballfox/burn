@@ -10,10 +10,9 @@ use alloc::vec::Vec;
 ))]
 use alloc::vec;
 
-use burn_backend::AutodiffTensor;
-#[cfg(all(feature = "distributed", feature = "autodiff"))]
 use burn_backend::distributed::{DistributedParamId, DistributedParams};
-use burn_backend::{AutodiffBackend, Backend, BackendTypes, DType, ExecutionError};
+#[cfg(feature = "autodiff")]
+use burn_backend::{AutodiffBackend, AutodiffTensor, Backend, BackendTypes, DType, ExecutionError};
 
 #[cfg(feature = "autodiff")]
 use alloc::boxed::Box;
@@ -144,12 +143,15 @@ impl Backend for Dispatch {
     {
         dispatch_device!(device, |device| B::staging(data, device))
     }
+
+    fn flush(device: &Self::Device) {
+        dispatch_device!(device, |device| B::flush(device))
+    }
 }
 
 #[cfg(feature = "autodiff")]
 impl AutodiffBackend for Dispatch {
     type InnerBackend = Dispatch;
-    
 
     fn int_inner(tensor: DispatchTensor) -> DispatchTensor {
         tensor
@@ -162,8 +164,6 @@ impl AutodiffBackend for Dispatch {
     fn q_inner(tensor: DispatchTensor) -> DispatchTensor {
         tensor
     }
-
-    
 
     fn int_from_inner(tensor: DispatchTensor) -> DispatchTensor {
         tensor
@@ -268,32 +268,80 @@ impl AutodiffBackend for Dispatch {
             _ => panic!("Requires autodiff tensor."),
         }
     }
-    
-    fn backward<T: AutodiffTensor>(tensor: T) -> T::Gradients
-{
+
+    fn backward<T: AutodiffTensor>(tensor: T) -> T::Gradients {
         tensor.backward()
     }
-    
-    fn grad<T: AutodiffTensor>(
-        tensor: &T,
-        grads: &T::Gradients,
-    ) -> Option<T::Primitive>{
+
+    fn grad<T: AutodiffTensor>(tensor: &T, grads: &T::Gradients) -> Option<T::Primitive> {
         tensor.grad(grads)
     }
-    
+
     fn grad_remove<T: AutodiffTensor>(
         tensor: &T,
         grads: &mut T::Gradients,
-    ) -> Option<T::Primitive>{
+    ) -> Option<T::Primitive> {
         tensor.grad_remove(grads)
     }
-    
-    fn grad_replace<T: AutodiffTensor>(
-        tensor: &T,
-        grads: &mut T::Gradients,
-        grad: T::Primitive,
-    ){
+
+    fn grad_replace<T: AutodiffTensor>(tensor: &T, grads: &mut T::Gradients, grad: T::Primitive) {
         tensor.grad_replace(grads, grad)
+    }
+
+    #[allow(unused_variables)]
+    fn distributed_params(tensor: &DispatchTensor) -> Option<DistributedParams> {
+        let DispatchTensor {
+            kind,
+            checkpointing: _,
+        } = tensor;
+
+        match &kind {
+            DispatchTensorKind::Autodiff(inner_kind) => match &**inner_kind {
+                #[cfg(feature = "cuda")]
+                DispatchTensorKind::Cuda(tensor) => {
+                    tensor.as_autodiff().node.distributed_params.clone()
+                }
+                #[cfg(feature = "remote")]
+                DispatchTensorKind::Remote(tensor) => {
+                    tensor.as_autodiff_float().node.distributed_params.clone()
+                }
+
+                DispatchTensorKind::Autodiff(_) => {
+                    panic!("Autodiff should not wrap an autodiff tensor.")
+                }
+                // Backends without distributed support never carry distributed params.
+                _ => None,
+            },
+            _ => panic!("Requires autodiff tensor."),
+        }
+    }
+
+    #[allow(unused_variables)]
+    fn is_distributed(tensor: &DispatchTensor) -> bool {
+        let DispatchTensor {
+            kind,
+            checkpointing: _,
+        } = tensor;
+
+        match &kind {
+            DispatchTensorKind::Autodiff(inner_kind) => match &**inner_kind {
+                #[cfg(feature = "cuda")]
+                DispatchTensorKind::Cuda(tensor) => {
+                    tensor.as_autodiff().node.distributed_params.is_some()
+                }
+                #[cfg(feature = "remote")]
+                DispatchTensorKind::Remote(tensor) => {
+                    tensor.as_autodiff_float().node.distributed_params.is_some()
+                }
+
+                DispatchTensorKind::Autodiff(_) => {
+                    panic!("Autodiff should not wrap an autodiff tensor.")
+                }
+                // Backends without distributed support are never distributed.
+                _ => false,
+            },
+            _ => panic!("Requires autodiff tensor."),
+        }
     }
 }
 
@@ -305,37 +353,32 @@ impl AutodiffTensor for DispatchTensor {
     fn backward(self) -> Self::Gradients {
         let DispatchTensor { kind, .. } = self;
 
-        // TODO: clean up for distributed feature gating
         match kind {
             DispatchTensorKind::Autodiff(tensor) => match *tensor {
-                #[cfg(all(feature = "cpu", not(feature = "distributed")))]
+                #[cfg(feature = "cpu")]
                 DispatchTensorKind::Cpu(tensor) => tensor.autodiff_float().backward(),
                 #[cfg(feature = "cuda")]
                 DispatchTensorKind::Cuda(tensor) => tensor.autodiff_float().backward(),
-                #[cfg(all(feature = "metal", not(feature = "distributed")))]
+                #[cfg(feature = "metal")]
                 DispatchTensorKind::Metal(tensor) => tensor.autodiff_float().backward(),
-                #[cfg(all(feature = "rocm", not(feature = "distributed")))]
+                #[cfg(feature = "rocm")]
                 DispatchTensorKind::Rocm(tensor) => tensor.autodiff_float().backward(),
-                #[cfg(all(feature = "vulkan", not(feature = "distributed")))]
+                #[cfg(feature = "vulkan")]
                 DispatchTensorKind::Vulkan(tensor) => tensor.autodiff_float().backward(),
-                #[cfg(all(feature = "wgpu", not(feature = "distributed")))]
+                #[cfg(feature = "wgpu")]
                 DispatchTensorKind::Wgpu(tensor) => tensor.autodiff_float().backward(),
-                #[cfg(all(feature = "webgpu", not(feature = "distributed")))]
+                #[cfg(feature = "webgpu")]
                 DispatchTensorKind::WebGpu(tensor) => tensor.autodiff_float().backward(),
-                #[cfg(all(any(feature = "flex", default_backend), not(feature = "distributed")))]
+                #[cfg(any(feature = "flex", default_backend))]
                 DispatchTensorKind::Flex(tensor) => tensor.autodiff_float().backward(),
-                #[cfg(all(feature = "ndarray", not(feature = "distributed")))]
+                #[cfg(feature = "ndarray")]
                 DispatchTensorKind::NdArray(tensor) => tensor.autodiff_float().backward(),
-                #[cfg(all(feature = "tch", not(feature = "distributed")))]
+                #[cfg(feature = "tch")]
                 DispatchTensorKind::LibTorch(tensor) => tensor.autodiff_float().backward(),
-                #[cfg(all(feature = "remote", not(feature = "distributed")))]
+                #[cfg(feature = "remote")]
                 DispatchTensorKind::Remote(tensor) => tensor.autodiff_float().backward(),
                 DispatchTensorKind::Autodiff(_) => {
                     panic!("Autodiff should not wrap an autodiff tensor.")
-                }
-                #[cfg(feature = "distributed")]
-                other => {
-                    panic!("Distributed operations are not supported for tensor kind {other:?}")
                 }
             },
             _ => panic!("Requires autodiff tensor."),
@@ -347,9 +390,9 @@ impl AutodiffTensor for DispatchTensor {
             kind,
             checkpointing,
         } = self;
-        let grad = match &kind {
+        let grad: Option<DispatchTensorKind> = match &kind {
             DispatchTensorKind::Autodiff(inner_kind) => match &**inner_kind {
-                #[cfg(all(feature = "cpu", not(feature = "distributed")))]
+                #[cfg(feature = "cpu")]
                 DispatchTensorKind::Cpu(tensor) => tensor
                     .as_autodiff_float()
                     .grad(grads)
@@ -359,32 +402,32 @@ impl AutodiffTensor for DispatchTensor {
                     .as_autodiff_float()
                     .grad(grads)
                     .map(|t| DispatchTensorKind::Cuda(crate::BackendTensor::Float(t))),
-                #[cfg(all(feature = "metal", not(feature = "distributed")))]
+                #[cfg(feature = "metal")]
                 DispatchTensorKind::Metal(tensor) => tensor
                     .as_autodiff_float()
                     .grad(grads)
                     .map(|t| DispatchTensorKind::Metal(crate::BackendTensor::Float(t))),
-                #[cfg(all(feature = "rocm", not(feature = "distributed")))]
+                #[cfg(feature = "rocm")]
                 DispatchTensorKind::Rocm(tensor) => tensor
                     .as_autodiff_float()
                     .grad(grads)
                     .map(|t| DispatchTensorKind::Rocm(crate::BackendTensor::Float(t))),
-                #[cfg(all(feature = "vulkan", not(feature = "distributed")))]
+                #[cfg(feature = "vulkan")]
                 DispatchTensorKind::Vulkan(tensor) => tensor
                     .as_autodiff_float()
                     .grad(grads)
                     .map(|t| DispatchTensorKind::Vulkan(crate::BackendTensor::Float(t))),
-                #[cfg(all(feature = "wgpu", not(feature = "distributed")))]
+                #[cfg(feature = "wgpu")]
                 DispatchTensorKind::Wgpu(tensor) => tensor
                     .as_autodiff_float()
                     .grad(grads)
                     .map(|t| DispatchTensorKind::Wgpu(crate::BackendTensor::Float(t))),
-                #[cfg(all(feature = "webgpu", not(feature = "distributed")))]
+                #[cfg(feature = "webgpu")]
                 DispatchTensorKind::WebGpu(tensor) => tensor
                     .as_autodiff_float()
                     .grad(grads)
                     .map(|t| DispatchTensorKind::WebGpu(crate::BackendTensor::Float(t))),
-                #[cfg(all(any(feature = "flex", default_backend), not(feature = "distributed")))]
+                #[cfg(any(feature = "flex", default_backend))]
                 DispatchTensorKind::Flex(tensor) => tensor
                     .as_autodiff_float()
                     .grad(grads)
@@ -394,22 +437,18 @@ impl AutodiffTensor for DispatchTensor {
                     .as_autodiff_float()
                     .grad(grads)
                     .map(|t| DispatchTensorKind::NdArray(crate::BackendTensor::Float(t))),
-                #[cfg(all(feature = "tch", not(feature = "distributed")))]
+                #[cfg(feature = "tch")]
                 DispatchTensorKind::LibTorch(tensor) => tensor
                     .as_autodiff_float()
                     .grad(grads)
                     .map(|t| DispatchTensorKind::LibTorch(crate::BackendTensor::Float(t))),
-                #[cfg(all(feature = "remote", not(feature = "distributed")))]
+                #[cfg(feature = "remote")]
                 DispatchTensorKind::Remote(tensor) => tensor
                     .as_autodiff_float()
                     .grad(grads)
                     .map(|t| DispatchTensorKind::Remote(crate::BackendTensor::Float(t))),
                 DispatchTensorKind::Autodiff(_) => {
                     panic!("Autodiff should not wrap an autodiff tensor.")
-                }
-                #[cfg(feature = "distributed")]
-                other => {
-                    panic!("Distributed operations are not supported for tensor kind {other:?}")
                 }
             },
             _ => panic!("Requires autodiff tensor."),
@@ -425,9 +464,9 @@ impl AutodiffTensor for DispatchTensor {
             kind,
             checkpointing,
         } = self;
-        let grad = match &kind {
+        let grad: Option<DispatchTensorKind> = match &kind {
             DispatchTensorKind::Autodiff(inner_kind) => match &**inner_kind {
-                #[cfg(all(feature = "cpu", not(feature = "distributed")))]
+                #[cfg(feature = "cpu")]
                 DispatchTensorKind::Cpu(tensor) => tensor
                     .as_autodiff_float()
                     .grad_remove(grads)
@@ -437,32 +476,32 @@ impl AutodiffTensor for DispatchTensor {
                     .as_autodiff_float()
                     .grad_remove(grads)
                     .map(|t| DispatchTensorKind::Cuda(crate::BackendTensor::Float(t))),
-                #[cfg(all(feature = "metal", not(feature = "distributed")))]
+                #[cfg(feature = "metal")]
                 DispatchTensorKind::Metal(tensor) => tensor
                     .as_autodiff_float()
                     .grad_remove(grads)
                     .map(|t| DispatchTensorKind::Metal(crate::BackendTensor::Float(t))),
-                #[cfg(all(feature = "rocm", not(feature = "distributed")))]
+                #[cfg(feature = "rocm")]
                 DispatchTensorKind::Rocm(tensor) => tensor
                     .as_autodiff_float()
                     .grad_remove(grads)
                     .map(|t| DispatchTensorKind::Rocm(crate::BackendTensor::Float(t))),
-                #[cfg(all(feature = "vulkan", not(feature = "distributed")))]
+                #[cfg(feature = "vulkan")]
                 DispatchTensorKind::Vulkan(tensor) => tensor
                     .as_autodiff_float()
                     .grad_remove(grads)
                     .map(|t| DispatchTensorKind::Vulkan(crate::BackendTensor::Float(t))),
-                #[cfg(all(feature = "wgpu", not(feature = "distributed")))]
+                #[cfg(feature = "wgpu")]
                 DispatchTensorKind::Wgpu(tensor) => tensor
                     .as_autodiff_float()
                     .grad_remove(grads)
                     .map(|t| DispatchTensorKind::Wgpu(crate::BackendTensor::Float(t))),
-                #[cfg(all(feature = "webgpu", not(feature = "distributed")))]
+                #[cfg(feature = "webgpu")]
                 DispatchTensorKind::WebGpu(tensor) => tensor
                     .as_autodiff_float()
                     .grad_remove(grads)
                     .map(|t| DispatchTensorKind::WebGpu(crate::BackendTensor::Float(t))),
-                #[cfg(all(any(feature = "flex", default_backend), not(feature = "distributed")))]
+                #[cfg(any(feature = "flex", default_backend))]
                 DispatchTensorKind::Flex(tensor) => tensor
                     .as_autodiff_float()
                     .grad_remove(grads)
@@ -472,22 +511,18 @@ impl AutodiffTensor for DispatchTensor {
                     .as_autodiff_float()
                     .grad_remove(grads)
                     .map(|t| DispatchTensorKind::NdArray(crate::BackendTensor::Float(t))),
-                #[cfg(all(feature = "tch", not(feature = "distributed")))]
+                #[cfg(feature = "tch")]
                 DispatchTensorKind::LibTorch(tensor) => tensor
                     .as_autodiff_float()
                     .grad_remove(grads)
                     .map(|t| DispatchTensorKind::LibTorch(crate::BackendTensor::Float(t))),
-                #[cfg(all(feature = "remote", not(feature = "distributed")))]
+                #[cfg(feature = "remote")]
                 DispatchTensorKind::Remote(tensor) => tensor
                     .as_autodiff_float()
                     .grad_remove(grads)
                     .map(|t| DispatchTensorKind::Remote(crate::BackendTensor::Float(t))),
                 DispatchTensorKind::Autodiff(_) => {
                     panic!("Autodiff should not wrap an autodiff tensor.")
-                }
-                #[cfg(feature = "distributed")]
-                other => {
-                    panic!("Distributed operations are not supported for tensor kind {other:?}")
                 }
             },
             _ => panic!("Requires autodiff tensor."),
@@ -511,7 +546,7 @@ impl AutodiffTensor for DispatchTensor {
 
         match &kind {
             DispatchTensorKind::Autodiff(inner_kind) => match (&**inner_kind, grad) {
-                #[cfg(all(feature = "cpu", not(feature = "distributed")))]
+                #[cfg(feature = "cpu")]
                 (DispatchTensorKind::Cpu(tensor), DispatchTensorKind::Cpu(grad)) => {
                     tensor.as_autodiff_float().grad_replace(grads, grad.float())
                 }
@@ -519,27 +554,27 @@ impl AutodiffTensor for DispatchTensor {
                 (DispatchTensorKind::Cuda(tensor), DispatchTensorKind::Cuda(grad)) => {
                     tensor.as_autodiff_float().grad_replace(grads, grad.float())
                 }
-                #[cfg(all(feature = "metal", not(feature = "distributed")))]
+                #[cfg(feature = "metal")]
                 (DispatchTensorKind::Metal(tensor), DispatchTensorKind::Metal(grad)) => {
                     tensor.as_autodiff_float().grad_replace(grads, grad.float())
                 }
-                #[cfg(all(feature = "rocm", not(feature = "distributed")))]
+                #[cfg(feature = "rocm")]
                 (DispatchTensorKind::Rocm(tensor), DispatchTensorKind::Rocm(grad)) => {
                     tensor.as_autodiff_float().grad_replace(grads, grad.float())
                 }
-                #[cfg(all(feature = "vulkan", not(feature = "distributed")))]
+                #[cfg(feature = "vulkan")]
                 (DispatchTensorKind::Vulkan(tensor), DispatchTensorKind::Vulkan(grad)) => {
                     tensor.as_autodiff_float().grad_replace(grads, grad.float())
                 }
-                #[cfg(all(feature = "wgpu", not(feature = "distributed")))]
+                #[cfg(feature = "wgpu")]
                 (DispatchTensorKind::Wgpu(tensor), DispatchTensorKind::Wgpu(grad)) => {
                     tensor.as_autodiff_float().grad_replace(grads, grad.float())
                 }
-                #[cfg(all(feature = "webgpu", not(feature = "distributed")))]
+                #[cfg(feature = "webgpu")]
                 (DispatchTensorKind::WebGpu(tensor), DispatchTensorKind::WebGpu(grad)) => {
                     tensor.as_autodiff_float().grad_replace(grads, grad.float())
                 }
-                #[cfg(all(any(feature = "flex", default_backend), not(feature = "distributed")))]
+                #[cfg(any(feature = "flex", default_backend))]
                 (DispatchTensorKind::Flex(tensor), DispatchTensorKind::Flex(grad)) => {
                     tensor.as_autodiff_float().grad_replace(grads, grad.float())
                 }
@@ -547,7 +582,7 @@ impl AutodiffTensor for DispatchTensor {
                 (DispatchTensorKind::NdArray(tensor), DispatchTensorKind::NdArray(grad)) => {
                     tensor.as_autodiff_float().grad_replace(grads, grad.float())
                 }
-                #[cfg(all(feature = "remote", not(feature = "distributed")))]
+                #[cfg(feature = "remote")]
                 (DispatchTensorKind::Remote(tensor), DispatchTensorKind::Remote(grad)) => {
                     tensor.as_autodiff_float().grad_replace(grads, grad.float())
                 }
@@ -563,6 +598,70 @@ impl AutodiffTensor for DispatchTensor {
         }
     }
 
+    fn inner(self) -> DispatchTensor {
+        let DispatchTensor {
+            kind,
+            checkpointing: _,
+        } = self;
+
+        let kind = match kind {
+            DispatchTensorKind::Autodiff(inner_kind) => match *inner_kind {
+                #[cfg(feature = "cpu")]
+                DispatchTensorKind::Cpu(tensor) => DispatchTensorKind::Cpu(
+                    crate::BackendTensor::Float(tensor.autodiff_float().primitive),
+                ),
+                #[cfg(feature = "cuda")]
+                DispatchTensorKind::Cuda(tensor) => DispatchTensorKind::Cuda(
+                    crate::BackendTensor::Float(tensor.autodiff_float().primitive),
+                ),
+                #[cfg(feature = "metal")]
+                DispatchTensorKind::Metal(tensor) => DispatchTensorKind::Metal(
+                    crate::BackendTensor::Float(tensor.autodiff_float().primitive),
+                ),
+                #[cfg(feature = "rocm")]
+                DispatchTensorKind::Rocm(tensor) => DispatchTensorKind::Rocm(
+                    crate::BackendTensor::Float(tensor.autodiff_float().primitive),
+                ),
+                #[cfg(feature = "vulkan")]
+                DispatchTensorKind::Vulkan(tensor) => DispatchTensorKind::Vulkan(
+                    crate::BackendTensor::Float(tensor.autodiff_float().primitive),
+                ),
+                #[cfg(feature = "wgpu")]
+                DispatchTensorKind::Wgpu(tensor) => DispatchTensorKind::Wgpu(
+                    crate::BackendTensor::Float(tensor.autodiff_float().primitive),
+                ),
+                #[cfg(feature = "webgpu")]
+                DispatchTensorKind::WebGpu(tensor) => DispatchTensorKind::WebGpu(
+                    crate::BackendTensor::Float(tensor.autodiff_float().primitive),
+                ),
+                #[cfg(any(feature = "flex", default_backend))]
+                DispatchTensorKind::Flex(tensor) => DispatchTensorKind::Flex(
+                    crate::BackendTensor::Float(tensor.autodiff_float().primitive),
+                ),
+                #[cfg(feature = "ndarray")]
+                DispatchTensorKind::NdArray(tensor) => DispatchTensorKind::NdArray(
+                    crate::BackendTensor::Float(tensor.autodiff_float().primitive),
+                ),
+                #[cfg(feature = "tch")]
+                DispatchTensorKind::LibTorch(tensor) => DispatchTensorKind::LibTorch(
+                    crate::BackendTensor::Float(tensor.autodiff_float().primitive),
+                ),
+                #[cfg(feature = "remote")]
+                DispatchTensorKind::Remote(tensor) => DispatchTensorKind::Remote(
+                    crate::BackendTensor::Float(tensor.autodiff_float().primitive),
+                ),
+                DispatchTensorKind::Autodiff(_) => {
+                    panic!("Autodiff should not wrap an autodiff tensor.")
+                }
+            },
+            _ => panic!("Requires autodiff tensor."),
+        };
+        DispatchTensor {
+            kind,
+            checkpointing: None,
+        }
+    }
+
     fn from_inner(tensor: DispatchTensor) -> DispatchTensor {
         let DispatchTensor {
             kind,
@@ -570,7 +669,7 @@ impl AutodiffTensor for DispatchTensor {
         } = tensor;
 
         let kind = match kind {
-            #[cfg(all(feature = "cpu", not(feature = "distributed")))]
+            #[cfg(feature = "cpu")]
             DispatchTensorKind::Cpu(tensor) => {
                 DispatchTensorKind::Autodiff(Box::new(DispatchTensorKind::Cpu(
                     crate::BackendTensor::Autodiff(Autodiff::<Cpu>::from_inner(tensor.float())),
@@ -582,55 +681,55 @@ impl AutodiffTensor for DispatchTensor {
                     crate::BackendTensor::Autodiff(Autodiff::<Cuda>::from_inner(tensor.float())),
                 )))
             }
-            #[cfg(all(feature = "metal", not(feature = "distributed")))]
+            #[cfg(feature = "metal")]
             DispatchTensorKind::Metal(tensor) => {
                 DispatchTensorKind::Autodiff(Box::new(DispatchTensorKind::Metal(
                     crate::BackendTensor::Autodiff(Autodiff::<Metal>::from_inner(tensor.float())),
                 )))
             }
-            #[cfg(all(feature = "rocm", not(feature = "distributed")))]
+            #[cfg(feature = "rocm")]
             DispatchTensorKind::Rocm(tensor) => {
                 DispatchTensorKind::Autodiff(Box::new(DispatchTensorKind::Rocm(
                     crate::BackendTensor::Autodiff(Autodiff::<Rocm>::from_inner(tensor.float())),
                 )))
             }
-            #[cfg(all(feature = "vulkan", not(feature = "distributed")))]
+            #[cfg(feature = "vulkan")]
             DispatchTensorKind::Vulkan(tensor) => {
                 DispatchTensorKind::Autodiff(Box::new(DispatchTensorKind::Vulkan(
                     crate::BackendTensor::Autodiff(Autodiff::<Vulkan>::from_inner(tensor.float())),
                 )))
             }
-            #[cfg(all(feature = "wgpu", not(feature = "distributed")))]
+            #[cfg(feature = "wgpu")]
             DispatchTensorKind::Wgpu(tensor) => {
                 DispatchTensorKind::Autodiff(Box::new(DispatchTensorKind::Wgpu(
                     crate::BackendTensor::Autodiff(Autodiff::<Wgpu>::from_inner(tensor.float())),
                 )))
             }
-            #[cfg(all(feature = "webgpu", not(feature = "distributed")))]
+            #[cfg(feature = "webgpu")]
             DispatchTensorKind::WebGpu(tensor) => {
                 DispatchTensorKind::Autodiff(Box::new(DispatchTensorKind::WebGpu(
                     crate::BackendTensor::Autodiff(Autodiff::<WebGpu>::from_inner(tensor.float())),
                 )))
             }
-            #[cfg(all(any(feature = "flex", default_backend), not(feature = "distributed")))]
+            #[cfg(any(feature = "flex", default_backend))]
             DispatchTensorKind::Flex(tensor) => {
                 DispatchTensorKind::Autodiff(Box::new(DispatchTensorKind::Flex(
                     crate::BackendTensor::Autodiff(Autodiff::<Flex>::from_inner(tensor.float())),
                 )))
             }
-            #[cfg(all(feature = "ndarray", not(feature = "distributed")))]
+            #[cfg(feature = "ndarray")]
             DispatchTensorKind::NdArray(tensor) => {
                 DispatchTensorKind::Autodiff(Box::new(DispatchTensorKind::NdArray(
                     crate::BackendTensor::Autodiff(Autodiff::<NdArray>::from_inner(tensor.float())),
                 )))
             }
-            #[cfg(all(feature = "tch", not(feature = "distributed")))]
+            #[cfg(feature = "tch")]
             DispatchTensorKind::LibTorch(tensor) => DispatchTensorKind::Autodiff(Box::new(
                 DispatchTensorKind::LibTorch(crate::BackendTensor::Autodiff(
                     Autodiff::<LibTorch>::from_inner(tensor.float()),
                 )),
             )),
-            #[cfg(all(feature = "remote", not(feature = "distributed")))]
+            #[cfg(feature = "remote")]
             DispatchTensorKind::Remote(tensor) => {
                 DispatchTensorKind::Autodiff(Box::new(DispatchTensorKind::Remote(
                     crate::BackendTensor::Autodiff(Autodiff::<Remote>::from_inner(tensor.float())),
@@ -639,8 +738,6 @@ impl AutodiffTensor for DispatchTensor {
             DispatchTensorKind::Autodiff(_) => {
                 panic!("Autodiff should not wrap an autodiff tensor.")
             }
-            #[cfg(feature = "distributed")]
-            other => panic!("Distributed operations are not supported for tensor kind {other:?}"),
         };
 
         // TODO: should use C::STRATEGY
@@ -652,74 +749,6 @@ impl AutodiffTensor for DispatchTensor {
         DispatchTensor {
             kind,
             checkpointing,
-        }
-    }
-
-    fn inner(self) -> DispatchTensor {
-        let DispatchTensor {
-            kind,
-            checkpointing: _,
-        } = self;
-
-        let kind = match kind {
-            DispatchTensorKind::Autodiff(inner_kind) => match *inner_kind {
-                #[cfg(all(feature = "cpu", not(feature = "distributed")))]
-                DispatchTensorKind::Cpu(tensor) => DispatchTensorKind::Cpu(
-                    crate::BackendTensor::Float(tensor.autodiff_float().primitive),
-                ),
-                #[cfg(feature = "cuda")]
-                DispatchTensorKind::Cuda(tensor) => DispatchTensorKind::Cuda(
-                    crate::BackendTensor::Float(tensor.autodiff_float().primitive),
-                ),
-                #[cfg(all(feature = "metal", not(feature = "distributed")))]
-                DispatchTensorKind::Metal(tensor) => DispatchTensorKind::Metal(
-                    crate::BackendTensor::Float(tensor.autodiff_float().primitive),
-                ),
-                #[cfg(all(feature = "rocm", not(feature = "distributed")))]
-                DispatchTensorKind::Rocm(tensor) => DispatchTensorKind::Rocm(
-                    crate::BackendTensor::Float(tensor.autodiff_float().primitive),
-                ),
-                #[cfg(all(feature = "vulkan", not(feature = "distributed")))]
-                DispatchTensorKind::Vulkan(tensor) => DispatchTensorKind::Vulkan(
-                    crate::BackendTensor::Float(tensor.autodiff_float().primitive),
-                ),
-                #[cfg(all(feature = "wgpu", not(feature = "distributed")))]
-                DispatchTensorKind::Wgpu(tensor) => DispatchTensorKind::Wgpu(
-                    crate::BackendTensor::Float(tensor.autodiff_float().primitive),
-                ),
-                #[cfg(all(feature = "webgpu", not(feature = "distributed")))]
-                DispatchTensorKind::WebGpu(tensor) => DispatchTensorKind::WebGpu(
-                    crate::BackendTensor::Float(tensor.autodiff_float().primitive),
-                ),
-                #[cfg(all(any(feature = "flex", default_backend), not(feature = "distributed")))]
-                DispatchTensorKind::Flex(tensor) => DispatchTensorKind::Flex(
-                    crate::BackendTensor::Float(tensor.autodiff_float().primitive),
-                ),
-                #[cfg(all(feature = "ndarray", not(feature = "distributed")))]
-                DispatchTensorKind::NdArray(tensor) => DispatchTensorKind::NdArray(
-                    crate::BackendTensor::Float(tensor.autodiff_float().primitive),
-                ),
-                #[cfg(all(feature = "tch", not(feature = "distributed")))]
-                DispatchTensorKind::LibTorch(tensor) => DispatchTensorKind::LibTorch(
-                    crate::BackendTensor::Float(tensor.autodiff_float().primitive),
-                ),
-                #[cfg(all(feature = "remote", not(feature = "distributed")))]
-                DispatchTensorKind::Remote(tensor) => DispatchTensorKind::Remote(
-                    crate::BackendTensor::Float(tensor.autodiff_float().primitive),
-                ),
-                DispatchTensorKind::Autodiff(_) => {
-                    panic!("Autodiff should not wrap an autodiff tensor.")
-                }
-                #[cfg(feature = "distributed")]
-                other => {
-                    panic!("Distributed operations are not supported for tensor kind {other:?}")
-                }
-            },
-            _ => panic!("Requires autodiff tensor."),
-        };
-        DispatchTensor {
-            kind,
-            checkpointing: None,
         }
     }
 }
@@ -874,9 +903,25 @@ impl Dispatch {
                 .map(|i| LibTorchDevice::Cuda(i).into())
                 .collect(),
             #[cfg(feature = "remote")]
-            // Remote devices are user-supplied addresses, not enumerable hardware.
+            // Remote devices are keyed by a network address, which the type-id-only
+            // `enumerate` can't carry. Use [`Dispatch::enumerate_remote`] to list the devices
+            // behind a given address.
             DispatchDeviceId::Remote => Vec::new(),
             _ => unreachable!("No backend feature enabled."),
         }
+    }
+
+    /// List every device hosted by the remote server at `address`.
+    ///
+    /// Unlike [`enumerate`](Self::enumerate), remote devices are identified by a network
+    /// address rather than enumerable local hardware, so they need a dedicated entry point.
+    /// Connecting to the server (required to learn its device count) happens here; see
+    /// [`RemoteDevice::enumerate`].
+    #[cfg(feature = "remote")]
+    pub fn enumerate_remote(address: &str) -> Vec<DispatchDevice> {
+        RemoteDevice::enumerate(address)
+            .into_iter()
+            .map(DispatchDevice::Remote)
+            .collect()
     }
 }

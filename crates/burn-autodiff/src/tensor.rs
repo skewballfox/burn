@@ -4,10 +4,13 @@ use crate::{
     graph::{ComputingProperty, Node, NodeId, NodeRef, Parent, Requirement, Step},
     runtime::{AutodiffClient, AutodiffClientImpl},
 };
-#[cfg(feature = "distributed")]
+#[cfg(feature = "std")]
 use crate::{distributed::DistributedGradientRegistration, grads::GradSyncContext};
 use alloc::{boxed::Box, vec};
-use burn_backend::{AutodiffTensor as BackendAutodiffTensor, Backend, BackendTypes, ComplexTensorBackend, TensorMetadata, TensorPrimitive};
+use burn_backend::{
+    AutodiffTensor as BackendAutodiffTensor, Backend, BackendTypes, ComplexTensorBackend,
+    TensorMetadata, TensorPrimitive,
+};
 
 #[cfg(target_has_atomic = "ptr")]
 use alloc::sync::Arc;
@@ -15,8 +18,7 @@ use alloc::sync::Arc;
 #[cfg(not(target_has_atomic = "ptr"))]
 use portable_atomic_util::Arc;
 
-#[cfg(feature = "distributed")]
-use burn_backend::distributed::{DistributedBackend, DistributedParamId, DistributedParams};
+use burn_backend::distributed::{DistributedParamId, DistributedParams};
 
 #[derive(Debug, Clone)]
 pub struct AutodiffTensor<B: BackendTypes> {
@@ -79,38 +81,57 @@ pub trait AutodiffTensorTrait: BackendAutodiffTensor {
         grads.remove::<Self>(self);
         grads.register::<Self>(self.node().id, grad);
     }
+
+    /// Mark the tensor as distributed across multiple devices.
+    /// Its gradients will be automatically aggregated from those devices after the backward pass.
+    ///
+    /// # Arguments
+    ///
+    /// * `param_id` - The module tensor's [`DistributedParamId`].
+    fn grad_distributed(mut self, param_id: DistributedParamId) -> Self {
+        let node = self.node_mut();
+        *node = Node::new(
+            vec![],
+            0,
+            node.id,
+            node.requirement,
+            node.properties.clone(),
+            node.client.clone(),
+            Some(DistributedParams { param_id }),
+        )
+        .into();
+        let step = RootStep::new(node.clone());
+
+        self.register_step(step, CheckpointerBuilder::default())
+    }
     /// Mark the tensor as requiring gradients.
     ///
     /// # Panics
     ///
     /// It panics if the tensor is not a leaf.
     fn require_grad(mut self) -> Self {
-        
-            let node = self.node_mut();
-            match node.requirement {
-                    Requirement::Grad => self,
-                    Requirement::GradInBackward => {
-                        panic!("Can't convert a non leaf tensor into a tracked tensor")
-                    }
-                    Requirement::None => {
-                        
-                        *node = Node::new(
-                            vec![],
-                            0,
-                            node.id,
-                            Requirement::Grad,
-                            node.properties.clone(),
-                            node.client.clone(),
-                            #[cfg(feature = "distributed")]
-                            node.distributed_params.clone(),
-                        )
-                        .into();
-                        let step = RootStep::new(node.clone());
+        let node = self.node_mut();
+        match node.requirement {
+            Requirement::Grad => self,
+            Requirement::GradInBackward => {
+                panic!("Can't convert a non leaf tensor into a tracked tensor")
+            }
+            Requirement::None => {
+                *node = Node::new(
+                    vec![],
+                    0,
+                    node.id,
+                    Requirement::Grad,
+                    node.properties.clone(),
+                    node.client.clone(),
+                    node.distributed_params.clone(),
+                )
+                .into();
+                let step = RootStep::new(node.clone());
 
-                        self.register_step(step, CheckpointerBuilder::default())
-                    }
-                }
-
+                self.register_step(step, CheckpointerBuilder::default())
+            }
+        }
     }
 
     /// Create a tensor from parent infos.
@@ -143,74 +164,68 @@ pub trait AutodiffTensorTrait: BackendAutodiffTensor {
             requirement,
             computing_properties,
             client,
-            #[cfg(feature = "distributed")]
             None,
         )
         .into();
 
         Self::new_with_node(primitive, node)
-        }
     }
-
-    
-    
+}
 
 impl<B: Backend> BackendAutodiffTensor for AutodiffTensor<B> {
     type Primitive = B::FloatTensorPrimitive;
     type Gradients = Gradients;
-    
+
     fn backward(self) -> Self::Gradients {
         self.backward()
     }
     fn grad(&self, grads: &Self::Gradients) -> Option<Self::Primitive> {
         <Self as AutodiffTensorTrait>::grad(self, grads)
     }
-    
+
     fn inner(self) -> Self::Primitive {
         self.primitive
     }
-    
+
     fn from_inner(tensor: Self::Primitive) -> Self {
         AutodiffTensor::new(tensor)
     }
-    
+
     fn grad_remove(&self, grads: &mut Self::Gradients) -> Option<Self::Primitive> {
         <Self as AutodiffTensorTrait>::grad_remove(self, grads)
     }
-    
+
     fn grad_replace(&self, grads: &mut Self::Gradients, grad: Self::Primitive) {
         <Self as AutodiffTensorTrait>::grad_replace(self, grads, grad)
     }
-    
 }
 
 impl<B: ComplexTensorBackend> BackendAutodiffTensor for ComplexAutodiffTensor<B> {
     type Primitive = B::ComplexTensorPrimitive;
     type Gradients = Gradients;
-    
+
     fn backward(self) -> Self::Gradients {
         self.backward()
     }
     fn grad(&self, grads: &Self::Gradients) -> Option<Self::Primitive> {
         <Self as AutodiffTensorTrait>::grad(self, grads)
     }
-    
+
     fn inner(self) -> Self::Primitive {
         self.primitive
     }
-    
+
     fn from_inner(tensor: Self::Primitive) -> Self {
         ComplexAutodiffTensor::new(tensor)
     }
-    
+
     fn grad_remove(&self, grads: &mut Self::Gradients) -> Option<Self::Primitive> {
         <Self as AutodiffTensorTrait>::grad_remove(self, grads)
     }
-    
+
     fn grad_replace(&self, grads: &mut Self::Gradients, grad: Self::Primitive) {
         <Self as AutodiffTensorTrait>::grad_replace(self, grads, grad)
     }
-    
 }
 
 impl<B: ComplexTensorBackend> AutodiffTensorTrait for ComplexAutodiffTensor<B> {
@@ -220,12 +235,11 @@ impl<B: ComplexTensorBackend> AutodiffTensorTrait for ComplexAutodiffTensor<B> {
     fn node_mut(&mut self) -> &mut NodeRef {
         &mut self.node
     }
-    
-    
+
     fn node(&self) -> &NodeRef {
         &self.node
     }
-    
+
     fn ref_count(&self) -> &NodeRefCount {
         &self.rc
     }
@@ -247,19 +261,19 @@ impl<B: ComplexTensorBackend> AutodiffTensorTrait for ComplexAutodiffTensor<B> {
     fn into_primitive(self) -> Self::Primitive {
         self.primitive
     }
-    
+
     fn placeholder_primitive(placeholder: Self::PrimitivePlaceholder) -> Self::Primitive {
         placeholder
     }
-    
+
     fn primitive_to_placeholder(primitive: Self::Primitive) -> Self::PrimitivePlaceholder {
         primitive
     }
-    
+
     fn destructure(self) -> (Self::Primitive, NodeRef, NodeRefCount) {
         (self.primitive, self.node, self.rc)
     }
-    
+
     fn new_with_node(primitive: Self::Primitive, node: NodeRef) -> Self {
         Self {
             rc: Arc::new(node.id),
@@ -267,8 +281,6 @@ impl<B: ComplexTensorBackend> AutodiffTensorTrait for ComplexAutodiffTensor<B> {
             node,
         }
     }
-
-    
 }
 impl<B: Backend> AutodiffTensorTrait for AutodiffTensor<B> {
     /// wraps the enum used for gets until I can figure out whether it should be used
@@ -277,12 +289,11 @@ impl<B: Backend> AutodiffTensorTrait for AutodiffTensor<B> {
     fn node_mut(&mut self) -> &mut NodeRef {
         &mut self.node
     }
-    
-    
+
     fn node(&self) -> &NodeRef {
         &self.node
     }
-    
+
     fn ref_count(&self) -> &NodeRefCount {
         &self.rc
     }
@@ -304,19 +315,19 @@ impl<B: Backend> AutodiffTensorTrait for AutodiffTensor<B> {
     fn into_primitive(self) -> Self::Primitive {
         self.primitive
     }
-    
+
     fn placeholder_primitive(placeholder: Self::PrimitivePlaceholder) -> Self::Primitive {
         placeholder.tensor()
     }
-    
+
     fn primitive_to_placeholder(primitive: Self::Primitive) -> Self::PrimitivePlaceholder {
         TensorPrimitive::Float(primitive)
     }
-    
+
     fn destructure(self) -> (Self::Primitive, NodeRef, NodeRefCount) {
         (self.primitive, self.node, self.rc)
     }
-    
+
     fn new_with_node(primitive: Self::Primitive, node: NodeRef) -> Self {
         Self {
             rc: Arc::new(node.id),
@@ -324,8 +335,6 @@ impl<B: Backend> AutodiffTensorTrait for AutodiffTensor<B> {
             node,
         }
     }
-
-    
 }
 impl<B: BackendTypes> TensorMetadata for AutodiffTensor<B> {
     fn dtype(&self) -> burn_std::DType {
@@ -379,7 +388,6 @@ impl Step for RootStep {
         self.node.order
     }
 
-    #[cfg(feature = "distributed")]
     fn distributed_params(&self) -> Option<DistributedParams> {
         self.node.distributed_params.clone()
     }
@@ -396,7 +404,6 @@ impl<B: Backend> AutodiffTensor<B> {
             Requirement::None,
             ComputingProperty::Ambiguous,
             AutodiffClientImpl::new(),
-            #[cfg(feature = "distributed")]
             None,
         )
         .into();
@@ -408,71 +415,13 @@ impl<B: Backend> AutodiffTensor<B> {
         }
     }
 
-    
-
-    
-
-    
-
-    #[cfg(not(feature = "distributed"))]
+    #[cfg(not(feature = "std"))]
     pub fn backward(self) -> Gradients {
         let client = self.node.client.clone();
 
         AutodiffClient::backward::<Self>(&client, self, BackwardMode::default())
     }
-
-    
-
-    #[cfg(feature = "distributed")]
-    /// Mark the tensor as distributed across multiple devices.
-    /// Its gradients will be automatically aggregated from those devices after the backward pass.
-    ///
-    /// # Arguments
-    ///
-    /// * `param_id` - The module tensor's [`DistributedParamId`].
-    pub fn grad_distributed(mut self, param_id: DistributedParamId) -> Self {
-        self.node = Node::new(
-            vec![],
-            0,
-            self.node.id,
-            self.node.requirement,
-            self.node.properties.clone(),
-            self.node.client.clone(),
-            Some(DistributedParams { param_id }),
-        )
-        .into();
-        let step = RootStep::new(self.node.clone());
-
-        self.register_step(step, CheckpointerBuilder::default())
-    }
-}
-
-impl<B: BackendTypes> ComplexAutodiffTensor<B> {
-    /// Create a new leaf tensor.
-    pub fn new(primitive: B::ComplexTensorPrimitive) -> Self {
-        let id = NodeId::new();
-        let node: NodeRef = Node::new(
-            vec![],
-            0,
-            id,
-            Requirement::None,
-            ComputingProperty::Ambiguous,
-            AutodiffClientImpl::new(),
-            #[cfg(feature = "distributed")]
-            None,
-        )
-        .into();
-
-        Self {
-            rc: Arc::new(node.id),
-            primitive,
-            node: node.clone(),
-        }
-    }
-}
-
-#[cfg(feature = "distributed")]
-impl<B: DistributedBackend> AutodiffTensor<B> {
+    #[cfg(feature = "std")]
     pub fn backward(self) -> Gradients {
         let device = B::float_device(&self.primitive);
         let device_cloned = device.clone();
@@ -487,7 +436,58 @@ impl<B: DistributedBackend> AutodiffTensor<B> {
             Box::new(registration)
         }));
 
-        let grads = AutodiffClient::backward::<B>(&client, self, mode);
+        let grads = AutodiffClient::backward::<Self>(&client, self, mode);
+        B::submit_sync_collective(&device);
+        grads
+    }
+}
+
+impl<B: BackendTypes> ComplexAutodiffTensor<B> {
+    /// Create a new leaf tensor.
+    pub fn new(primitive: B::ComplexTensorPrimitive) -> Self {
+        let id = NodeId::new();
+        let node: NodeRef = Node::new(
+            vec![],
+            0,
+            id,
+            Requirement::None,
+            ComputingProperty::Ambiguous,
+            AutodiffClientImpl::new(),
+            None,
+        )
+        .into();
+
+        Self {
+            rc: Arc::new(node.id),
+            primitive,
+            node: node.clone(),
+        }
+    }
+}
+
+impl<B: Backend + ComplexTensorBackend> ComplexAutodiffTensor<B> {
+    #[cfg(not(feature = "std"))]
+    pub fn backward(self) -> Gradients {
+        let client = self.node.client.clone();
+
+        AutodiffClient::backward::<Self>(&client, self, BackwardMode::default())
+    }
+    #[cfg(feature = "std")]
+    pub fn backward(self) -> Gradients {
+        let device = B::complex_device(&self.primitive);
+        let device_cloned = device.clone();
+        let client = self.node.client.clone();
+
+        let mode = BackwardMode::Distributed(Box::new(|ctx: GradSyncContext| {
+            let registration = DistributedGradientRegistration::<B>::new(
+                ctx.n_required_map,
+                ctx.distributed_params,
+                device_cloned,
+            );
+            Box::new(registration)
+        }));
+
+        let grads = AutodiffClient::backward::<Self>(&client, self, mode);
         B::submit_sync_collective(&device);
         grads
     }
