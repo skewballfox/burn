@@ -4,9 +4,9 @@ use burn_backend::{Backend, TensorMetadata};
 use burn_std::Shape;
 
 #[derive(Debug)]
-pub(crate) struct MaxMinDim;
+pub(crate) struct MaxMinDim<B: Backend>(pub(crate) std::marker::PhantomData<B>);
 
-impl<B: Backend> Backward<B, 1> for MaxMinDim {
+impl<B: Backend> Backward<B, 1> for MaxMinDim<B> {
     type State = (B::IntTensorPrimitive, Shape, usize);
 
     fn backward(

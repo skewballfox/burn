@@ -4,9 +4,9 @@ use burn_backend::{Backend, TensorMetadata};
 use burn_std::Shape;
 
 #[derive(Debug)]
-pub(crate) struct SortDim;
+pub(crate) struct SortDim<B: Backend>(pub(crate) std::marker::PhantomData<B>);
 
-impl<B: Backend> Backward<B, 1> for SortDim {
+impl<B: Backend> Backward<B, 1> for SortDim<B> {
     type State = (B::IntTensorPrimitive, Shape, usize);
 
     fn backward(

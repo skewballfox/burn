@@ -41,6 +41,9 @@ pub trait AutodiffTensorTrait: BackendAutodiffTensor {
     type PrimitivePlaceholder: Clone + Send + Sync + 'static;
     /// Maps to the underlying tensor primitive's "ones_like" function, used during the backward pass to create gradient tensors with the same shape and device as the original tensor.
     fn ones_like(tensor: &Self::Primitive) -> Self::Primitive;
+    /// Maps to the underlying tensor primitive's "sum_dim" function, used for broadcasting
+    fn sum_dim(tensor: Self::Primitive, dim: usize) -> Self::Primitive;
+
     /// Create a tensor from parent infos.
     fn new_with_node(primitive: Self::Primitive, node: NodeRef) -> Self;
     /// Get a mutable reference to the tensor's node.
@@ -296,6 +299,10 @@ impl<B: ComplexTensorBackend> AutodiffTensorTrait for ComplexAutodiffTensor<B> {
             node,
         }
     }
+    
+    fn sum_dim(tensor: Self::Primitive, dim: usize) -> Self::Primitive {
+        B::complex_sum_dim(tensor, dim)
+    }
 }
 impl<B: Backend> AutodiffTensorTrait for AutodiffTensor<B> {
     /// wraps the enum used for gets until I can figure out whether it should be used
@@ -349,6 +356,10 @@ impl<B: Backend> AutodiffTensorTrait for AutodiffTensor<B> {
             primitive,
             node,
         }
+    }
+    
+    fn sum_dim(tensor: Self::Primitive, dim: usize) -> Self::Primitive {
+        B::float_sum_dim(tensor, dim)
     }
 }
 impl<B: BackendTypes> TensorMetadata for AutodiffTensor<B> {

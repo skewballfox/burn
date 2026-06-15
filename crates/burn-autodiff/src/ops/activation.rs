@@ -10,18 +10,18 @@ use crate::{
     graph::NodeId,
     ops::{Backward, Ops, OpsKind, unary},
     retro_unary,
-    tensor::AutodiffTensor,
+    tensor::{AutodiffTensor},
 };
 use burn_backend::{Backend, ops::ActivationOps, tensor::FloatTensor};
 
 impl<B: Backend, C: CheckpointStrategy> ActivationOps<Autodiff<B, C>> for Autodiff<B, C> {
     fn gelu(tensor: FloatTensor<Self>) -> FloatTensor<Self> {
         #[derive(Debug)]
-        struct Gelu;
+        struct Gelu<B: Backend>(pub(crate) std::marker::PhantomData<B>);
 
         retro_unary!(RetroGelu, B::gelu);
 
-        impl<B: Backend> Backward<B, 1> for Gelu {
+        impl<B: Backend> Backward<B, 1> for Gelu<B> {
             type State = NodeId;
 
             fn backward(
@@ -38,11 +38,11 @@ impl<B: Backend, C: CheckpointStrategy> ActivationOps<Autodiff<B, C>> for Autodi
             }
         }
 
-        match Gelu
-            .prepare::<C>([tensor.node.clone()])
+        match Gelu::<B>(PhantomData)
+            .prepare::<C,AutodiffTensor<B>>([tensor.node.clone()])
             .memory_bound()
             .retro_forward(RetroGelu::<B>::new(tensor.node.id))
-            .parents([&tensor])
+            .parents::<B,AutodiffTensor<B>,_>([&tensor])
             .stateful()
         {
             OpsKind::Tracked(mut prep) => {
@@ -55,11 +55,11 @@ impl<B: Backend, C: CheckpointStrategy> ActivationOps<Autodiff<B, C>> for Autodi
 
     fn relu(tensor: FloatTensor<Self>) -> FloatTensor<Self> {
         #[derive(Debug)]
-        struct Relu;
+        struct Relu<B: Backend>(pub(crate) std::marker::PhantomData<B>);
 
         retro_unary!(RetroRelu, B::relu);
 
-        impl<B: Backend> Backward<B, 1> for Relu {
+        impl<B: Backend> Backward<B, 1> for Relu<B> {
             type State = NodeId;
 
             fn backward(
@@ -75,11 +75,11 @@ impl<B: Backend, C: CheckpointStrategy> ActivationOps<Autodiff<B, C>> for Autodi
             }
         }
 
-        match Relu
-            .prepare::<C>([tensor.node.clone()])
+        match Relu::<B>(PhantomData)
+            .prepare::<C,AutodiffTensor<B>>([tensor.node.clone()])
             .memory_bound()
             .retro_forward(RetroRelu::<B>::new(tensor.node.id))
-            .parents([&tensor])
+            .parents::<B,AutodiffTensor<B>,_>([&tensor])
             .stateful()
         {
             OpsKind::Tracked(mut prep) => {
@@ -92,11 +92,11 @@ impl<B: Backend, C: CheckpointStrategy> ActivationOps<Autodiff<B, C>> for Autodi
 
     fn sigmoid(tensor: FloatTensor<Self>) -> FloatTensor<Self> {
         #[derive(Debug)]
-        struct Sigmoid;
+        struct Sigmoid<B: Backend>(pub(crate) std::marker::PhantomData<B>);
 
         retro_unary!(RetroSigmoid, B::sigmoid);
 
-        impl<B: Backend> Backward<B, 1> for Sigmoid {
+        impl<B: Backend> Backward<B, 1> for Sigmoid<B> {
             type State = NodeId;
 
             fn backward(
@@ -113,11 +113,11 @@ impl<B: Backend, C: CheckpointStrategy> ActivationOps<Autodiff<B, C>> for Autodi
             }
         }
 
-        match Sigmoid
-            .prepare::<C>([tensor.node.clone()])
+        match Sigmoid::<B>(PhantomData)
+            .prepare::<C, AutodiffTensor<B>>([tensor.node.clone()])
             .memory_bound()
             .retro_forward(RetroSigmoid::<B>::new(tensor.node.id))
-            .parents([&tensor])
+            .parents::<B, AutodiffTensor<B>, _>([&tensor])
             .stateful()
         {
             OpsKind::Tracked(mut prep) => {
@@ -130,11 +130,11 @@ impl<B: Backend, C: CheckpointStrategy> ActivationOps<Autodiff<B, C>> for Autodi
 
     fn log_sigmoid(tensor: FloatTensor<Self>) -> FloatTensor<Self> {
         #[derive(Debug)]
-        struct LogSigmoid;
+        struct LogSigmoid<B: Backend>(pub(crate) std::marker::PhantomData<B>);
 
         retro_unary!(RetroLogSigmoid, B::log_sigmoid);
 
-        impl<B: Backend> Backward<B, 1> for LogSigmoid {
+        impl<B: Backend> Backward<B, 1> for LogSigmoid<B> {
             type State = NodeId;
 
             fn backward(
@@ -151,11 +151,11 @@ impl<B: Backend, C: CheckpointStrategy> ActivationOps<Autodiff<B, C>> for Autodi
             }
         }
 
-        match LogSigmoid
-            .prepare::<C>([tensor.node.clone()])
+        match LogSigmoid::<B>(PhantomData)
+            .prepare::<C,AutodiffTensor<B>>([tensor.node.clone()])
             .memory_bound()
             .retro_forward(RetroLogSigmoid::<B>::new(tensor.node.id))
-            .parents([&tensor])
+            .parents::<B, AutodiffTensor<B>, _>([&tensor])
             .stateful()
         {
             OpsKind::Tracked(mut prep) => {

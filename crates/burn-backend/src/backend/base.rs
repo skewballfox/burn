@@ -14,7 +14,7 @@ use crate::distributed::{DistributedParamId, DistributedParams};
 use super::DeviceOps;
 
 /// The mapping of types used by Backend and traits.
-pub trait BackendTypes: Clone + core::fmt::Debug + 'static {
+pub trait BackendTypes: Clone + Send+ Sync+core::fmt::Debug + 'static {
     /// Device type.
     type Device: DeviceOps;
 
@@ -348,7 +348,7 @@ pub trait AutodiffBackend: Backend {
 /// Trait implemented by all autodiff tensors, providing the necessary interface for the backward pass and gradient management.
 pub trait AutodiffTensor: TensorMetadata {
     /// The underlying primitive type that is being differentiated
-    type Primitive: TensorMetadata;
+    type Primitive: TensorMetadata + Clone + Send + 'static;
     /// Gradients type associated with this tensor, used in the backward pass.
     type Gradients: Send;
     /// Backward pass for this tensor, which will compute the gradients for all tracked tensors in the computational graph.

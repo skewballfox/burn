@@ -1,15 +1,15 @@
+use std::marker::PhantomData;
+
 use burn_backend::{
-    Backend, ComplexTensorBackend,
-    ops::ComplexTensorOps,
-    tensor::{BoolTensor, ComplexTensor, Device, IntTensor},
+    Backend, ComplexTensorBackend, TensorMetadata, ops::ComplexTensorOps, tensor::{BoolTensor, ComplexTensor, Device, IntTensor}
 };
 
-use crate::{Autodiff, checkpoint::strategy::CheckpointStrategy, tensor::ComplexAutodiffTensor};
+use crate::{Autodiff, NodeId, checkpoint::{base::Checkpointer, retro_forward::RetroForward, state::BackwardStates, strategy::CheckpointStrategy}, grads::Gradients, ops::{Backward, Ops, OpsKind, unary}, tensor::ComplexAutodiffTensor};
 
-impl<B: ComplexTensorBackend + Backend, C: CheckpointStrategy> ComplexTensorBackend
+impl<B: ComplexTensorBackend, C: CheckpointStrategy> ComplexTensorBackend
     for Autodiff<B, C>
 {
-    type InnerBackend = Self;
+    type InnerBackend = B::InnerBackend;
 
     fn complex_from_real_data(
         data: burn_std::TensorData,
@@ -41,7 +41,7 @@ impl<B: ComplexTensorBackend + Backend, C: CheckpointStrategy> ComplexTensorBack
     }
 }
 
-impl<B: ComplexTensorBackend + Backend, C: CheckpointStrategy> ComplexTensorOps<Self>
+impl<B: ComplexTensorBackend, C: CheckpointStrategy> ComplexTensorOps<Self>
     for Autodiff<B, C>
 {
     fn complex_device(tensor: &ComplexTensor<Self>) -> Device<Self> {
@@ -67,28 +67,28 @@ impl<B: ComplexTensorBackend + Backend, C: CheckpointStrategy> ComplexTensorOps<
     }
 
     fn complex_random(
-        _shape: burn_std::Shape,
-        _distribution: burn_std::Distribution,
-        _device: &burn_backend::tensor::Device<Self>,
-        _dtype: burn_std::ComplexDType,
+        shape: burn_std::Shape,
+        distribution: burn_std::Distribution,
+        device: &burn_backend::tensor::Device<Self>,
+        dtype: burn_std::ComplexDType,
     ) -> ComplexTensor<Self> {
-        todo!()
+        ComplexAutodiffTensor::new(B::complex_random(shape, distribution, device, dtype))
     }
 
     fn complex_zeros(
-        _shape: burn_std::Shape,
-        _device: &burn_backend::tensor::Device<Self>,
-        _dtype: burn_std::ComplexDType,
+        shape: burn_std::Shape,
+        device: &burn_backend::tensor::Device<Self>,
+        dtype: burn_std::ComplexDType,
     ) -> ComplexTensor<Self> {
-        todo!()
+        ComplexAutodiffTensor::new(B::complex_zeros(shape, device, dtype))
     }
 
     fn complex_ones(
-        _shape: burn_std::Shape,
-        _device: &burn_backend::tensor::Device<Self>,
-        _dtype: burn_std::ComplexDType,
+        shape: burn_std::Shape,
+        device: &burn_backend::tensor::Device<Self>,
+        dtype: burn_std::ComplexDType,
     ) -> ComplexTensor<Self> {
-        todo!()
+        ComplexAutodiffTensor::new(B::complex_ones(shape, device, dtype))
     }
 
     fn complex_full(
@@ -107,10 +107,19 @@ impl<B: ComplexTensorBackend + Backend, C: CheckpointStrategy> ComplexTensorOps<
         todo!()
     }
 
+    #[cfg_attr(feature = "tracing", tracing::instrument(
+        level="trace",
+        skip(tensor),
+        fields(
+            from = ?tensor.node,
+            shape = ?tensor.shape(),
+            dtype = ?tensor.dtype(),
+        )
+    ))]
     async fn complex_into_data(
-        _tensor: ComplexTensor<Self>,
+        tensor: ComplexTensor<Self>,
     ) -> Result<burn_std::TensorData, burn_std::ExecutionError> {
-        todo!()
+        B::complex_into_data(tensor.primitive).await
     }
 
     fn complex_reshape(
@@ -297,11 +306,61 @@ impl<B: ComplexTensorBackend + Backend, C: CheckpointStrategy> ComplexTensorOps<
     }
 
     fn complex_swap_dims(
-        _tensor: ComplexTensor<Self>,
-        _dim1: usize,
-        _dim2: usize,
+        tensor: ComplexTensor<Self>,
+        dim1: usize,
+        dim2: usize,
     ) -> ComplexTensor<Self> {
-        todo!()
+        #[derive(Debug)]
+        struct SwapDim<B: ComplexTensorBackend>(pub(crate) std::marker::PhantomData<B>);
+
+        #[derive(new, Debug)]
+        struct RetroSwapDims<B: ComplexTensorBackend> {
+            input_id: NodeId,
+            dim1: usize,
+            dim2: usize,
+            _backend: PhantomData<B>,
+        }
+
+        impl<B: ComplexTensorBackend + std::marker::Send> RetroForward for RetroSwapDims<B> {
+            fn forward(&self, states: &mut BackwardStates, out_node: NodeId) {
+                let input = states.get_state::<B::ComplexTensorPrimitive>(&self.input_id);
+                let out = B::complex_swap_dims(input, self.dim1, self.dim2);
+                states.save(out_node, out)
+            }
+        }
+
+        impl<B: ComplexTensorBackend> Backward<B, 1> for SwapDim<B> {
+            type State = (usize, usize);
+
+            fn backward(
+                self,
+                ops: Ops<Self::State, 1>,
+                grads: &mut Gradients,
+                _checkpointer: &mut Checkpointer,
+            ) {
+                let (dim1, dim2) = ops.state;
+
+                unary::<ComplexAutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
+                    B::complex_swap_dims(grad, dim2, dim1)
+                });
+            }
+        }
+
+        match SwapDim::<B>(PhantomData)
+            .prepare::<C, ComplexAutodiffTensor<B>>([tensor.node.clone()])
+            .memory_bound()
+            .retro_forward(RetroSwapDims::<B>::new(tensor.node.id, dim1, dim2))
+            .parents::<B,ComplexAutodiffTensor<B>,_>([&tensor])
+            .stateful()
+        {
+            OpsKind::Tracked(prep) => prep.finish(
+                (dim1, dim2),
+                B::complex_swap_dims(tensor.primitive, dim1, dim2),
+            ),
+            OpsKind::UnTracked(prep) => {
+                prep.finish(B::complex_swap_dims(tensor.primitive, dim1, dim2))
+            }
+        }
     }
 
     fn complex_repeat_dim(

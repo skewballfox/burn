@@ -18,7 +18,6 @@ use burn_backend::BackendTypes;
 pub trait Backward<B, const N: usize>: Send + core::fmt::Debug
 where
     Self: Sized + 'static,
-    B: BackendTypes,
 {
     /// Associated type to compute the backward pass.
     type State: Clone + Send + core::fmt::Debug + 'static;
@@ -32,7 +31,7 @@ where
     );
 
     /// Prepare the backward ops.
-    fn prepare<C: CheckpointStrategy>(
+    fn prepare<C: CheckpointStrategy, T: AutodiffTensorTrait>(
         self,
         nodes: [NodeRef; N],
     ) -> OpsPrep<Self, B, Self::State, C, N> {

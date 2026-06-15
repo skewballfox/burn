@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use alloc::vec::Vec;
 use burn_backend::{
     DeviceId,
@@ -45,9 +47,9 @@ impl<B: Backend, C: CheckpointStrategy> DistributedOps<Self> for Autodiff<B, C> 
         device_ids: Vec<DeviceId>,
     ) -> CollectiveTensor<Self> {
         #[derive(Debug)]
-        struct AllReduce;
+        struct AllReduce<B: Backend>(pub(crate) std::marker::PhantomData<B>);
 
-        impl<B: Backend> Backward<B, 1> for AllReduce {
+        impl<B: Backend> Backward<B, 1> for AllReduce<B> {
             type State = (ReduceOperation, Vec<DeviceId>);
 
             fn backward(
@@ -69,8 +71,8 @@ impl<B: Backend, C: CheckpointStrategy> DistributedOps<Self> for Autodiff<B, C> 
         // Safety: we call `assume_resolved` only to wrap it in a new `CollectiveTensor`.
         let resolved = unsafe { collective.assume_resolved() };
 
-        match AllReduce
-            .prepare::<C>([tensor.node.clone()])
+        match AllReduce::<B>(PhantomData)
+            .prepare::<C, AutodiffTensor<B>>([tensor.node.clone()])
             .compute_bound()
             .stateful()
         {
