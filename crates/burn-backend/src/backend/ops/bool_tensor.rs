@@ -413,21 +413,9 @@ pub trait BoolTensorOps<B: Backend> {
     /// The transposed tensor.
     fn bool_transpose(tensor: BoolTensor<B>) -> BoolTensor<B> {
         let ndims = tensor.shape().num_dims();
-        Self::bool_swap_dims(tensor, ndims - 2, ndims - 1)
+        B::swap_dims::<BoolTensor<B>>(tensor, ndims - 2, ndims - 1)
     }
 
-    /// Swaps two dimensions of a bool tensor.
-    ///
-    /// # Arguments
-    ///
-    /// * `tensor` - The tensor to swap the dimensions of.
-    /// * `dim1` - The first dimension to swap.
-    /// * `dim2` - The second dimension to swap.
-    ///
-    /// # Returns
-    ///
-    /// The tensor with the dimensions swapped.
-    fn bool_swap_dims(tensor: BoolTensor<B>, dim1: usize, dim2: usize) -> BoolTensor<B>;
 
     /// Permutes the dimensions of a tensor.
     ///

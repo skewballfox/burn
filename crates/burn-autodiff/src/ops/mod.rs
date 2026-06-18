@@ -8,6 +8,7 @@ mod module;
 mod qtensor;
 mod tensor;
 mod transaction;
+mod general;
 
 pub(crate) mod maxmin;
 pub(crate) mod sort;

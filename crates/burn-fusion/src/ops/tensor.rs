@@ -555,36 +555,36 @@ impl<B: FusionBackend> FloatTensorOps<Self> for Fusion<B> {
             .output()
     }
 
-    fn float_swap_dims(tensor: FloatTensor<Self>, dim1: usize, dim2: usize) -> FloatTensor<Self> {
-        #[derive(new, Debug)]
-        struct SwapDimsOps<B: FusionBackend> {
-            desc: SwapDimsOpIr,
-            _b: PhantomData<B>,
-        }
+    // fn float_swap_dims(tensor: FloatTensor<Self>, dim1: usize, dim2: usize) -> FloatTensor<Self> {
+    //     #[derive(new, Debug)]
+    //     struct SwapDimsOps<B: FusionBackend> {
+    //         desc: SwapDimsOpIr,
+    //         _b: PhantomData<B>,
+    //     }
 
-        impl<B: FusionBackend> Operation<B::FusionRuntime> for SwapDimsOps<B> {
-            fn execute(&self, handles: &mut HandleContainer<B::Handle>) {
-                let input = handles.get_float_tensor::<B>(&self.desc.input);
-                let output = B::float_swap_dims(input, self.desc.dim1, self.desc.dim2);
-                handles.register_float_tensor::<B>(&self.desc.out.id, output);
-            }
-        }
+    //     impl<B: FusionBackend> Operation<B::FusionRuntime> for SwapDimsOps<B> {
+    //         fn execute(&self, handles: &mut HandleContainer<B::Handle>) {
+    //             let input = handles.get_float_tensor::<B>(&self.desc.input);
+    //             let output = B::float_swap_dims(input, self.desc.dim1, self.desc.dim2);
+    //             handles.register_float_tensor::<B>(&self.desc.out.id, output);
+    //         }
+    //     }
 
-        let streams = StreamId::current();
+    //     let streams = StreamId::current();
 
-        let client = tensor.client.clone();
-        let desc = SwapDimsOpIr::create(tensor.into_ir(), dim1, dim2, || {
-            client.create_empty_handle()
-        });
+    //     let client = tensor.client.clone();
+    //     let desc = SwapDimsOpIr::create(tensor.into_ir(), dim1, dim2, || {
+    //         client.create_empty_handle()
+    //     });
 
-        client
-            .register(
-                streams,
-                OperationIr::BaseFloat(BaseOperationIr::SwapDims(desc.clone())),
-                SwapDimsOps::<B>::new(desc),
-            )
-            .output()
-    }
+    //     client
+    //         .register(
+    //             streams,
+    //             OperationIr::BaseFloat(BaseOperationIr::SwapDims(desc.clone())),
+    //             SwapDimsOps::<B>::new(desc),
+    //         )
+    //         .output()
+    // }
 
     fn float_reshape(tensor: FloatTensor<Self>, shape: Shape) -> FloatTensor<Self> {
         if tensor.shape == shape {

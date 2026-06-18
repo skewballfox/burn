@@ -248,9 +248,7 @@ impl FloatTensorOps<Flex> for Flex {
         unary::recip(tensor)
     }
 
-    fn float_swap_dims(tensor: FloatTensor<Flex>, dim1: usize, dim2: usize) -> FloatTensor<Flex> {
-        tensor.transpose(dim1, dim2)
-    }
+    
 
     fn float_permute(tensor: FloatTensor<Flex>, axes: &[usize]) -> FloatTensor<Flex> {
         tensor.permute(axes)

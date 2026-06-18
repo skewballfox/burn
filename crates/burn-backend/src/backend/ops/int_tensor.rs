@@ -1102,21 +1102,9 @@ pub trait IntTensorOps<B: Backend> {
     /// The transposed tensor.
     fn int_transpose(tensor: IntTensor<B>) -> IntTensor<B> {
         let ndims = tensor.shape().num_dims();
-        Self::int_swap_dims(tensor, ndims - 2, ndims - 1)
+        B::swap_dims::<IntTensor<B>>(tensor, ndims - 2, ndims - 1)
     }
 
-    /// Swaps two dimensions of an int tensor.
-    ///
-    /// # Arguments
-    ///
-    /// * `tensor` - The tensor to swap the dimensions of.
-    /// * `dim1` - The first dimension to swap.
-    /// * `dim2` - The second dimension to swap.
-    ///
-    /// # Returns
-    ///
-    /// The tensor with the dimensions swapped.
-    fn int_swap_dims(tensor: IntTensor<B>, dim1: usize, dim2: usize) -> IntTensor<B>;
 
     /// Permutes the dimensions of a tensor.
     ///

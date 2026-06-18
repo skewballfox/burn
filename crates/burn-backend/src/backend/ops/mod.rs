@@ -5,6 +5,7 @@ mod modules;
 mod qtensor;
 mod tensor;
 mod transaction;
+mod general;
 
 pub(crate) mod argwhere;
 pub(crate) mod cat;
@@ -13,6 +14,7 @@ pub(crate) mod sort;
 
 pub use activation::*;
 pub use bool_tensor::*;
+pub use general::*;
 pub use int_tensor::*;
 pub use modules::*;
 pub use qtensor::*;

@@ -372,21 +372,10 @@ pub trait FloatTensorOps<B: Backend> {
     /// The transposed tensor.
     fn float_transpose(tensor: FloatTensor<B>) -> FloatTensor<B> {
         let ndims = tensor.shape().num_dims();
-        Self::float_swap_dims(tensor, ndims - 2, ndims - 1)
+        B::swap_dims::<FloatTensor<B>>(tensor, ndims - 2, ndims - 1)
     }
 
-    /// Swaps two dimensions of a tensor.
-    ///
-    /// # Arguments
-    ///
-    /// * `tensor` - The tensor to swap the dimensions of.
-    /// * `dim1` - The first dimension to swap.
-    /// * `dim2` - The second dimension to swap.
-    ///
-    /// # Returns
-    ///
-    /// The tensor with the dimensions swapped.
-    fn float_swap_dims(tensor: FloatTensor<B>, dim1: usize, dim2: usize) -> FloatTensor<B>;
+    
 
     /// Permutes the dimensions of a tensor.
     ///

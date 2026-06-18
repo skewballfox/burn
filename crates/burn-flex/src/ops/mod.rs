@@ -104,6 +104,7 @@ pub mod expand;
 pub mod fft;
 pub mod flip;
 mod float;
+mod general;
 pub mod gather_scatter;
 pub mod grid_sample;
 mod int;

@@ -53,7 +53,7 @@ pub(crate) fn linear_x_backward<B: Backend>(
     output_grad: FloatTensor<B>,
 ) -> FloatTensor<B> {
     // weight is [d_input, d_output], transpose to [d_output, d_input]
-    let weight = B::float_swap_dims(weight, 0, 1);
+    let weight = B::swap_dims::<FloatTensor<B>>(weight, 0, 1);
     // Unsqueeze to match output_grad rank for batch matmul
     let grad_ndims = output_grad.shape().num_dims();
     let weight = unsqueeze_leading::<B>(weight, grad_ndims);
@@ -68,7 +68,7 @@ pub(crate) fn linear_weight_backward<B: Backend>(
     output_grad: FloatTensor<B>,
 ) -> FloatTensor<B> {
     let ndims = x.shape().num_dims();
-    let x = B::float_swap_dims(x, ndims - 2, ndims - 1);
+    let x = B::swap_dims::<FloatTensor<B>>(x, ndims - 2, ndims - 1);
     let mut grad = B::float_matmul(x, output_grad);
 
     // Sum over all batch dimensions (all dims except the last two).

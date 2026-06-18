@@ -1469,35 +1469,7 @@ impl<B: FusionBackend> IntTensorOps<Self> for Fusion<B> {
             .output()
     }
 
-    fn int_swap_dims(tensor: IntTensor<Self>, dim1: usize, dim2: usize) -> IntTensor<Self> {
-        #[derive(new, Debug)]
-        struct SwapDimsOps<B: FusionBackend> {
-            desc: SwapDimsOpIr,
-            _b: PhantomData<B>,
-        }
-
-        impl<B: FusionBackend> Operation<B::FusionRuntime> for SwapDimsOps<B> {
-            fn execute(&self, handles: &mut HandleContainer<B::Handle>) {
-                let input = handles.get_int_tensor::<B>(&self.desc.input);
-                let output = B::int_swap_dims(input, self.desc.dim1, self.desc.dim2);
-                handles.register_int_tensor::<B>(&self.desc.out.id, output);
-            }
-        }
-        let streams = StreamId::current();
-
-        let client = tensor.client.clone();
-        let desc = SwapDimsOpIr::create(tensor.into_ir(), dim1, dim2, || {
-            client.create_empty_handle()
-        });
-
-        client
-            .register(
-                streams,
-                OperationIr::BaseInt(BaseOperationIr::SwapDims(desc.clone())),
-                SwapDimsOps::<B>::new(desc),
-            )
-            .output()
-    }
+    
 
     fn int_max(tensor: IntTensor<Self>) -> IntTensor<Self> {
         unary_int_ops!(MaxOps, B::int_max, reduce);

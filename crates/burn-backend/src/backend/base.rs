@@ -29,6 +29,7 @@ pub trait BackendTypes: Clone + Send + Sync + core::fmt::Debug + 'static {
 
     /// Tensor primitive to be used for all quantized operations.
     type QuantizedTensorPrimitive: TensorMetadata<Device = Self::Device> + 'static;
+
 }
 
 /// This trait defines all types and functions needed for a backend to be used with burn.
@@ -85,6 +86,7 @@ pub trait Backend:
     + FloatTensorOps<Self>
     + BoolTensorOps<Self>
     + IntTensorOps<Self>
+    + UntypedTensorOps<Self>
     + ModuleOps<Self>
     + ActivationOps<Self>
     + QTensorOps<Self>
