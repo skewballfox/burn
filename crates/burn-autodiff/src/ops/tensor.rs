@@ -85,10 +85,6 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
         B::float_into_data(tensor.primitive).await
     }
 
-    fn float_device(tensor: &FloatTensor<Self>) -> Device<Self> {
-        B::float_device(&tensor.primitive)
-    }
-
     #[cfg_attr(feature = "tracing", tracing::instrument(
         level="trace",
         skip(tensor),
@@ -123,7 +119,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
             .stateful()
         {
             OpsKind::Tracked(prep) => {
-                let device_old = B::float_device(&tensor.primitive);
+                let device_old = tensor.primitive.device();
                 prep.finish(device_old, B::float_to_device(tensor.primitive, device))
             }
             OpsKind::UnTracked(prep) => prep.finish(B::float_to_device(tensor.primitive, device)),
@@ -994,7 +990,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                     dim,
                     indices.clone(),
                     tensor.primitive.shape(),
-                    B::float_device(&tensor.primitive),
+                    tensor.primitive.device(),
                 ),
                 B::float_gather(dim, tensor.primitive, indices),
             ),
@@ -1155,7 +1151,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                         (
                             indices.clone(),
                             values.primitive.shape(),
-                            B::float_device(&data.primitive),
+                            data.primitive.device(),
                         ),
                         B::float_scatter_nd(
                             data.primitive,
@@ -1197,7 +1193,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                             ops.node,
                             grads,
                             |grad| {
-                                let device = B::float_device(&grad);
+                                let device = grad.device();
                                 let dtype = grad.dtype();
                                 let shape = grad.shape();
                                 let ones = B::float_ones(shape, &device, dtype.into());
@@ -1272,7 +1268,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                         _checkpointer: &mut Checkpointer,
                     ) {
                         let (data, values, indices, is_max) = ops.state;
-                        let device = B::float_device(&data);
+                        let device = data.device();
                         let data_dtype = data.dtype();
                         let data_shape = data.shape();
                         let settings = get_device_settings::<B>(&device);
@@ -1391,7 +1387,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 (
                     indices.clone(),
                     data.primitive.shape(),
-                    B::float_device(&data.primitive),
+                    data.primitive.device(),
                 ),
                 B::float_gather_nd(data.primitive, indices),
             ),
@@ -1452,7 +1448,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                     dim,
                     indices.clone(),
                     tensor.primitive.shape(),
-                    B::float_device(&tensor.primitive),
+                    tensor.primitive.device(),
                 ),
                 B::float_select(tensor.primitive, dim, indices),
             ),
@@ -1582,7 +1578,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 (
                     slices.to_vec(),
                     tensor.primitive.shape(),
-                    B::float_device(&tensor.primitive),
+                    tensor.primitive.device(),
                 ),
                 B::float_slice(tensor.primitive, slices),
             ),
@@ -1655,7 +1651,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 (
                     slices.to_vec(),
                     value.primitive.shape(),
-                    B::float_device(&value.primitive),
+                    value.primitive.device(),
                 ),
                 B::float_slice_assign(tensor.primitive, slices, value.primitive),
             ),
@@ -1717,7 +1713,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                     mask.clone(),
                     tensor.primitive.shape(),
                     source.primitive.shape(),
-                    B::float_device(&source.primitive),
+                    source.primitive.device(),
                 ),
                 B::float_mask_where(tensor.primitive, mask, source.primitive),
             ),
@@ -1901,7 +1897,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     let shape = ops.state;
                     let val = 1_f64 / shape.num_elements() as f64;
-                    let ones = B::float_ones(shape, &B::float_device(&grad), grad.dtype().into());
+                    let ones = B::float_ones(shape, &grad.device(), grad.dtype().into());
                     let val = B::float_mul_scalar(ones, val.into());
 
                     let grad = unsqueeze_like::<B>(grad, val.shape());
@@ -1932,8 +1928,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 _checkpointer: &mut Checkpointer,
             ) {
                 unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
-                    let val =
-                        B::float_ones(ops.state, &B::float_device(&grad), grad.dtype().into());
+                    let val = B::float_ones(ops.state, &grad.device(), grad.dtype().into());
 
                     let grad = unsqueeze_like::<B>(grad, val.shape());
                     B::float_mul(val, grad)
@@ -1966,7 +1961,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
 
                 unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     let val = 1_f64 / shape[dim] as f64;
-                    let ones = B::float_ones(shape, &B::float_device(&grad), grad.dtype().into());
+                    let ones = B::float_ones(shape, &grad.device(), grad.dtype().into());
                     let val = B::float_mul_scalar(ones, val.into());
 
                     let grad = B::float_sum_dim(grad, dim);
@@ -2004,7 +1999,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 let (shape, dim) = ops.state;
 
                 unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
-                    let ones = B::float_ones(shape, &B::float_device(&grad), grad.dtype().into());
+                    let ones = B::float_ones(shape, &grad.device(), grad.dtype().into());
                     let grad = B::float_sum_dim(grad, dim);
 
                     B::float_mul(ones, grad)
@@ -2141,7 +2136,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                     // Use scatter to accumulate gradients (scatter does sum reduction)
 
                     let shape = input.shape();
-                    let device = B::float_device(&input);
+                    let device = input.device();
                     let settings = get_device_settings::<B>(&device);
                     let dim_size = shape[dim] as i64;
 
@@ -2208,7 +2203,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                     // Use scatter to accumulate gradients (scatter does sum reduction)
 
                     let shape = input.shape();
-                    let device = B::float_device(&input);
+                    let device = input.device();
                     let settings = get_device_settings::<B>(&device);
                     let dim_size = shape[dim] as i64;
 
@@ -3110,7 +3105,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
             .stateful()
         {
             OpsKind::Tracked(preps) => preps.finish(
-                (tensor.primitive.shape(), B::float_device(&tensor.primitive)),
+                (tensor.primitive.shape(), tensor.primitive.device()),
                 B::float_round(tensor.primitive),
             ),
             OpsKind::UnTracked(preps) => preps.finish(B::float_round(tensor.primitive)),
@@ -3146,7 +3141,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
             .stateful()
         {
             OpsKind::Tracked(preps) => preps.finish(
-                (tensor.primitive.shape(), B::float_device(&tensor.primitive)),
+                (tensor.primitive.shape(), tensor.primitive.device()),
                 B::float_floor(tensor.primitive),
             ),
             OpsKind::UnTracked(preps) => preps.finish(B::float_floor(tensor.primitive)),
@@ -3182,7 +3177,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
             .stateful()
         {
             OpsKind::Tracked(preps) => preps.finish(
-                (tensor.primitive.shape(), B::float_device(&tensor.primitive)),
+                (tensor.primitive.shape(), tensor.primitive.device()),
                 B::float_ceil(tensor.primitive),
             ),
             OpsKind::UnTracked(preps) => preps.finish(B::float_ceil(tensor.primitive)),
@@ -3218,7 +3213,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
             .stateful()
         {
             OpsKind::Tracked(preps) => preps.finish(
-                (tensor.primitive.shape(), B::float_device(&tensor.primitive)),
+                (tensor.primitive.shape(), tensor.primitive.device()),
                 B::float_trunc(tensor.primitive),
             ),
             OpsKind::UnTracked(preps) => preps.finish(B::float_trunc(tensor.primitive)),
@@ -3376,7 +3371,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
         {
             OpsKind::Tracked(prep) => {
                 let shape = tensor.primitive.shape();
-                let settings = get_device_settings::<B>(&B::float_device(&tensor.primitive));
+                let settings = get_device_settings::<B>(&tensor.primitive.device());
                 let (tensor, index) =
                     B::float_max_dim_with_indices(tensor.primitive, dim, settings.int_dtype);
                 prep.finish((index, shape, dim), tensor)
@@ -3420,7 +3415,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
         {
             OpsKind::Tracked(prep) => {
                 let shape = tensor.primitive.shape();
-                let settings = get_device_settings::<B>(&B::float_device(&tensor.primitive));
+                let settings = get_device_settings::<B>(&tensor.primitive.device());
                 let (tensor, index) =
                     B::float_min_dim_with_indices(tensor.primitive, dim, settings.int_dtype);
                 prep.finish((index, shape, dim), tensor)
@@ -3536,6 +3531,63 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
         }
     }
 
+    fn float_hypot(lhs: FloatTensor<Self>, rhs: FloatTensor<Self>) -> FloatTensor<Self> {
+        #[derive(Debug)]
+        struct Hypot;
+
+        impl<B: Backend> Backward<B, 2> for Hypot {
+            type State = (NodeId, NodeId, BinaryOpsBroadcast);
+
+            fn backward(
+                self,
+                ops: Ops<Self::State, 2>,
+                grads: &mut Gradients,
+                checkpointer: &mut Checkpointer,
+            ) {
+                let (lhs_id, rhs_id, broadcast) = ops.state;
+                let lhs: B::FloatTensorPrimitive = checkpointer.retrieve_node_output(lhs_id);
+                let rhs: B::FloatTensorPrimitive = checkpointer.retrieve_node_output(rhs_id);
+
+                let [lhs_4lhs, lhs_4rhs] = duplicate(&ops.parents, Some(lhs.clone()));
+                let [rhs_4lhs, rhs_4rhs] = duplicate(&ops.parents, Some(rhs.clone()));
+
+                binary::<B, _, _>(
+                    ops.parents,
+                    ops.node,
+                    grads,
+                    |grad| {
+                        // lhs / hypot(lhs, rhs) * grad
+                        let value =
+                            B::float_div(lhs, B::float_hypot(lhs_4lhs.unwrap(), rhs_4lhs.unwrap()));
+                        broadcast.backward_lhs::<B>(B::float_mul(grad, value))
+                    },
+                    |grad| {
+                        // rhs / hypot(lhs, rhs) * grad
+                        let value =
+                            B::float_div(rhs, B::float_hypot(lhs_4rhs.unwrap(), rhs_4rhs.unwrap()));
+                        broadcast.backward_rhs::<B>(B::float_mul(grad, value))
+                    },
+                );
+            }
+        }
+        let broadcast = BinaryOpsBroadcast::new::<B>(&lhs.primitive, &rhs.primitive);
+        match Hypot
+            .prepare::<C>([lhs.node.clone(), rhs.node.clone()])
+            .compute_bound()
+            .stateful()
+        {
+            OpsKind::Tracked(mut prep) => {
+                let lhs_state = prep.checkpoint(&lhs);
+                let rhs_state = prep.checkpoint(&rhs);
+                prep.finish(
+                    (lhs_state, rhs_state, broadcast),
+                    B::float_hypot(lhs.primitive, rhs.primitive),
+                )
+            }
+            OpsKind::UnTracked(prep) => prep.finish(B::float_hypot(lhs.primitive, rhs.primitive)),
+        }
+    }
+
     fn float_sign(tensor: FloatTensor<Self>) -> FloatTensor<Self> {
         #[derive(Debug)]
         struct Sign<B: Backend>(PhantomData<B>);
@@ -3645,7 +3697,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
         {
             OpsKind::Tracked(prep) => {
                 let shape = tensor.primitive.shape();
-                let settings = get_device_settings::<B>(&B::float_device(&tensor.primitive));
+                let settings = get_device_settings::<B>(&tensor.primitive.device());
                 let (tensor, indices) = B::float_sort_with_indices(
                     tensor.primitive,
                     dim,
@@ -3822,7 +3874,7 @@ impl<B: Backend, C: CheckpointStrategy> FloatTensorOps<Self> for Autodiff<B, C> 
                 let windows = calculate_unfold_windows(shape_in[dim], size, step);
 
                 unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
-                    let device = B::float_device(&grad);
+                    let device = grad.device();
                     let mut grad_input =
                         B::float_zeros(shape_in.clone(), &device, grad.dtype().into());
 

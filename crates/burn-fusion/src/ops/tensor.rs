@@ -180,10 +180,6 @@ impl<B: FusionBackend> FloatTensorOps<Self> for Fusion<B> {
         tensor.into_data::<B>().await
     }
 
-    fn float_device(tensor: &FloatTensor<Self>) -> Device<Self> {
-        tensor.client.device().clone()
-    }
-
     #[cfg_attr(feature = "tracing", tracing::instrument(
         level="trace",
         skip(tensor),
@@ -2571,6 +2567,25 @@ impl<B: FusionBackend> FloatTensorOps<Self> for Fusion<B> {
                 streams,
                 OperationIr::Float(desc.out.dtype, FloatOperationIr::GridSample2d(desc.clone())),
                 GridSample2dOps::<B>::new(desc),
+            )
+            .output()
+    }
+
+    fn float_hypot(lhs: FloatTensor<Self>, rhs: FloatTensor<Self>) -> FloatTensor<Self> {
+        binary_float_ops!(HypotOps, B::float_hypot);
+
+        let streams = StreamId::current();
+
+        let client = lhs.client.clone();
+        let desc = BinaryOpIr::create(lhs.into_ir(), rhs.into_ir(), || {
+            client.create_empty_handle()
+        });
+
+        client
+            .register(
+                streams,
+                OperationIr::Float(desc.out.dtype, FloatOperationIr::Hypot(desc.clone())),
+                HypotOps::<B>::new(desc),
             )
             .output()
     }

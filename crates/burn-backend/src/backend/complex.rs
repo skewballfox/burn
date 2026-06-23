@@ -34,7 +34,9 @@ pub type ComplexTensor<B> = <B as BackendTypes>::ComplexTensorPrimitive;
 /// around a standard `Backend` implementation. For backends that don't yet natively support complex
 /// operations, a default implementation exists for any backend that sets the complex primitive to
 /// UnimplementedTensorPrimitive.
-pub trait ComplexTensorBackend: ComplexTensorOps<Self> +  BackendTypes+ Sized + Send+ Sync + core::fmt::Debug+'static {
+pub trait ComplexTensorBackend:
+    ComplexTensorOps<Self> + Sized + BackendTypes + Send + Sync + 'static
+{
     /// The inner backend type.
     ///
     /// Must share all primitive types and device with `Self` so that operations

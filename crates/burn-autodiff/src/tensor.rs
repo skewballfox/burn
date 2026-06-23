@@ -23,13 +23,17 @@ use burn_backend::distributed::{DistributedParamId, DistributedParams};
 #[derive(Debug, Clone)]
 pub struct AutodiffTensor<B: BackendTypes> {
     pub primitive: B::FloatTensorPrimitive,
-    pub node: NodeRef,
-    pub rc: NodeRefCount,
+    pub(crate) state: AutodiffState,
 }
 
 #[derive(Debug, Clone)]
 pub struct ComplexAutodiffTensor<B: BackendTypes> {
     pub primitive: B::ComplexTensorPrimitive,
+    pub node: NodeRef,
+    pub rc: NodeRefCount,
+}
+#[derive(Debug, Clone)]
+pub struct AutodiffState {
     pub node: NodeRef,
     pub rc: NodeRefCount,
 }
@@ -327,7 +331,7 @@ impl<B: Backend> AutodiffTensorTrait for AutodiffTensor<B> {
     fn ones_like(tensor: &Self::Primitive) -> Self::Primitive {
         B::float_ones(
             tensor.shape(),
-            &B::float_device(tensor),
+            &tensor.device(),
             tensor.dtype().into(),
         )
     }
@@ -388,6 +392,9 @@ impl<B: BackendTypes> TensorMetadata for ComplexAutodiffTensor<B> {
     fn rank(&self) -> usize {
         self.primitive.rank()
     }
+    fn device(&self) -> B::Device {
+        self.primitive.device()
+    }
 }
 
 pub type NodeRefCount = Arc<NodeId>;
@@ -435,9 +442,10 @@ impl<B: Backend> AutodiffTensor<B> {
         .into();
 
         Self {
-            rc: Arc::new(node.id),
+            
             primitive,
-            node: node.clone(),
+            state: AutodiffState { node: node.clone(), rc:  Arc::new(node.id) }
+            
         }
     }
 
@@ -449,9 +457,9 @@ impl<B: Backend> AutodiffTensor<B> {
     }
     #[cfg(feature = "std")]
     pub fn backward(self) -> Gradients {
-        let device = B::float_device(&self.primitive);
+        let device = self.primitive.device();
         let device_cloned = device.clone();
-        let client = self.node.client.clone();
+        let client = self.state.node.client.clone();
 
         let mode = BackwardMode::Distributed(Box::new(|ctx: GradSyncContext| {
             let registration = DistributedGradientRegistration::<B>::new(

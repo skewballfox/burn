@@ -85,10 +85,6 @@ impl<R: RouterChannel> FloatTensorOps<Self> for BackendRouter<R> {
         tensor.into_data().await
     }
 
-    fn float_device(tensor: &FloatTensor<Self>) -> Device<Self> {
-        tensor.client.device()
-    }
-
     fn float_to_device(tensor: FloatTensor<Self>, device: &Device<Self>) -> FloatTensor<Self> {
         if &tensor.client.device() == device {
             return tensor;
@@ -1032,6 +1028,20 @@ impl<R: RouterChannel> FloatTensorOps<Self> for BackendRouter<R> {
             .register(OperationIr::Float(
                 desc.out.dtype,
                 FloatOperationIr::ArcTan2(desc),
+            ))
+            .output()
+    }
+
+    fn float_hypot(lhs: FloatTensor<Self>, rhs: FloatTensor<Self>) -> FloatTensor<Self> {
+        let client = lhs.client.clone();
+        let desc = BinaryOpIr::create(lhs.into_ir(), rhs.into_ir(), || {
+            client.create_empty_handle()
+        });
+
+        client
+            .register(OperationIr::Float(
+                desc.out.dtype,
+                FloatOperationIr::Hypot(desc),
             ))
             .output()
     }

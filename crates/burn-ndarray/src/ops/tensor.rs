@@ -75,10 +75,6 @@ impl FloatTensorOps<Self> for NdArray {
         Ok(tensor.into_data())
     }
 
-    fn float_device(_tensor: &FloatTensor<Self>) -> NdArrayDevice {
-        NdArrayDevice::Cpu
-    }
-
     fn float_to_device(tensor: FloatTensor<Self>, _device: &NdArrayDevice) -> FloatTensor<Self> {
         tensor
     }
@@ -762,6 +758,12 @@ impl FloatTensorOps<Self> for NdArray {
     ) -> FloatTensor<Self> {
         execute_with_float_dtype!(tensor, FloatElem, |array: SharedArray<FloatElem>| {
             NdArrayOps::unfold(array, dim, size, step)
+        })
+    }
+
+    fn float_hypot(lhs: FloatTensor<Self>, rhs: FloatTensor<Self>) -> FloatTensor<Self> {
+        execute_with_float_dtype!((lhs, rhs), FloatElem, |lhs, rhs| {
+            NdArrayMathOps::elementwise_op(lhs, rhs, |a: &FloatElem, b: &FloatElem| a.hypot(*b))
         })
     }
 }

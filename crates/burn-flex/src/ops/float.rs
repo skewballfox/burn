@@ -49,11 +49,6 @@ impl FloatTensorOps<Flex> for Flex {
         Ok(tensor.into_data())
     }
 
-    fn float_device(_tensor: &FloatTensor<Flex>) -> Device<Flex> {
-        // CPU backend: all tensors are on the default device
-        Default::default()
-    }
-
     fn float_to_device(tensor: FloatTensor<Flex>, _device: &Device<Flex>) -> FloatTensor<Flex> {
         // CPU backend: no-op, tensors are always on CPU
         tensor
@@ -1083,6 +1078,16 @@ impl FloatTensorOps<Flex> for Flex {
             out_dtype,
             |x: f32| x.is_infinite(),
             |x: f64| x.is_infinite(),
+        )
+    }
+
+    fn float_hypot(lhs: FloatTensor<Flex>, rhs: FloatTensor<Flex>) -> FloatTensor<Flex> {
+        binary_op(
+            lhs,
+            rhs,
+            |a: f32, b| a.hypot(b),
+            |a: f64, b| a.hypot(b),
+            None,
         )
     }
 }

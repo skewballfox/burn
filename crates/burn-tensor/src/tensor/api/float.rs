@@ -50,6 +50,14 @@ $$\text{erf}\(x\) = \frac{2}{\sqrt{\pi}} \int_0^x e^{-t^2} dt$$
         Self::new(erf_impl(self.primitive))
     }
 
+    /// Applies [hypotenuse operation](https://en.wikipedia.org/wiki/Hypotenuse) element wise.
+    ///
+    #[cfg_attr(doc, doc = r#"$y_i = \sqrt{x_i^2 + y_i^2}$"#)]
+    #[cfg_attr(not(doc), doc = "`y_i = sqrt(x_i^2 + y_i^2)`")]
+    pub fn hypot(self, other: Self) -> Self {
+        Self::new(hypot_impl(self.primitive, other.primitive))
+    }
+
     /// Applies [reciprocal operation](https://en.wikipedia.org/wiki/Multiplicative_inverse)
     /// (or multiplicative inverse) element wise.
     ///
@@ -1096,6 +1104,10 @@ fn recip_impl(p: BridgeTensor) -> BridgeTensor {
     BridgeTensor::float(Dispatch::float_recip(p.into_float()))
 }
 
+fn hypot_impl(lhs: BridgeTensor, rhs: BridgeTensor) -> BridgeTensor {
+    BridgeTensor::float(Dispatch::float_hypot(lhs.into_float(), rhs.into_float()))
+}
+
 fn round_impl(p: BridgeTensor) -> BridgeTensor {
     BridgeTensor::float(Dispatch::float_round(p.into_float()))
 }
@@ -1117,7 +1129,7 @@ fn random_like_impl(p: &BridgeTensor, distribution: Distribution) -> BridgeTenso
     BridgeTensor::float(Dispatch::float_random(
         p.shape(),
         distribution,
-        &Dispatch::float_device(p.as_dispatch()),
+        &p.as_dispatch().device(),
         p.dtype().into(),
     ))
 }

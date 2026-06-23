@@ -12,13 +12,17 @@ use cubecl::{
 use cubek::matmul::{
     components::tile::TileMatmulKind,
     definition::MatmulKind,
-    launch::{MatmulAutotuneKey, MatmulGlobalScale, Strategy, should_tune_double_buffering},
     routines::{
-        BlueprintStrategy, TileSizeSelection, double_buffering::DoubleBufferingArgs,
-        double_unit::DoubleUnitSelectionArgs, gemm::GemmStrategy,
-        ordered_double_buffering::OrderedSelectionArgs, simple::SimpleArgs,
-        simple_unit::SimpleUnitSelectionArgs,
+        BlueprintStrategy, TileSizeSelection,
+        batch::{
+            double_buffering::DoubleBufferingArgs, double_unit::DoubleUnitSelectionArgs,
+            ordered_double_buffering::OrderedSelectionArgs, simple::SimpleArgs,
+            simple_unit::SimpleUnitSelectionArgs,
+        },
+        cpu_gemm::CpuGemmStrategy,
+        gemm::GemmStrategy,
     },
+    strategy::{MatmulAutotuneKey, MatmulGlobalScale, Strategy, should_tune_double_buffering},
 };
 
 fn matmul_input_gen<R: CubeRuntime>(
@@ -151,6 +155,13 @@ pub fn matmul_autotune<R: CubeRuntime>(
             }
         });
 
+        // CPU-only group
+        let cpu =
+            TuneGroup::<MatmulAutotuneKey>::new("cpu", move |_key| match num_cpu_cores.is_some() {
+                true => PRIORITY_MAX,
+                false => PRIORITY_NEVER,
+            });
+
         fn double_buffering_priority(key: &MatmulAutotuneKey, max: i8, min: i8) -> i8 {
             if should_tune_double_buffering(false, key) {
                 max
@@ -255,6 +266,17 @@ pub fn matmul_autotune<R: CubeRuntime>(
                 },
             )
             .group(&unit, move |_key| PRIORITY_MAX),
+        );
+
+        // CPU GEMM (CPU-only via the `cpu` group; the size limit is specific to this strategy).
+        let cpu_gemm_strategy =
+            Strategy::CpuGemm(BlueprintStrategy::Inferred(CpuGemmStrategy::default()));
+        set = set.with(
+            Tunable::new(&cpu_gemm_strategy.to_string(), move |(lhs, rhs, out)| {
+                launch_matmul::<R>(&cpu_gemm_strategy, lhs, rhs, out)
+                    .map_err(|err| format!("{err:?}"))
+            })
+            .group(&cpu, move |_key| PRIORITY_MAX),
         );
 
         // Accelerated matmuls

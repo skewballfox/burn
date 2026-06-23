@@ -1,4 +1,4 @@
-use crate::backends::*;
+use crate::{DispatchDevice, backends::*};
 
 use burn_autodiff::AutodiffTensorTrait as _;
 #[cfg(feature = "autodiff")]
@@ -183,39 +183,49 @@ impl<B: Backend + ComplexTensorBackend> BackendTensor<B> {
             _ => unreachable!(),
         }
     }
-    /// Returns the backend device.
-    pub(crate) fn device(&self) -> B::Device {
+
+    /// Returns the tensor primitive kind name.
+    pub fn name(&self) -> &'static str {
         match self {
-            BackendTensor::Float(tensor) => B::float_device(tensor),
-            BackendTensor::Int(tensor) => B::int_device(tensor),
-            BackendTensor::Bool(tensor) => B::bool_device(tensor),
-            BackendTensor::Quantized(tensor) => B::q_device(tensor),
+            BackendTensor::Float(_) => "Float",
+            BackendTensor::Int(_) => "Int",
+            BackendTensor::Bool(_) => "Bool",
+            BackendTensor::Quantized(_) => "Quantized",
             #[cfg(feature = "autodiff")]
-            BackendTensor::Autodiff(tensor) => B::float_device(&tensor.primitive),
+            BackendTensor::Autodiff(_) => "Autodiff",
             #[cfg(feature = "autodiff")]
-            BackendTensor::AutodiffComplex(tensor) => {
-                // The unimplementedTensorPrimitive needs a placeholder that should never be reached at runtime
-                #[allow(unreachable_code)]
-                B::complex_device(tensor.primitive())
-            }
-            //#[cfg(feature = "complex")]
-            BackendTensor::Complex(tensor) => B::complex_device(tensor),
+            BackendTensor::AutodiffComplex(_) => "AutodiffComplex",
+            BackendTensor::Complex(_) => "Complex",
         }
     }
 }
 
-impl<B: Backend> TensorMetadata for BackendTensor<B> {
+impl<B: BackendTypes> TensorMetadata for BackendTensor<B> {
+    type Device = B::Device;
+    fn device(&self) -> Self::Device {
+        match self {
+            BackendTensor::Float(tensor) => tensor.device(),
+            BackendTensor::Int(tensor) => tensor.device(),
+            BackendTensor::Bool(tensor) => tensor.device(),
+            BackendTensor::Quantized(tensor) => tensor.device(),
+            BackendTensor::Complex(tensor) => tensor.device(),
+            #[cfg(feature = "autodiff")]
+            BackendTensor::Autodiff(tensor) => tensor.device(),
+            #[cfg(feature = "autodiff")]
+            BackendTensor::AutodiffComplex(tensor) => tensor.device(),
+        }
+    }
     fn dtype(&self) -> DType {
         match self {
             BackendTensor::Float(tensor) => tensor.dtype(),
             BackendTensor::Int(tensor) => tensor.dtype(),
             BackendTensor::Bool(tensor) => tensor.dtype(),
             BackendTensor::Quantized(tensor) => tensor.dtype(),
+            BackendTensor::Complex(tensor) => tensor.dtype(),
             #[cfg(feature = "autodiff")]
             BackendTensor::Autodiff(tensor) => tensor.dtype(),
             #[cfg(feature = "autodiff")]
             BackendTensor::AutodiffComplex(tensor) => tensor.dtype(),
-            BackendTensor::Complex(tensor) => tensor.dtype(),
         }
     }
 
@@ -312,6 +322,8 @@ pub enum DispatchTensorKind {
 }
 
 impl TensorMetadata for DispatchTensorKind {
+    type Device = DispatchDevice;
+
     fn dtype(&self) -> DType {
         match self {
             #[cfg(feature = "cpu")]
@@ -369,6 +381,35 @@ impl TensorMetadata for DispatchTensorKind {
             Self::Autodiff(tensor) => tensor.shape(),
         }
     }
+
+    fn device(&self) -> DispatchDevice {
+        match self {
+            #[cfg(feature = "cpu")]
+            DispatchTensorKind::Cpu(tensor) => DispatchDevice::Cpu(tensor.device()),
+            #[cfg(feature = "cuda")]
+            DispatchTensorKind::Cuda(tensor) => DispatchDevice::Cuda(tensor.device()),
+            #[cfg(feature = "metal")]
+            DispatchTensorKind::Metal(tensor) => DispatchDevice::Metal(tensor.device()),
+            #[cfg(feature = "rocm")]
+            DispatchTensorKind::Rocm(tensor) => DispatchDevice::Rocm(tensor.device()),
+            #[cfg(feature = "vulkan")]
+            DispatchTensorKind::Vulkan(tensor) => DispatchDevice::Vulkan(tensor.device()),
+            #[cfg(feature = "wgpu")]
+            DispatchTensorKind::Wgpu(tensor) => DispatchDevice::Wgpu(tensor.device()),
+            #[cfg(feature = "webgpu")]
+            DispatchTensorKind::WebGpu(tensor) => DispatchDevice::WebGpu(tensor.device()),
+            #[cfg(any(feature = "flex", default_backend))]
+            DispatchTensorKind::Flex(tensor) => DispatchDevice::Flex(tensor.device()),
+            #[cfg(feature = "ndarray")]
+            DispatchTensorKind::NdArray(tensor) => DispatchDevice::NdArray(tensor.device()),
+            #[cfg(feature = "tch")]
+            DispatchTensorKind::LibTorch(tensor) => DispatchDevice::LibTorch(tensor.device()),
+            #[cfg(feature = "remote")]
+            DispatchTensorKind::Remote(tensor) => DispatchDevice::Remote(tensor.device()),
+            #[cfg(feature = "autodiff")]
+            DispatchTensorKind::Autodiff(tensor) => DispatchDevice::autodiff(tensor.device()),
+        }
+    }
 }
 
 impl TensorMetadata for DispatchTensor {
@@ -378,6 +419,26 @@ impl TensorMetadata for DispatchTensor {
 
     fn shape(&self) -> Shape {
         self.kind.shape()
+    }
+
+    type Device = DispatchDevice;
+
+    fn device(&self) -> Self::Device {
+        #[allow(unused_mut)]
+        let mut device = self.kind.device();
+
+        // TODO: should int and bool kinds return an autodiff device?
+        // It would be much easier once there is a single underlying primitive type, which
+        // we can wrap with Autodiff in all cases.
+
+        #[cfg(feature = "autodiff")]
+        if let DispatchDevice::Autodiff(device) = &mut device
+            && let Some(checkpointing) = &self.checkpointing
+        {
+            device.checkpointing = *checkpointing;
+        }
+
+        device
     }
 }
 
@@ -446,6 +507,9 @@ macro_rules! impl_dispatch_conversion {
         #[cfg($cfg)]
         impl DispatchKindConversion<$backend> for DispatchTensor {
             fn try_into_backend(tensor: DispatchTensor) -> Result<BackendTensor<$backend>, String> {
+                // The catch-all is unreachable in single-backend builds (the enum then has one
+                // variant), but required when several backend features are enabled.
+                #[allow(unreachable_patterns)]
                 match tensor.kind {
                     DispatchTensorKind::$backend(t) => Ok(t),
                     #[allow(unreachable_patterns)]

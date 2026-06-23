@@ -30,14 +30,6 @@ impl FloatTensorOps<Self> for Dispatch {
         unary_float!(tensor, float, |tensor| B::float_into_data(tensor).await)
     }
 
-    fn float_device(tensor: &FloatTensor<Self>) -> DispatchDevice {
-        // println!("float_device: {tensor:?}");
-        // let device = tensor.device();
-        // println!("  {device:?}");
-        // device
-        tensor.device()
-    }
-
     fn float_to_device(tensor: FloatTensor<Self>, device: &DispatchDevice) -> FloatTensor<Self> {
         // Relocating a non-tracked float tensor onto an autodiff device is a plain data move:
         // place it on the underlying hardware device and leave the tensor non-tracked. The
@@ -696,5 +688,9 @@ impl FloatTensorOps<Self> for Dispatch {
 
     fn float_is_inf(tensor: FloatTensor<Self>, out_dtype: BoolDType) -> BoolTensor<Self> {
         unary_float!(tensor, float, |tensor| B::float_is_inf(tensor, out_dtype) => Bool)
+    }
+
+    fn float_hypot(lhs: FloatTensor<Self>, rhs: FloatTensor<Self>) -> FloatTensor<Self> {
+        binary_float!((lhs, float), (rhs, float), |lhs, rhs| B::float_hypot(lhs, rhs) => Float)
     }
 }

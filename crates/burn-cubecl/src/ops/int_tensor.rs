@@ -48,10 +48,6 @@ impl<R: CubeRuntime> IntTensorOps<Self> for CubeBackend<R> {
         }
     }
 
-    fn int_device(tensor: &IntTensor<Self>) -> Device<Self> {
-        tensor.device.clone()
-    }
-
     fn int_to_device(tensor: IntTensor<Self>, device: &Device<Self>) -> IntTensor<Self> {
         super::to_device(tensor, device)
     }
@@ -345,6 +341,22 @@ impl<R: CubeRuntime> IntTensorOps<Self> for CubeBackend<R> {
             ReduceOperationConfig::Sum,
         )
         .unwrap()
+    }
+
+    fn int_any(tensor: IntTensor<Self>, out_dtype: BoolDType) -> BoolTensor<Self> {
+        reduce::reduce_logical(tensor, None, ReduceOperationConfig::Any, out_dtype)
+    }
+
+    fn int_any_dim(tensor: IntTensor<Self>, dim: usize, out_dtype: BoolDType) -> BoolTensor<Self> {
+        reduce::reduce_logical(tensor, Some(dim), ReduceOperationConfig::Any, out_dtype)
+    }
+
+    fn int_all(tensor: IntTensor<Self>, out_dtype: BoolDType) -> BoolTensor<Self> {
+        reduce::reduce_logical(tensor, None, ReduceOperationConfig::All, out_dtype)
+    }
+
+    fn int_all_dim(tensor: IntTensor<Self>, dim: usize, out_dtype: BoolDType) -> BoolTensor<Self> {
+        reduce::reduce_logical(tensor, Some(dim), ReduceOperationConfig::All, out_dtype)
     }
 
     fn int_prod(tensor: IntTensor<Self>) -> IntTensor<Self> {
