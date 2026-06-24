@@ -4,8 +4,7 @@ use burn_std::{
 };
 
 use crate::{
-    BackendTypes, ComplexTensor, ComplexTensorBackend, TensorMetadata,
-    ops::IntTensorOps,
+    ComplexTensor, ComplexTensorBackend, TensorMetadata,
     tensor::{Device, FloatTensor, IntTensor},
 };
 
@@ -1227,22 +1226,7 @@ pub trait ComplexTensorOps<B: ComplexTensorBackend> {
     /// # Returns
     ///
     /// The elements of `lhs` raised to the power of the corresponding elements of `rhs`.
-    fn complex_powi(lhs: ComplexTensor<B>, rhs: IntTensor<B>) -> ComplexTensor<B>
-    where
-        B::InnerBackend: IntTensorOps<B::InnerBackend>,
-        // make the equality explicit at the use site
-        <B::InnerBackend as BackendTypes>::IntTensorPrimitive: From<B::IntTensorPrimitive>,
-    {
-        let dtype = burn_std::complex_utils::complex_to_real_dtype(lhs.dtype());
-
-        Self::complex_powf(
-            lhs,
-            <B::InnerBackend as IntTensorOps<B::InnerBackend>>::int_into_float(
-                rhs,
-                FloatDType::from(dtype),
-            ),
-        )
-    }
+    fn complex_powi(lhs: ComplexTensor<B>, rhs: IntTensor<B>) -> ComplexTensor<B>;
 
     /// Element-wise complex power with a float scalar.
     ///

@@ -10,9 +10,9 @@ use alloc::vec::Vec;
 ))]
 use alloc::vec;
 
+use burn_backend::distributed::DistributedParams;
 #[cfg(feature = "autodiff")]
-use burn_backend::distributed::{DistributedParamId, DistributedParams};
-use burn_backend::{AutodiffBackend, Backend, BackendTypes, DType, ExecutionError};
+use burn_backend::{AutodiffBackend, AutodiffTensor, Backend, BackendTypes, DType, ExecutionError};
 
 #[cfg(feature = "autodiff")]
 use alloc::boxed::Box;
@@ -154,10 +154,205 @@ impl Backend for Dispatch {
 impl AutodiffBackend for Dispatch {
     type InnerBackend = Dispatch;
 
+    fn int_inner(tensor: DispatchTensor) -> DispatchTensor {
+        tensor
+    }
+
+    fn bool_inner(tensor: DispatchTensor) -> DispatchTensor {
+        tensor
+    }
+
+    fn q_inner(tensor: DispatchTensor) -> DispatchTensor {
+        tensor
+    }
+
+    fn int_from_inner(tensor: DispatchTensor) -> DispatchTensor {
+        tensor
+    }
+
+    fn bool_from_inner(tensor: DispatchTensor) -> DispatchTensor {
+        tensor
+    }
+
+    fn q_from_inner(tensor: DispatchTensor) -> DispatchTensor {
+        tensor
+    }
+
+    #[cfg(feature = "distributed")]
+    fn set_distributed_params(
+        tensor: DispatchTensor,
+        param_id: DistributedParamId,
+    ) -> DispatchTensor {
+        let DispatchTensor {
+            kind,
+            checkpointing,
+        } = tensor;
+
+        let kind = match kind {
+            DispatchTensorKind::Autodiff(inner_kind) => match *inner_kind {
+                #[cfg(feature = "cuda")]
+                DispatchTensorKind::Cuda(tensor) => {
+                    DispatchTensorKind::Autodiff(Box::new(DispatchTensorKind::Cuda(
+                        crate::BackendTensor::Autodiff(Autodiff::<Cuda>::set_distributed_params(
+                            tensor.as_autodiff().clone(),
+                            param_id,
+                        )),
+                    )))
+                }
+                DispatchTensorKind::Autodiff(_) => {
+                    panic!("Autodiff should not wrap an autodiff tensor.")
+                }
+                other => {
+                    panic!("Distributed operations are not supported for tensor kind {other:?}")
+                }
+            },
+            _ => panic!("Requires autodiff tensor."),
+        };
+
+        let checkpointing = if let Some(strategy) = checkpointing {
+            Some(strategy)
+        } else {
+            Some(crate::CheckpointingStrategy::None)
+        };
+        DispatchTensor {
+            kind,
+            checkpointing,
+        }
+    }
+
+    #[cfg(feature = "distributed")]
+    fn distributed_params(tensor: &DispatchTensor) -> Option<DistributedParams> {
+        let DispatchTensor {
+            kind,
+            checkpointing: _,
+        } = tensor;
+
+        match &kind {
+            DispatchTensorKind::Autodiff(inner_kind) => match &**inner_kind {
+                #[cfg(feature = "cuda")]
+                DispatchTensorKind::Cuda(tensor) => {
+                    tensor.as_autodiff().node.distributed_params.clone()
+                }
+
+                DispatchTensorKind::Autodiff(_) => {
+                    panic!("Autodiff should not wrap an autodiff tensor.")
+                }
+                other => {
+                    panic!("Distributed operations are not supported for tensor kind {other:?}")
+                }
+            },
+            _ => panic!("Requires autodiff tensor."),
+        }
+    }
+
+    #[cfg(feature = "distributed")]
+    fn is_distributed(tensor: &DispatchTensor) -> bool {
+        let DispatchTensor {
+            kind,
+            checkpointing: _,
+        } = tensor;
+
+        match &kind {
+            DispatchTensorKind::Autodiff(inner_kind) => match &**inner_kind {
+                #[cfg(feature = "cuda")]
+                DispatchTensorKind::Cuda(tensor) => {
+                    tensor.as_autodiff().node.distributed_params.is_some()
+                }
+
+                DispatchTensorKind::Autodiff(_) => {
+                    panic!("Autodiff should not wrap an autodiff tensor.")
+                }
+                other => {
+                    panic!("Distributed operations are not supported for tensor kind {other:?}")
+                }
+            },
+            _ => panic!("Requires autodiff tensor."),
+        }
+    }
+
+    fn backward<T: AutodiffTensor>(tensor: T) -> T::Gradients {
+        tensor.backward()
+    }
+
+    fn grad<T: AutodiffTensor>(tensor: &T, grads: &T::Gradients) -> Option<T::Primitive> {
+        tensor.grad(grads)
+    }
+
+    fn grad_remove<T: AutodiffTensor>(
+        tensor: &T,
+        grads: &mut T::Gradients,
+    ) -> Option<T::Primitive> {
+        tensor.grad_remove(grads)
+    }
+
+    fn grad_replace<T: AutodiffTensor>(tensor: &T, grads: &mut T::Gradients, grad: T::Primitive) {
+        tensor.grad_replace(grads, grad)
+    }
+
+    #[allow(unused_variables)]
+    fn distributed_params(tensor: &DispatchTensor) -> Option<DistributedParams> {
+        let DispatchTensor {
+            kind,
+            checkpointing: _,
+        } = tensor;
+
+        match &kind {
+            DispatchTensorKind::Autodiff(inner_kind) => match &**inner_kind {
+                #[cfg(feature = "cuda")]
+                DispatchTensorKind::Cuda(tensor) => {
+                    tensor.as_autodiff().node.distributed_params.clone()
+                }
+                #[cfg(feature = "remote")]
+                DispatchTensorKind::Remote(tensor) => {
+                    tensor.as_autodiff_float().node.distributed_params.clone()
+                }
+
+                DispatchTensorKind::Autodiff(_) => {
+                    panic!("Autodiff should not wrap an autodiff tensor.")
+                }
+                // Backends without distributed support never carry distributed params.
+                _ => None,
+            },
+            _ => panic!("Requires autodiff tensor."),
+        }
+    }
+
+    #[allow(unused_variables)]
+    fn is_distributed(tensor: &DispatchTensor) -> bool {
+        let DispatchTensor {
+            kind,
+            checkpointing: _,
+        } = tensor;
+
+        match &kind {
+            DispatchTensorKind::Autodiff(inner_kind) => match &**inner_kind {
+                #[cfg(feature = "cuda")]
+                DispatchTensorKind::Cuda(tensor) => {
+                    tensor.as_autodiff().node.distributed_params.is_some()
+                }
+                #[cfg(feature = "remote")]
+                DispatchTensorKind::Remote(tensor) => {
+                    tensor.as_autodiff_float().node.distributed_params.is_some()
+                }
+
+                DispatchTensorKind::Autodiff(_) => {
+                    panic!("Autodiff should not wrap an autodiff tensor.")
+                }
+                // Backends without distributed support are never distributed.
+                _ => false,
+            },
+            _ => panic!("Requires autodiff tensor."),
+        }
+    }
+}
+
+impl AutodiffTensor for DispatchTensor {
+    type Primitive = DispatchTensor;
+
     type Gradients = Gradients;
 
-    fn backward(tensor: DispatchTensor) -> Self::Gradients {
-        let DispatchTensor { kind, .. } = tensor;
+    fn backward(self) -> Self::Gradients {
+        let DispatchTensor { kind, .. } = self;
 
         match kind {
             DispatchTensorKind::Autodiff(tensor) => match *tensor {
@@ -191,11 +386,11 @@ impl AutodiffBackend for Dispatch {
         }
     }
 
-    fn grad(tensor: &DispatchTensor, grads: &Self::Gradients) -> Option<DispatchTensor> {
+    fn grad(&self, grads: &Self::Gradients) -> Option<DispatchTensor> {
         let DispatchTensor {
             kind,
             checkpointing,
-        } = tensor;
+        } = self;
         let grad: Option<DispatchTensorKind> = match &kind {
             DispatchTensorKind::Autodiff(inner_kind) => match &**inner_kind {
                 #[cfg(feature = "cpu")]
@@ -265,11 +460,11 @@ impl AutodiffBackend for Dispatch {
         })
     }
 
-    fn grad_remove(tensor: &DispatchTensor, grads: &mut Self::Gradients) -> Option<DispatchTensor> {
+    fn grad_remove(&self, grads: &mut Self::Gradients) -> Option<DispatchTensor> {
         let DispatchTensor {
             kind,
             checkpointing,
-        } = tensor;
+        } = self;
         let grad: Option<DispatchTensorKind> = match &kind {
             DispatchTensorKind::Autodiff(inner_kind) => match &**inner_kind {
                 #[cfg(feature = "cpu")]
@@ -339,11 +534,11 @@ impl AutodiffBackend for Dispatch {
         })
     }
 
-    fn grad_replace(tensor: &DispatchTensor, grads: &mut Self::Gradients, grad: DispatchTensor) {
+    fn grad_replace(&self, grads: &mut Self::Gradients, grad: DispatchTensor) {
         let DispatchTensor {
             kind,
             checkpointing,
-        } = tensor;
+        } = self;
         let DispatchTensor {
             kind: grad,
             checkpointing: grad_ckp,
@@ -404,11 +599,11 @@ impl AutodiffBackend for Dispatch {
         }
     }
 
-    fn inner(tensor: DispatchTensor) -> DispatchTensor {
+    fn inner(self) -> DispatchTensor {
         let DispatchTensor {
             kind,
             checkpointing: _,
-        } = tensor;
+        } = self;
 
         let kind = match kind {
             DispatchTensorKind::Autodiff(inner_kind) => match *inner_kind {
@@ -466,18 +661,6 @@ impl AutodiffBackend for Dispatch {
             kind,
             checkpointing: None,
         }
-    }
-
-    fn int_inner(tensor: DispatchTensor) -> DispatchTensor {
-        tensor
-    }
-
-    fn bool_inner(tensor: DispatchTensor) -> DispatchTensor {
-        tensor
-    }
-
-    fn q_inner(tensor: DispatchTensor) -> DispatchTensor {
-        tensor
     }
 
     fn from_inner(tensor: DispatchTensor) -> DispatchTensor {
@@ -567,127 +750,6 @@ impl AutodiffBackend for Dispatch {
         DispatchTensor {
             kind,
             checkpointing,
-        }
-    }
-
-    fn int_from_inner(tensor: DispatchTensor) -> DispatchTensor {
-        tensor
-    }
-
-    fn bool_from_inner(tensor: DispatchTensor) -> DispatchTensor {
-        tensor
-    }
-
-    fn q_from_inner(tensor: DispatchTensor) -> DispatchTensor {
-        tensor
-    }
-
-    // Only the collective-capable backends (Cuda/Remote) carry distributed params; in builds
-    // without them the match arms cfg out, leaving the bindings unused and the tail unreachable.
-    #[allow(unused_variables, unreachable_code)]
-    fn set_distributed_params(
-        tensor: DispatchTensor,
-        param_id: DistributedParamId,
-    ) -> DispatchTensor {
-        let DispatchTensor {
-            kind,
-            checkpointing,
-        } = tensor;
-
-        let kind = match kind {
-            DispatchTensorKind::Autodiff(inner_kind) => match *inner_kind {
-                #[cfg(feature = "cuda")]
-                DispatchTensorKind::Cuda(tensor) => {
-                    DispatchTensorKind::Autodiff(Box::new(DispatchTensorKind::Cuda(
-                        crate::BackendTensor::Autodiff(Autodiff::<Cuda>::set_distributed_params(
-                            tensor.as_autodiff().clone(),
-                            param_id,
-                        )),
-                    )))
-                }
-                #[cfg(feature = "remote")]
-                DispatchTensorKind::Remote(tensor) => {
-                    DispatchTensorKind::Autodiff(Box::new(DispatchTensorKind::Remote(
-                        crate::BackendTensor::Autodiff(Autodiff::<Remote>::set_distributed_params(
-                            tensor.as_autodiff_float().clone(),
-                            param_id,
-                        )),
-                    )))
-                }
-                DispatchTensorKind::Autodiff(_) => {
-                    panic!("Autodiff should not wrap an autodiff tensor.")
-                }
-                other => {
-                    panic!("Distributed operations are not supported for tensor kind {other:?}")
-                }
-            },
-            _ => panic!("Requires autodiff tensor."),
-        };
-
-        let checkpointing = if let Some(strategy) = checkpointing {
-            Some(strategy)
-        } else {
-            Some(crate::CheckpointingStrategy::None)
-        };
-        DispatchTensor {
-            kind,
-            checkpointing,
-        }
-    }
-
-    #[allow(unused_variables)]
-    fn distributed_params(tensor: &DispatchTensor) -> Option<DistributedParams> {
-        let DispatchTensor {
-            kind,
-            checkpointing: _,
-        } = tensor;
-
-        match &kind {
-            DispatchTensorKind::Autodiff(inner_kind) => match &**inner_kind {
-                #[cfg(feature = "cuda")]
-                DispatchTensorKind::Cuda(tensor) => {
-                    tensor.as_autodiff().node.distributed_params.clone()
-                }
-                #[cfg(feature = "remote")]
-                DispatchTensorKind::Remote(tensor) => {
-                    tensor.as_autodiff_float().node.distributed_params.clone()
-                }
-
-                DispatchTensorKind::Autodiff(_) => {
-                    panic!("Autodiff should not wrap an autodiff tensor.")
-                }
-                // Backends without distributed support never carry distributed params.
-                _ => None,
-            },
-            _ => panic!("Requires autodiff tensor."),
-        }
-    }
-
-    #[allow(unused_variables)]
-    fn is_distributed(tensor: &DispatchTensor) -> bool {
-        let DispatchTensor {
-            kind,
-            checkpointing: _,
-        } = tensor;
-
-        match &kind {
-            DispatchTensorKind::Autodiff(inner_kind) => match &**inner_kind {
-                #[cfg(feature = "cuda")]
-                DispatchTensorKind::Cuda(tensor) => {
-                    tensor.as_autodiff().node.distributed_params.is_some()
-                }
-                #[cfg(feature = "remote")]
-                DispatchTensorKind::Remote(tensor) => {
-                    tensor.as_autodiff_float().node.distributed_params.is_some()
-                }
-
-                DispatchTensorKind::Autodiff(_) => {
-                    panic!("Autodiff should not wrap an autodiff tensor.")
-                }
-                // Backends without distributed support are never distributed.
-                _ => false,
-            },
-            _ => panic!("Requires autodiff tensor."),
         }
     }
 }

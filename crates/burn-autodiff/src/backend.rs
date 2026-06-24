@@ -1,18 +1,17 @@
 use crate::{
     checkpoint::strategy::{CheckpointStrategy, NoCheckpointing},
-    grads::Gradients,
-    tensor::AutodiffTensor,
+    tensor::{AutodiffTensor, ComplexAutodiffTensor},
 };
 use alloc::{format, string::String};
 use core::marker::PhantomData;
 
 use burn_backend::{
-    UnimplementedTensorPrimitive,
-    backend::{AutodiffBackend, Backend, BackendTypes, ExecutionError},
+    backend::{
+        AutodiffBackend, AutodiffTensor as BackendAutodiffTensor, Backend, BackendTypes,
+        ExecutionError,
+    },
     tensor::{BoolTensor, IntTensor, QuantizedTensor},
 };
-
-use burn_backend::distributed::{DistributedParamId, DistributedParams};
 
 /// Enable auto-differentiation on a backend.
 ///
@@ -35,8 +34,7 @@ impl<B: BackendTypes, C: CheckpointStrategy> BackendTypes for Autodiff<B, C> {
 
     type QuantizedTensorPrimitive = B::QuantizedTensorPrimitive;
 
-    type ComplexTensorPrimitive =
-        UnimplementedTensorPrimitive<B::ComplexTensorPrimitive, B::Device>;
+    type ComplexTensorPrimitive = ComplexAutodiffTensor<B>;
 }
 
 impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
@@ -97,6 +95,58 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
 }
 
 impl<B: Backend, C: CheckpointStrategy> AutodiffBackend for Autodiff<B, C> {
+    type InnerBackend = B;
+
+    fn backward<T: BackendAutodiffTensor>(tensor: T) -> T::Gradients {
+        tensor.backward()
+    }
+
+    fn grad<T: BackendAutodiffTensor>(tensor: &T, grads: &T::Gradients) -> Option<T::Primitive> {
+        tensor.grad(grads)
+    }
+
+    fn grad_remove<T: BackendAutodiffTensor>(
+        tensor: &T,
+        grads: &mut T::Gradients,
+    ) -> Option<T::Primitive> {
+        tensor.grad_remove(grads)
+    }
+
+    fn grad_replace<T: BackendAutodiffTensor>(
+        tensor: &T,
+        grads: &mut T::Gradients,
+        grad: T::Primitive,
+    ) {
+        tensor.grad_replace(grads, grad);
+    }
+
+    fn int_inner(tensor: IntTensor<Self>) -> IntTensor<Self::InnerBackend> {
+        tensor
+    }
+
+    fn bool_inner(tensor: BoolTensor<Self>) -> BoolTensor<Self::InnerBackend> {
+        tensor
+    }
+
+    fn int_from_inner(tensor: IntTensor<Self::InnerBackend>) -> IntTensor<Self> {
+        tensor
+    }
+
+    fn bool_from_inner(tensor: BoolTensor<Self::InnerBackend>) -> BoolTensor<Self> {
+        tensor
+    }
+
+    fn q_inner(tensor: QuantizedTensor<Self>) -> QuantizedTensor<Self::InnerBackend> {
+        tensor
+    }
+
+    fn q_from_inner(tensor: QuantizedTensor<Self::InnerBackend>) -> QuantizedTensor<Self> {
+        tensor
+    }
+}
+
+#[cfg(feature = "distributed")]
+impl<B: DistributedBackend, C: CheckpointStrategy> AutodiffBackend for Autodiff<B, C> {
     type InnerBackend = B;
     type Gradients = Gradients;
 

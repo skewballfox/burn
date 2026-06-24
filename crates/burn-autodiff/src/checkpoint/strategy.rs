@@ -1,6 +1,6 @@
 use core::fmt::Debug;
 
-use burn_backend::Backend;
+use burn_backend::{Backend, BackendTypes};
 
 #[cfg(target_has_atomic = "ptr")]
 use alloc::sync::Arc;
@@ -8,7 +8,7 @@ use alloc::sync::Arc;
 #[cfg(not(target_has_atomic = "ptr"))]
 use portable_atomic_util::Arc;
 
-use crate::{graph::ComputingProperty, tensor::AutodiffTensor};
+use crate::{AutodiffTensorTrait, graph::ComputingProperty, tensor::AutodiffTensor};
 
 use super::{
     builder::{ActionType, CheckpointerBuilder},
@@ -21,13 +21,14 @@ pub trait CheckpointStrategy: Clone + Copy + Debug + Default + Send + Sync + 'st
     fn compute_property<R: RetroForward>(retro_forward: R) -> ComputingProperty;
 
     /// Checkpoints parents if necessary in the strategy
-    fn checkpoint_parents<'a, B2, A>(
-        parents: A,
+    fn checkpoint_parents<'a, B2, T,  P>(
+        parents: P,
         builder: &mut CheckpointerBuilder,
     ) -> Result<(), CheckpointingError>
     where
-        B2: Backend,
-        A: IntoIterator<Item = &'a AutodiffTensor<B2>>;
+        B2: BackendTypes,
+        T: AutodiffTensorTrait +  'a,
+        P: IntoIterator<Item = &'a T> + 'a;
 }
 
 #[derive(Debug)]
@@ -50,13 +51,14 @@ impl CheckpointStrategy for NoCheckpointing {
 
     /// An operation marked as memory bound is actually compute bound.
     /// It's therefore useless to checkpoint the parents
-    fn checkpoint_parents<'a, B2, A>(
-        _parents: A,
+    fn checkpoint_parents<'a, B2, T, P>(
+        _parents: P,
         _builder: &mut CheckpointerBuilder,
     ) -> Result<(), CheckpointingError>
     where
-        B2: Backend,
-        A: IntoIterator<Item = &'a AutodiffTensor<B2>>,
+        B2: BackendTypes,
+        T: AutodiffTensorTrait +'a, 
+        P: IntoIterator<Item = &'a T> ,
     {
         // Nothing to do here
         Ok(())
@@ -79,18 +81,19 @@ impl CheckpointStrategy for BalancedCheckpointing {
     /// An operation marked as memory bound is really memory bound.
     /// Since the operation may not checkpoint its parents but may need them indirectly
     /// if asked to recompute itself, the method needs to know the parent tensors to maybe checkpoint them
-    fn checkpoint_parents<'a, B2, A>(
-        parents: A,
+    fn checkpoint_parents<'a, B2, T, P>(
+        parents: P,
         builder: &mut CheckpointerBuilder,
     ) -> Result<(), CheckpointingError>
     where
-        B2: Backend,
-        A: IntoIterator<Item = &'a AutodiffTensor<B2>>,
+        B2: BackendTypes,
+        T: AutodiffTensorTrait + 'a,
+        P: IntoIterator<Item = &'a T> + 'a,
     {
         let mut can_checkpoint = true;
 
         for tensor in parents.into_iter() {
-            if let crate::graph::Requirement::None = tensor.node.requirement {
+            if let crate::graph::Requirement::None = tensor.node().requirement {
                 can_checkpoint = false;
             } else {
                 builder.checkpoint(tensor, ActionType::Backup);

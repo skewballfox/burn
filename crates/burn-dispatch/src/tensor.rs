@@ -1,5 +1,6 @@
 use crate::{DispatchDevice, backends::*};
 
+use burn_autodiff::AutodiffTensorTrait as _;
 #[cfg(feature = "autodiff")]
 use burn_autodiff::checkpoint::strategy::{
     BalancedCheckpointing, CheckpointStrategy, NoCheckpointing,
@@ -37,6 +38,23 @@ pub enum BackendTensor<B: BackendTypes> {
     //#[cfg(feature = "complex")]
     /// Complex tensor handle.
     Complex(B::ComplexTensorPrimitive),
+}
+
+impl<B: BackendTypes> BackendTensor<B> {
+    /// Returns the tensor primitive kind name.
+    pub fn name(&self) -> &'static str {
+        match self {
+            BackendTensor::Float(_) => "Float",
+            BackendTensor::Int(_) => "Int",
+            BackendTensor::Bool(_) => "Bool",
+            BackendTensor::Quantized(_) => "Quantized",
+            #[cfg(feature = "autodiff")]
+            BackendTensor::Autodiff(_) => "Autodiff",
+            #[cfg(feature = "autodiff")]
+            BackendTensor::AutodiffComplex(_) => "AutodiffComplex",
+            BackendTensor::Complex(_) => "Complex",
+        }
+    }
 }
 
 impl<B: Backend + ComplexTensorBackend> BackendTensor<B> {
@@ -221,7 +239,6 @@ impl<B: BackendTypes> TensorMetadata for BackendTensor<B> {
             BackendTensor::Autodiff(tensor) => tensor.shape(),
             #[cfg(feature = "autodiff")]
             BackendTensor::AutodiffComplex(tensor) => tensor.shape(),
-            //#[cfg(feature = "complex")]
             BackendTensor::Complex(tensor) => tensor.shape(),
         }
     }
@@ -549,6 +566,13 @@ macro_rules! impl_dispatch_conversion {
                     // Inverse: Wrap the `Float` variant back into the backend's `Autodiff` primitive variant
                     BackendTensor::Float(t) => {
                         let ad_tensor = BackendTensor::Autodiff(t);
+                        // Wrap in the concrete backend's dispatch container
+                        let inner_dispatch = DispatchTensorKind::$backend(ad_tensor);
+                        // Re-apply the outer Autodiff dispatch wrapper
+                        DispatchTensorKind::Autodiff(Box::new(inner_dispatch))
+                    }
+                    BackendTensor::Complex(t) => {
+                        let ad_tensor = BackendTensor::AutodiffComplex(t);
                         // Wrap in the concrete backend's dispatch container
                         let inner_dispatch = DispatchTensorKind::$backend(ad_tensor);
                         // Re-apply the outer Autodiff dispatch wrapper

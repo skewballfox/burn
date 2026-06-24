@@ -5,7 +5,7 @@ use crate::{
     grads::{BackwardMode, Gradients},
     graph::{Parent, StepBoxed},
     runtime::server::NodeCleaner,
-    tensor::{AutodiffTensor, NodeRefCount},
+    tensor::{AutodiffTensorTrait, NodeRefCount},
 };
 use alloc::vec::Vec;
 
@@ -113,15 +113,16 @@ impl AutodiffClient for GraphMutexClient {
         state.server.register(node_id_ref, step, actions);
     }
 
-    fn backward<B: Backend>(&self, root: AutodiffTensor<B>, mode: BackwardMode) -> Gradients {
-        let node_id = root.node.id;
-        let graph = GraphMutexClient::graph(root.node.id, &[]);
+    fn backward<T: AutodiffTensorTrait>(&self, root: T, mode: BackwardMode) -> Gradients {
+        let (root_primitive, root_node, _) = root.destructure();
+        let node_id = root_node.id;
+        let graph = GraphMutexClient::graph(node_id, &[]);
 
         let grads = {
             let mut state = graph.state.lock();
             state
                 .server
-                .backward::<GraphCleaner, B>(root.node, root.primitive, node_id, mode)
+                .backward::<GraphCleaner, T>(root_node, root_primitive, node_id, mode)
         }; // lock released
 
         GraphCleaner::cleanup_orphaned_entries();
