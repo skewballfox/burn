@@ -3,12 +3,12 @@ use crate::{Tensor, kind::Autodiff};
 #[cfg(feature = "autodiff")]
 use crate::ops::BridgeTensor;
 #[cfg(feature = "autodiff")]
-use burn_backend::AutodiffBackend;
+use burn_backend::{AutodiffBackend, AutodiffTensor};
 #[cfg(feature = "autodiff")]
-use burn_dispatch::Dispatch;
+use burn_dispatch::{Dispatch, DispatchTensor};
 
 #[cfg(feature = "autodiff")]
-type AutodiffGradients = <Dispatch as AutodiffBackend>::Gradients;
+type AutodiffGradients = <DispatchTensor as AutodiffTensor>::Gradients;
 
 // Aligned, type-erased storage for `AutodiffGradients`. See `crate::macros`
 // for why this indirection exists.

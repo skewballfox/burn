@@ -30,6 +30,8 @@ pub use graph::NodeId;
 pub(crate) mod tensor;
 pub(crate) mod utils;
 
+pub use tensor::AutodiffTensorTrait;
+
 mod backend;
 
 pub(crate) mod runtime;

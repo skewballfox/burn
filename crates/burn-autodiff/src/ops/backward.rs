@@ -3,9 +3,10 @@ use crate::{
     checkpoint::{base::Checkpointer, builder::CheckpointerBuilder, strategy::CheckpointStrategy},
     grads::Gradients,
     graph::{ComputingProperty, NodeRef, Requirement},
+    tensor::AutodiffTensorTrait,
     utils::duplicate,
 };
-use burn_backend::Backend;
+use burn_backend::BackendTypes;
 
 /// Trait for all operations.
 ///
@@ -17,7 +18,6 @@ use burn_backend::Backend;
 pub trait Backward<B, const N: usize>: Send + core::fmt::Debug
 where
     Self: Sized + 'static,
-    B: Backend,
 {
     /// Associated type to compute the backward pass.
     type State: Clone + Send + core::fmt::Debug + 'static;
@@ -31,7 +31,7 @@ where
     );
 
     /// Prepare the backward ops.
-    fn prepare<C: CheckpointStrategy>(
+    fn prepare<C: CheckpointStrategy, T: AutodiffTensorTrait>(
         self,
         nodes: [NodeRef; N],
     ) -> OpsPrep<Self, B, Self::State, C, N> {
@@ -47,42 +47,41 @@ where
 }
 
 /// Execute a binary operation during the backward step.
-pub fn binary<B, FLhs, FRhs>(
+pub fn binary<T: AutodiffTensorTrait, FLhs, FRhs>(
     parents: [Option<NodeRef>; 2],
     node: NodeRef,
     grads: &mut Gradients,
     func_lhs: FLhs,
     func_rhs: FRhs,
 ) where
-    B: Backend,
-    FLhs: FnOnce(B::FloatTensorPrimitive) -> B::FloatTensorPrimitive,
-    FRhs: FnOnce(B::FloatTensorPrimitive) -> B::FloatTensorPrimitive,
+    FLhs: FnOnce(T::Primitive) -> T::Primitive,
+    FRhs: FnOnce(T::Primitive) -> T::Primitive,
 {
-    let [grad_4lhs, grad_4rhs] = duplicate(&parents, Some(grads.consume::<B>(&node)));
+    let [grad_4lhs, grad_4rhs] = duplicate(&parents, Some(grads.consume_typed::<T>(&node)));
     let [node_lhs, node_rhs] = parents;
 
     if let Some(node) = node_lhs {
         let grad = func_lhs(grad_4lhs.unwrap());
-        grads.register::<B>(node.id, grad)
+        grads.register_typed::<T>(node.id, grad)
     }
 
     if let Some(node) = node_rhs {
         let grad = func_rhs(grad_4rhs.unwrap());
-        grads.register::<B>(node.id, grad)
+        grads.register_typed::<T>(node.id, grad)
     }
 }
 
 /// Execute a unary operation during the backward step.
-pub fn unary<B, F>(parents: [Option<NodeRef>; 1], node: NodeRef, grads: &mut Gradients, func: F)
+pub fn unary<T, F>(parents: [Option<NodeRef>; 1], node: NodeRef, grads: &mut Gradients, func: F)
 where
-    B: Backend,
-    F: FnOnce(B::FloatTensorPrimitive) -> B::FloatTensorPrimitive,
+    T: AutodiffTensorTrait,
+    F: FnOnce(T::Primitive) -> T::Primitive,
 {
     let [parent_node] = parents;
-    let grad = grads.consume::<B>(&node);
+    let grad = grads.consume_typed::<T>(&node);
 
     if let Some(node) = parent_node {
         let grad = func(grad);
-        grads.register::<B>(node.id, grad)
+        grads.register_typed::<T>(node.id, grad)
     }
 }

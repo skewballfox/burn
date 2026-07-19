@@ -8,10 +8,10 @@ use crate::{
     },
     grads::Gradients,
     graph::{ComputingProperty, NodeId, NodeRef, Parent, Requirement, Step},
-    tensor::AutodiffTensor,
+    tensor::{AutodiffTensor, AutodiffTensorTrait},
 };
 use alloc::boxed::Box;
-use burn_backend::{Backend, TensorMetadata, tensor::FloatTensor};
+use burn_backend::{Backend, BackendTypes, TensorMetadata, tensor::FloatTensor};
 use burn_std::Shape;
 use core::marker::PhantomData;
 
@@ -21,7 +21,7 @@ use burn_backend::distributed::DistributedParams;
 ///
 /// Each mode has its own set of functions to minimize cloning for unused backward states.
 #[derive(new)]
-pub struct OpsPrep<Backward, B, S, C, const N: usize, Mode = Init> {
+pub struct OpsPrep<Backward, B,  S, C, const N: usize, Mode = Init> {
     nodes: [NodeRef; N],
     requirement: Requirement,
     backward: Backward,
@@ -48,7 +48,7 @@ pub struct UnTracked;
 
 impl<BO, B, S, C, const N: usize> OpsPrep<BO, B, S, C, N, Init>
 where
-    B: Backend,
+    B: BackendTypes,
     BO: Backward<B, N, State = S>,
 {
     /// Indicates that the operation is compute bound, meaning its computation
@@ -65,7 +65,7 @@ where
 
     /// Indicates that the operation is memory bound, meaning its computation
     /// is light and can be recomputed
-    pub fn memory_bound(self) -> OpsPrep<BO, B, S, C, N, MemoryBound> {
+    pub fn memory_bound(self) -> OpsPrep<BO, B,S, C, N, MemoryBound> {
         OpsPrep::new(
             self.nodes,
             self.requirement,
@@ -76,9 +76,10 @@ where
     }
 }
 
-impl<BO, B, S, C, const N: usize> OpsPrep<BO, B, S, C, N, MemoryBound>
+impl<BO, B,  S, C, const N: usize> OpsPrep<BO, B,  S, C, N, MemoryBound>
 where
-    B: Backend,
+    B: BackendTypes,
+    
     BO: Backward<B, N, State = S>,
     C: CheckpointStrategy,
 {
@@ -86,7 +87,7 @@ where
     pub fn retro_forward<R: RetroForward>(
         self,
         retro_forward: R,
-    ) -> OpsPrep<BO, B, S, C, N, MemoryBoundRetroForward> {
+    ) -> OpsPrep<BO, B,  S, C, N, MemoryBoundRetroForward> {
         OpsPrep::new(
             self.nodes,
             self.requirement,
@@ -97,19 +98,19 @@ where
     }
 }
 
-impl<BO, B, S, C, const N: usize> OpsPrep<BO, B, S, C, N, MemoryBoundRetroForward>
+impl<BO, B,  S, C, const N: usize> OpsPrep<BO, B, S, C, N, MemoryBoundRetroForward>
 where
-    B: Backend,
     BO: Backward<B, N, State = S>,
     C: CheckpointStrategy,
 {
     /// Checkpoints the parents, if needed
-    pub fn parents<'a, B2, A>(mut self, parents: A) -> OpsPrep<BO, B, S, C, N, ComputePropertyDone>
+    pub fn parents<'a, B2,T, P>(mut self, parents: P) -> OpsPrep<BO, B, S, C, N, ComputePropertyDone>
     where
-        B2: Backend,
-        A: IntoIterator<Item = &'a AutodiffTensor<B2>>,
+        B2: BackendTypes,
+        T: AutodiffTensorTrait +  'a,
+        P: IntoIterator<Item = &'a T> +'a,
     {
-        let compute_property = match C::checkpoint_parents(parents, &mut self.checkpointer_builder)
+        let compute_property = match C::checkpoint_parents::<B2, T, P>(parents, &mut self.checkpointer_builder)
         {
             Ok(..) => self.compute_property,
             Err(..) => ComputingProperty::ComputeBound,
@@ -125,23 +126,23 @@ where
     }
 }
 
-impl<BO, B, C, const N: usize> OpsPrep<BO, B, (), C, N, ComputePropertyDone>
+impl<BO, B,  C, const N: usize> OpsPrep<BO, B,  (), C, N, ComputePropertyDone>
 where
-    B: Backend,
+    B: BackendTypes,
     BO: Backward<B, N, State = ()>,
 {
     /// Prepare a stateless operation.
-    pub fn stateless(self, output: FloatTensor<B>) -> AutodiffTensor<B> {
+    pub fn stateless<T: AutodiffTensorTrait>(self, output: T::Primitive) -> T {
         match self.stateful() {
-            OpsKind::Tracked(prep) => prep.finish((), output),
-            OpsKind::UnTracked(prep) => prep.finish(output),
+            OpsKind::Tracked(prep) => prep.finish::<T>((), output),
+            OpsKind::UnTracked(prep) => prep.finish::<T>(output),
         }
     }
 }
 
-impl<BO, B, S, C, const N: usize> OpsPrep<BO, B, S, C, N, ComputePropertyDone>
+impl<BO, B,  S, C, const N: usize> OpsPrep<BO, B,  S, C, N, ComputePropertyDone>
 where
-    B: Backend,
+    
     S: Clone + Send + core::fmt::Debug + 'static,
     BO: Backward<B, N, State = S>,
 {
@@ -168,20 +169,20 @@ where
 
 impl<BO, B, S, C, const N: usize> OpsPrep<BO, B, S, C, N, UnTracked>
 where
-    B: Backend,
+    B: BackendTypes,
     S: Clone + Send + core::fmt::Debug + 'static,
     BO: Backward<B, N, State = S>,
 {
     /// Finish the preparation of an untracked operation and returns the output tensor.
-    pub fn finish(self, output: FloatTensor<B>) -> AutodiffTensor<B> {
-        let output = AutodiffTensor::from_parents(
+    pub fn finish<T: AutodiffTensorTrait>(self, output: T::Primitive) -> T {
+        let output = T::from_parents(
             output,
             &self.nodes,
             self.requirement,
             self.compute_property,
         );
         let parents = self.nodes.map(|node| node.clone_if_require_grad());
-        let ops = Ops::new(parents, output.node.clone(), ());
+        let ops = Ops::new(parents, output.node().clone(), ());
 
         // We register the ops in the graph even if untracked, otherwise memory bound operations
         // that have an untracked parent would not be able to retrieve it
@@ -189,37 +190,37 @@ where
     }
 }
 
-impl<BO, B, S, C, const N: usize> OpsPrep<BO, B, S, C, N, Tracked>
+impl<BO, B, S, C, const N: usize> OpsPrep<BO,B, S, C, N, Tracked>
 where
-    B: Backend,
+    B: BackendTypes,
     S: Clone + Send + core::fmt::Debug + 'static,
     BO: Backward<B, N, State = S>,
 {
     /// Finish the preparation of a tracked operation and returns the output tensor.
-    pub fn finish(self, state: S, output: FloatTensor<B>) -> AutodiffTensor<B> {
-        let output = AutodiffTensor::from_parents(
+    pub fn finish<T: AutodiffTensorTrait>(self, state: S, output: T::Primitive) -> T {
+        let output = T::from_parents(
             output,
             &self.nodes,
             self.requirement,
             self.compute_property,
         );
         let parents = self.nodes.map(|node| node.clone_if_require_grad());
-        let ops = Ops::new(parents, output.node.clone(), state);
+        let ops = Ops::new(parents, output.node().clone(), state);
 
         output.register_step(OpsStep::new(ops, self.backward), self.checkpointer_builder)
     }
 
     /// Checkpoints the tensor
-    pub fn checkpoint(&mut self, tensor: &AutodiffTensor<B>) -> NodeId {
+    pub fn checkpoint<T: AutodiffTensorTrait>(&mut self, tensor: &T) -> NodeId {
         self.checkpointer_builder
             .checkpoint(tensor, ActionType::Explicit);
 
-        tensor.node.id
+        tensor.node().id
     }
 }
 
 /// Enum used before finishing tracked and untracked operations.
-pub enum OpsKind<BO, B, S, C, const N: usize> {
+pub enum OpsKind<BO, B,  S, C, const N: usize> {
     /// Tracked operation preparation.
     Tracked(OpsPrep<BO, B, S, C, N, Tracked>),
     /// Untracked operation preparation.
@@ -241,7 +242,7 @@ pub struct Ops<S, const N: usize> {
 #[derive(new, Debug)]
 struct OpsStep<B, T, SB, const N: usize>
 where
-    B: Backend,
+    B: BackendTypes,
     T: Backward<B, N, State = SB>,
     SB: Clone + Send + core::fmt::Debug + 'static,
 {
@@ -252,7 +253,7 @@ where
 
 impl<B, T, SB, const N: usize> Step for OpsStep<B, T, SB, N>
 where
-    B: Backend,
+    B: BackendTypes,
     T: Backward<B, N, State = SB>,
     SB: Clone + Send + core::fmt::Debug + 'static,
 {
@@ -307,7 +308,7 @@ impl<const N: usize> Step for UntrackedOpsStep<N> {
 ///
 /// If broadcasting happened during the forward pass, the gradients will be sum along the
 /// broadcasted dimension.
-pub fn broadcast_shape<B: Backend>(mut grad: FloatTensor<B>, shape: &Shape) -> FloatTensor<B> {
+pub fn broadcast_shape<T: AutodiffTensorTrait>(mut grad: T::Primitive, shape: &Shape) -> T::Primitive {
     let shape_grad = grad.shape();
     let ndims = shape_grad.num_dims();
 
@@ -319,7 +320,7 @@ pub fn broadcast_shape<B: Backend>(mut grad: FloatTensor<B>, shape: &Shape) -> F
                     shape, shape_grad, "Expected the shape of the next grad to be 1."
                 );
             }
-            grad = B::float_sum_dim(grad, i);
+            grad = T::sum_dim(grad, i);
         }
     }
 

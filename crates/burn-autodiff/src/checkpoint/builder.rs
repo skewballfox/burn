@@ -1,7 +1,5 @@
 use crate::{
-    collections::HashMap,
-    graph::{ComputingProperty, NodeId},
-    tensor::AutodiffTensor,
+    AutodiffTensorTrait, collections::HashMap, graph::{ComputingProperty, NodeId}, tensor::AutodiffTensor
 };
 use alloc::{boxed::Box, vec::Vec};
 
@@ -81,25 +79,25 @@ pub(crate) enum ActionType {
 }
 
 impl CheckpointerBuilder {
-    pub(crate) fn checkpoint<B: Backend>(
+    pub(crate) fn checkpoint<T: AutodiffTensorTrait>(
         &mut self,
-        tensor: &AutodiffTensor<B>,
+        tensor: &T,
         action_type: ActionType,
     ) {
         let action_list = match action_type {
             ActionType::Explicit => &mut self.explicit_actions,
             ActionType::Backup => &mut self.backup_actions,
         };
-        match &tensor.node.properties {
+        match &tensor.node().properties {
             ComputingProperty::ComputeBound | ComputingProperty::Ambiguous => {
                 action_list.push(CheckpointingAction::Computed {
-                    node_id: tensor.node.id,
-                    state_content: Box::new(tensor.primitive.clone()),
+                    node_id: tensor.node().id,
+                    state_content: Box::new(tensor.primitive().clone()),
                 })
             }
             ComputingProperty::MemoryBound { retro_forward } => {
                 action_list.push(CheckpointingAction::Recompute {
-                    node_id: tensor.node.id,
+                    node_id: tensor.node().id,
                     retro_forward: retro_forward.clone(),
                 })
             }

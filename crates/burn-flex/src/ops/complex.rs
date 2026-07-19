@@ -1,5 +1,5 @@
 use alloc::vec::Vec;
-use burn_backend::ops::ComplexTensorOps;
+use burn_backend::ops::{ComplexTensorOps, IntTensorOps as _};
 use burn_backend::tensor::{BoolTensor, Device, FloatTensor, IntTensor};
 use burn_backend::{ComplexTensor, ComplexTensorBackend, Distribution};
 use burn_backend::{Element, TensorData};
@@ -598,6 +598,11 @@ impl ComplexTensorOps<Flex> for Flex {
                 }
             }
         })
+    }
+
+    fn complex_powi(lhs: ComplexTensor<Flex>, rhs: IntTensor<Flex>) -> ComplexTensor<Flex> {
+        let dtype = burn_std::complex_utils::complex_to_real_dtype(lhs.dtype());
+        Self::complex_powf(lhs, Flex::int_into_float(rhs, FloatDType::from(dtype)))
     }
 
     fn complex_matmul(lhs: ComplexTensor<Flex>, rhs: ComplexTensor<Flex>) -> ComplexTensor<Flex> {

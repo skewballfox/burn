@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use alloc::vec::Vec;
 use burn_backend::{
     DeviceId,
@@ -14,6 +16,7 @@ use crate::{
     Autodiff,
     checkpoint::strategy::CheckpointStrategy,
     ops::{Backward, Ops, OpsKind, unary},
+    tensor::AutodiffTensor,
 };
 
 impl<B: Backend, C: CheckpointStrategy> DistributedOps<Self> for Autodiff<B, C> {
@@ -44,9 +47,9 @@ impl<B: Backend, C: CheckpointStrategy> DistributedOps<Self> for Autodiff<B, C> 
         device_ids: Vec<DeviceId>,
     ) -> CollectiveTensor<Self> {
         #[derive(Debug)]
-        struct AllReduce;
+        struct AllReduce<B: Backend>(pub(crate) std::marker::PhantomData<B>);
 
-        impl<B: Backend> Backward<B, 1> for AllReduce {
+        impl<B: Backend> Backward<B, 1> for AllReduce<B> {
             type State = (ReduceOperation, Vec<DeviceId>);
 
             fn backward(
@@ -58,7 +61,7 @@ impl<B: Backend, C: CheckpointStrategy> DistributedOps<Self> for Autodiff<B, C> 
                 // Backward uses the same reduce op: local gradients are synchronized via the backend, which handles
                 // scaling (e.g., ncclAvg for mean). This works for the reduce ops that are currently supported, but we
                 // might need to rework it if we add other ops such as ncclMax.
-                unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+                unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
                     B::all_reduce(grad, ops.state.0, ops.state.1).resolve()
                 });
             }
@@ -68,8 +71,8 @@ impl<B: Backend, C: CheckpointStrategy> DistributedOps<Self> for Autodiff<B, C> 
         // Safety: we call `assume_resolved` only to wrap it in a new `CollectiveTensor`.
         let resolved = unsafe { collective.assume_resolved() };
 
-        match AllReduce
-            .prepare::<C>([tensor.node.clone()])
+        match AllReduce::<B>(PhantomData)
+            .prepare::<C, AutodiffTensor<B>>([tensor.node.clone()])
             .compute_bound()
             .stateful()
         {

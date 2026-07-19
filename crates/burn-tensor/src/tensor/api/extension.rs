@@ -186,7 +186,7 @@ impl<B: Backend + ComplexTensorBackend> BackendPrimitive<B> for Int {
             BackendTensor::Int(t) => Ok(t),
             other => Err(PrimitiveConversionError::KindMismatch(format!(
                 "Expected Int primitive, got variant: {}",
-                other.name()
+                BackendTensor::<B>::name(&other)
             ))),
         }
     }

@@ -1,12 +1,12 @@
 use super::{Backward, Ops, unary};
-use crate::{checkpoint::base::Checkpointer, grads::Gradients};
+use crate::{checkpoint::base::Checkpointer, grads::Gradients, tensor::AutodiffTensor};
 use burn_backend::{Backend, TensorMetadata};
 use burn_std::Shape;
 
 #[derive(Debug)]
-pub(crate) struct SortDim;
+pub(crate) struct SortDim<B: Backend>(pub(crate) std::marker::PhantomData<B>);
 
-impl<B: Backend> Backward<B, 1> for SortDim {
+impl<B: Backend> Backward<B, 1> for SortDim<B> {
     type State = (B::IntTensorPrimitive, Shape, usize);
 
     fn backward(
@@ -15,7 +15,7 @@ impl<B: Backend> Backward<B, 1> for SortDim {
         grads: &mut Gradients,
         _checkpointer: &mut Checkpointer,
     ) {
-        unary::<B, _>(ops.parents, ops.node, grads, |grad| {
+        unary::<AutodiffTensor<B>, _>(ops.parents, ops.node, grads, |grad| {
             let (indices, shape, dim) = ops.state;
             let device = grad.device();
             let dtype = grad.dtype();

@@ -610,7 +610,10 @@ impl Numeric for Complex {
     }
 
     fn powi(lhs: BridgeTensor, rhs: BridgeTensor) -> BridgeTensor {
-        BridgeTensor::complex(Dispatch::complex_powi(lhs.into_complex(), rhs.into()))
+        BridgeTensor::complex(Dispatch::complex_powi(
+            lhs.into_complex(),
+            rhs.into_complex(),
+        ))
     }
 
     fn powi_scalar(lhs: BridgeTensor, rhs: Scalar) -> BridgeTensor {
