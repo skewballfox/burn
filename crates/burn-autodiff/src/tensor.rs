@@ -29,13 +29,18 @@ pub struct AutodiffTensor<B: BackendTypes> {
 #[derive(Debug, Clone)]
 pub struct ComplexAutodiffTensor<B: BackendTypes> {
     pub primitive: B::ComplexTensorPrimitive,
-    pub node: NodeRef,
-    pub rc: NodeRefCount,
+    pub(crate) state: AutodiffState,
 }
 #[derive(Debug, Clone)]
 pub struct AutodiffState {
     pub node: NodeRef,
     pub rc: NodeRefCount,
+}
+
+impl AutodiffState {
+    fn new(node: NodeRef) -> Self {
+        Self { rc: Arc::new(node.id), node: node  }
+    }
 }
 
 /// Trait implemented by all autodiff tensors, providing the necessary interface for the backward pass and gradient management.
@@ -255,15 +260,15 @@ impl<B: ComplexTensorBackend> AutodiffTensorTrait for ComplexAutodiffTensor<B> {
     /// as the primitive associated type for float autodiff
     type PrimitivePlaceholder = Self::Primitive;
     fn node_mut(&mut self) -> &mut NodeRef {
-        &mut self.node
+        &mut self.state.node
     }
 
     fn node(&self) -> &NodeRef {
-        &self.node
+        &self.state.node
     }
 
     fn ref_count(&self) -> &NodeRefCount {
-        &self.rc
+        &self.state.rc
     }
 
     fn add(lhs: Self::Primitive, rhs: Self::Primitive) -> Self::Primitive {
@@ -293,14 +298,13 @@ impl<B: ComplexTensorBackend> AutodiffTensorTrait for ComplexAutodiffTensor<B> {
     }
 
     fn destructure(self) -> (Self::Primitive, NodeRef, NodeRefCount) {
-        (self.primitive, self.node, self.rc)
+        (self.primitive, self.state.node, self.state.rc)
     }
 
     fn new_with_node(primitive: Self::Primitive, node: NodeRef) -> Self {
         Self {
-            rc: Arc::new(node.id),
             primitive,
-            node,
+            state: AutodiffState::new(node)
         }
     }
     
@@ -313,15 +317,15 @@ impl<B: Backend> AutodiffTensorTrait for AutodiffTensor<B> {
     /// as the primitive associated type for float autodiff
     type PrimitivePlaceholder = TensorPrimitive<B>;
     fn node_mut(&mut self) -> &mut NodeRef {
-        &mut self.node
+        &mut self.state.node
     }
 
     fn node(&self) -> &NodeRef {
-        &self.node
+        &self.state.node
     }
 
     fn ref_count(&self) -> &NodeRefCount {
-        &self.rc
+        &self.state.rc
     }
 
     fn add(lhs: Self::Primitive, rhs: Self::Primitive) -> Self::Primitive {
@@ -351,14 +355,14 @@ impl<B: Backend> AutodiffTensorTrait for AutodiffTensor<B> {
     }
 
     fn destructure(self) -> (Self::Primitive, NodeRef, NodeRefCount) {
-        (self.primitive, self.node, self.rc)
+        (self.primitive, self.state.node, self.state.rc)
     }
 
     fn new_with_node(primitive: Self::Primitive, node: NodeRef) -> Self {
         Self {
-            rc: Arc::new(node.id),
+
             primitive,
-            node,
+            state: AutodiffState::new(node)
         }
     }
     
@@ -378,6 +382,16 @@ impl<B: BackendTypes> TensorMetadata for AutodiffTensor<B> {
     fn rank(&self) -> usize {
         self.primitive.rank()
     }
+    
+    type Device = B::Device;
+    
+    fn device(&self) -> Self::Device {
+        self.primitive.device()
+    }
+    
+    fn can_mut(&self) -> bool {
+        self.primitive.can_mut()
+    }
 }
 
 impl<B: BackendTypes> TensorMetadata for ComplexAutodiffTensor<B> {
@@ -395,6 +409,14 @@ impl<B: BackendTypes> TensorMetadata for ComplexAutodiffTensor<B> {
     fn device(&self) -> B::Device {
         self.primitive.device()
     }
+
+    fn can_mut(&self) -> bool {
+        // Precise: the inner handle's buffer refcount already accounts for any
+        // clone the autodiff graph retains (e.g. checkpointed states).
+        self.primitive.can_mut()
+    }
+    
+    type Device= B::Device;
 }
 
 pub type NodeRefCount = Arc<NodeId>;
@@ -492,9 +514,8 @@ impl<B: BackendTypes> ComplexAutodiffTensor<B> {
         .into();
 
         Self {
-            rc: Arc::new(node.id),
             primitive,
-            node: node.clone(),
+            state: AutodiffState::new(node.clone()),
         }
     }
 }
@@ -510,7 +531,7 @@ impl<B: ComplexTensorBackend> ComplexAutodiffTensor<B> {
     pub fn backward(self) -> Gradients {
         let device = B::complex_device(&self.primitive);
         let device_cloned = device.clone();
-        let client = self.node.client.clone();
+        let client = self.state.node.client.clone();
 
         let mode = BackwardMode::Distributed(Box::new(|ctx: GradSyncContext| {
             let registration = DistributedGradientRegistration::<B::InnerBackend>::new(
