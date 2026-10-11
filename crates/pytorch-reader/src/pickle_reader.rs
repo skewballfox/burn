@@ -883,18 +883,86 @@ fn gather_strided(
     element_size: usize,
     byte_len: usize,
 ) -> Vec<u8> {
-    let mut out = Vec::with_capacity(byte_len);
-    let num_elements = byte_len / element_size;
-    for linear_index in 0..num_elements {
-        let mut remaining = linear_index;
-        let mut storage_index = 0;
-        for (&dim, &step) in shape.iter().zip(stride).rev() {
-            storage_index += (remaining % dim) * step;
-            remaining /= dim;
-        }
-        let start = storage_index * element_size;
-        out.extend_from_slice(&data[start..start + element_size]);
+    if byte_len == 0 {
+        return Vec::new();
     }
+    // Moving whole elements as fixed-size arrays turns each copy into a register move rather
+    // than a `memcpy` of a run-time length. `DType::size` has no other widths.
+    match element_size {
+        1 => gather_elements::<1>(data, shape, stride),
+        2 => gather_elements::<2>(data, shape, stride),
+        4 => gather_elements::<4>(data, shape, stride),
+        8 => gather_elements::<8>(data, shape, stride),
+        _ => unreachable!("no dtype is {element_size} bytes wide"),
+    }
+}
+
+/// [`gather_strided`] for a non-empty view of `N`-byte elements.
+fn gather_elements<const N: usize>(data: &[u8], shape: &[usize], stride: &[usize]) -> Vec<u8> {
+    let (elements, _) = data.as_chunks::<N>();
+
+    // A `.t()` view, which is how `nn.Linear` weights are often saved.
+    if let ([rows, cols], [1, step]) = (shape, stride)
+        && step == rows
+    {
+        return transpose(elements, *cols, *rows).into_flattened();
+    }
+
+    let ((&inner_len, outer_shape), (&inner_step, outer_stride)) = (
+        shape.split_last().unwrap_or((&1, &[])),
+        stride.split_last().unwrap_or((&0, &[])),
+    );
+    let mut out = Vec::with_capacity(shape.iter().product());
+    out.extend(
+        strided_offsets(outer_shape, outer_stride)
+            .flat_map(|base| (0..inner_len).map(move |k| elements[base + k * inner_step])),
+    );
+    out.into_flattened()
+}
+
+/// Storage offsets of a strided view's indices, in row-major order.
+///
+/// Each dimension expands every offset of the dimensions outside it into one per step, so an
+/// offset is built by adding strides as the indices advance, rather than by dividing the
+/// linear index by every extent.
+fn strided_offsets<'a>(
+    shape: &'a [usize],
+    stride: &'a [usize],
+) -> Box<dyn Iterator<Item = usize> + 'a> {
+    shape
+        .iter()
+        .zip(stride)
+        .fold(Box::new(core::iter::once(0)), |offsets, (&dim, &step)| {
+            Box::new(offsets.flat_map(move |base| (0..dim).map(move |i| base + i * step)))
+        })
+}
+
+/// Transpose a row-major `[rows, cols]` matrix into a row-major `[cols, rows]` one.
+///
+/// Copies `TILE` x `TILE` tiles, so the source and output rows a tile touches stay in cache
+/// while it is copied, instead of striding across the whole output for every element.
+fn transpose<const N: usize>(src: &[[u8; N]], rows: usize, cols: usize) -> Vec<[u8; N]> {
+    const TILE: usize = 32;
+
+    let mut out = vec![[0; N]; rows * cols];
+    // A band of output rows is a band of source columns; fill it one tile of source rows at a
+    // time.
+    out.chunks_mut(TILE * rows)
+        .zip((0..cols).step_by(TILE))
+        .for_each(|(band, col_start)| {
+            src.chunks(TILE * cols)
+                .zip((0..rows).step_by(TILE))
+                .for_each(|(block, row_start)| {
+                    band.chunks_exact_mut(rows)
+                        .zip(col_start..)
+                        .for_each(|(out_row, col)| {
+                            out_row[row_start..]
+                                .iter_mut()
+                                .zip(block.chunks_exact(cols))
+                                .for_each(|(dst, src_row)| *dst = src_row[col]);
+                        });
+                });
+        });
     out
 }
 
@@ -2115,6 +2183,55 @@ mod tests {
             let bytes = tensor.read().unwrap_or_else(|e| panic!("{name}: {e}"));
             let data: Vec<f32> = bytemuck::pod_collect_to_vec(&bytes);
             assert_eq!(data, expected, "{name}");
+        }
+    }
+
+    /// `gather_strided` against the definition it replaces, `storage[sum(i_k * stride_k)]`
+    /// per element, for every element width. The transposes are larger than its tile and
+    /// not a multiple of it, so partial tiles on both axes are covered.
+    #[test]
+    fn gather_strided_matches_the_definition() {
+        fn reference(data: &[u8], shape: &[usize], stride: &[usize], size: usize) -> Vec<u8> {
+            let num_elements: usize = shape.iter().product();
+            (0..num_elements)
+                .flat_map(|linear| {
+                    let index: usize = shape
+                        .iter()
+                        .zip(stride)
+                        .rev()
+                        .scan(linear, |remaining, (&dim, &step)| {
+                            let digit = *remaining % dim;
+                            *remaining /= dim;
+                            Some(digit * step)
+                        })
+                        .sum();
+                    data[index * size..][..size].iter().copied()
+                })
+                .collect()
+        }
+
+        let cases: &[(&[usize], &[usize])] = &[
+            (&[37, 70], &[1, 37]),
+            (&[70, 37], &[1, 70]),
+            (&[32, 64], &[1, 32]),
+            (&[3, 5, 7], &[1, 3, 15]),
+            (&[2, 3, 4, 5], &[60, 1, 15, 3]),
+            (&[4, 6], &[12, 2]),
+            (&[3, 4], &[0, 1]),
+            (&[9], &[3]),
+        ];
+        for size in [1, 2, 4, 8] {
+            let data: Vec<u8> = (0..30_000u32)
+                .map(|i| u8::try_from(i % 251).unwrap())
+                .collect();
+            for &(shape, stride) in cases {
+                let byte_len = shape.iter().product::<usize>() * size;
+                assert_eq!(
+                    gather_strided(&data, shape, stride, size, byte_len),
+                    reference(&data, shape, stride, size),
+                    "{size}-byte elements, shape {shape:?}, stride {stride:?}"
+                );
+            }
         }
     }
 
