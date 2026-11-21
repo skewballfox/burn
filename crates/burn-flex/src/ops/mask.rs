@@ -1,8 +1,7 @@
 //! Mask operations for conditional element replacement.
 
-use alloc::vec::Vec;
 use burn_backend::Element;
-use burn_std::{Bytes, bf16, f16};
+use burn_std::{bf16, f16};
 
 use crate::{FlexBuf, FlexTensor, Layout};
 
@@ -606,6 +605,7 @@ pub fn mask_where_bool(tensor: FlexTensor, mask: FlexTensor, value: FlexTensor) 
 mod tests {
     use super::*;
     use burn_backend::TensorData;
+    use burn_std::Bytes;
 
     #[test]
     fn test_mask_where_preserves_bool_store_with_unique_value() {

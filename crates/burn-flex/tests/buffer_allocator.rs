@@ -16,14 +16,9 @@ use std::alloc::{GlobalAlloc, Layout, System};
 use std::ptr::NonNull;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
-use burn_backend::TensorData;
-use burn_backend::ops::{ActivationOps, FloatTensorOps, ModuleOps};
-#[cfg(feature = "buffer-allocator-gemm")]
-use burn_backend::ops::{ConvOptions, QTensorOps};
-#[cfg(feature = "buffer-allocator-gemm")]
+use burn_backend::ops::{ActivationOps, ConvOptions, FloatTensorOps, ModuleOps, QTensorOps};
 use burn_backend::quantization::QuantScheme;
-#[cfg(feature = "buffer-allocator-gemm")]
-use burn_backend::{FloatDType, TensorPrimitive};
+use burn_backend::{FloatDType, TensorData, TensorPrimitive};
 use burn_flex::{Flex, FlexTensor};
 use burn_std::{AllocationError, BoolDType, BufferAllocator, FromGlobalAlloc};
 
@@ -33,11 +28,7 @@ use burn_std::{AllocationError, BoolDType, BufferAllocator, FromGlobalAlloc};
 const METADATA_BYTES: usize = 2 * size_of::<FlexTensor>() + 64;
 
 /// The number of outputs of [`infer`].
-const OUTPUTS: usize = if cfg!(feature = "buffer-allocator-gemm") {
-    9
-} else {
-    5
-};
+const OUTPUTS: usize = 8;
 
 /// Passes every allocation to [`System`], and records those above [`METADATA_BYTES`] while armed.
 ///
@@ -126,7 +117,9 @@ static ARENA: Arena = Arena {
 
 fn ramp(shape: &[usize], scale: f32) -> TensorData {
     let n = shape.iter().product::<usize>();
-    let values = (0..n).map(|i| (i as f32 * scale).sin()).collect::<Vec<_>>();
+    let values = (0..n)
+        .map(|i| (f32::from(u16::try_from(i).unwrap()) * scale).sin())
+        .collect::<Vec<_>>();
     TensorData::new(values, shape.to_vec())
 }
 
@@ -137,9 +130,7 @@ struct Inputs {
     w2: TensorData,
     gamma: TensorData,
     indices: TensorData,
-    #[cfg(feature = "buffer-allocator-gemm")]
     image: TensorData,
-    #[cfg(feature = "buffer-allocator-gemm")]
     kernel: TensorData,
 }
 
@@ -150,10 +141,8 @@ impl Inputs {
             w1: ramp(&[8, 64], 0.37),
             w2: ramp(&[8, 64], 0.53),
             gamma: ramp(&[64], 0.07),
-            indices: TensorData::new((0..8 * 64).map(|i| (i * 7 % 64) as i64).collect(), [8, 64]),
-            #[cfg(feature = "buffer-allocator-gemm")]
+            indices: TensorData::new((0..8 * 64).map(|i: i64| i * 7 % 64).collect(), [8, 64]),
             image: ramp(&[1, 4, 16, 16], 0.19),
-            #[cfg(feature = "buffer-allocator-gemm")]
             kernel: ramp(&[8, 4, 3, 3], 0.29),
         }
     }
@@ -182,31 +171,28 @@ fn infer(inputs: Inputs, outputs: &mut Vec<FlexTensor>) {
     let transposed = Flex::float_swap_dims(x, 0, 1);
     let contiguous = Flex::float_exp(transposed);
 
-    outputs.extend([probs, summed, joined, masked, contiguous]);
+    let image = FlexTensor::from_data(inputs.image);
+    let kernel = FlexTensor::from_data(inputs.kernel);
+    let conv = Flex::conv2d(
+        image,
+        kernel,
+        None,
+        ConvOptions::new([1, 1], [1, 1], [1, 1], 1),
+    );
+    let pooled = Flex::max_pool2d(conv.clone(), [2, 2], [2, 2], [0, 0], [1, 1], false);
 
-    #[cfg(feature = "buffer-allocator-gemm")]
-    {
-        let image = FlexTensor::from_data(inputs.image);
-        let kernel = FlexTensor::from_data(inputs.kernel);
-        let conv = Flex::conv2d(
-            image,
-            kernel,
-            None,
-            ConvOptions::new([1, 1], [1, 1], [1, 1], 1),
-        );
-        let pooled = Flex::max_pool2d(conv.clone(), [2, 2], [2, 2], [0, 0], [1, 1], false);
+    let quantized = Flex::quantize_dynamic(w2, &QuantScheme::default());
+    let q_product = match Flex::q_matmul(
+        TensorPrimitive::Float(w1),
+        TensorPrimitive::QFloat(Flex::q_transpose(quantized)),
+    ) {
+        TensorPrimitive::Float(tensor) => tensor,
+        TensorPrimitive::QFloat(tensor) => Flex::dequantize(tensor, FloatDType::F32),
+    };
 
-        let product = Flex::float_matmul(w1.clone(), Flex::float_transpose(w2.clone()));
-        let quantized = Flex::quantize_dynamic(w2, &QuantScheme::default());
-        let q_product = match Flex::q_matmul(
-            TensorPrimitive::Float(w1),
-            TensorPrimitive::QFloat(Flex::q_transpose(quantized)),
-        ) {
-            TensorPrimitive::Float(tensor) => tensor,
-            TensorPrimitive::QFloat(tensor) => Flex::dequantize(tensor, FloatDType::F32),
-        };
-        outputs.extend([conv, pooled, product, q_product]);
-    }
+    outputs.extend([
+        probs, summed, joined, masked, contiguous, conv, pooled, q_product,
+    ]);
 }
 
 fn run(inputs: Inputs) -> Vec<FlexTensor> {
@@ -218,7 +204,7 @@ fn run(inputs: Inputs) -> Vec<FlexTensor> {
 fn values(outputs: Vec<FlexTensor>) -> Vec<Vec<f32>> {
     outputs
         .into_iter()
-        .map(|tensor| tensor.into_data().convert::<f32>().into_vec().unwrap())
+        .map(|tensor| tensor.into_data().convert::<f32>().try_into_vec().unwrap())
         .collect()
 }
 

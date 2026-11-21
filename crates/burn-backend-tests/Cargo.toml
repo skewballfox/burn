@@ -27,6 +27,8 @@ rocm = ["burn-tensor/rocm", "quantization", "cube"]
 flex = ["burn-tensor/flex", "quantization"]
 flex-simd = ["flex", "burn-flex/simd"]
 flex-rayon = ["flex", "burn-flex/rayon"]
+# The Flex suite with every tensor buffer from a registered allocator.
+flex-buffer-allocator = ["flex", "burn-flex/buffer-allocator"]
 vulkan = ["wgpu", "burn-tensor/vulkan"]
 webgpu = ["wgpu", "burn-tensor/webgpu"]
 wgpu-msl = ["wgpu", "burn-tensor/wgpu-msl"]

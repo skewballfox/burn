@@ -23,7 +23,6 @@
 
 use crate::FlexBuf;
 use crate::layout::Layout;
-use alloc::vec::Vec;
 
 /// Max rank we're willing to handle without falling back to the
 /// strided iterator. Burn tensors are capped at 8 dims in practice.
@@ -460,7 +459,7 @@ pub(crate) fn collapse_for_zip3(a: &Layout, b: &Layout, c: &Layout) -> Option<Zi
     Some(nest)
 }
 
-/// Apply a 3-way mapping operation over strided layouts into a new Vec.
+/// Apply a 3-way mapping operation over strided layouts into a new buffer.
 pub(crate) fn zip3_map<A, B, C, R, F>(
     a: &[A],
     a_layout: &Layout,

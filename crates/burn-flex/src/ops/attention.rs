@@ -13,7 +13,6 @@ use alloc::vec;
 use alloc::vec::Vec;
 use burn_backend::DType;
 use burn_backend::ops::AttentionModuleOptions;
-use burn_std::Bytes;
 use bytemuck::Pod;
 use num_traits::Float;
 

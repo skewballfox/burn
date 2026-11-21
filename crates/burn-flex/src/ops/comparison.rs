@@ -1,11 +1,9 @@
 //! Comparison operations returning boolean tensors.
 
 use alloc::boxed::Box;
-#[cfg(feature = "simd")]
-use alloc::vec;
 use alloc::vec::Vec;
 use burn_backend::{DType, Element};
-use burn_std::{BoolDType, BoolStore, Bytes, Shape, bf16, f16};
+use burn_std::{BoolDType, BoolStore, Shape, bf16, f16};
 use bytemuck::Pod;
 
 use crate::strided_index::StridedIter;

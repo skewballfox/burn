@@ -47,6 +47,58 @@ pub(crate) fn into_registered(bytes: Bytes) -> Bytes {
     copy
 }
 
+/// Zeroed accumulators for SIMD kernels that add rows into them.
+///
+/// Without a registered allocator they are 64-byte aligned, so no vector store splits a cache
+/// line; [`FlexBuf`] has the alignment of `E` only. With one, they come from it.
+#[cfg(feature = "simd")]
+pub(crate) enum Accumulator<E> {
+    Aligned(crate::simd::aligned::AlignedVec<E>),
+    Buf(FlexBuf<E>),
+}
+
+#[cfg(feature = "simd")]
+impl<E: bytemuck::Pod + Send + Sync> Accumulator<E> {
+    pub(crate) fn zeroed(n: usize) -> Self {
+        #[cfg(feature = "buffer-allocator")]
+        if crate::allocator::allocator().is_some() {
+            return Self::Buf(FlexBuf::zeroed(n));
+        }
+        Self::Aligned(crate::simd::aligned::alloc_aligned_zeroed(n))
+    }
+
+    /// The sums as a buffer: a copy for aligned memory, as tensor storage has the alignment of
+    /// `E`.
+    pub(crate) fn into_buf(self) -> FlexBuf<E> {
+        match self {
+            Self::Aligned(sums) => FlexBuf::from_slice(&sums),
+            Self::Buf(sums) => sums,
+        }
+    }
+}
+
+#[cfg(feature = "simd")]
+impl<E> Deref for Accumulator<E> {
+    type Target = [E];
+
+    fn deref(&self) -> &[E] {
+        match self {
+            Self::Aligned(sums) => sums,
+            Self::Buf(sums) => sums,
+        }
+    }
+}
+
+#[cfg(feature = "simd")]
+impl<E> DerefMut for Accumulator<E> {
+    fn deref_mut(&mut self) -> &mut [E] {
+        match self {
+            Self::Aligned(sums) => sums,
+            Self::Buf(sums) => sums,
+        }
+    }
+}
+
 /// A growable buffer of `E`, like `Vec<E>`, whose memory comes from the Flex allocator.
 ///
 /// Build the data with [`push`](Self::push), [`extend_from_slice`](Self::extend_from_slice), or
@@ -73,6 +125,7 @@ impl<E: bytemuck::Pod + Send + Sync> FlexBuf<E> {
     /// # Panics
     ///
     /// When the allocator has no memory for `capacity` elements.
+    #[must_use]
     pub fn with_capacity(capacity: usize) -> Self {
         let size = capacity
             .checked_mul(size_of::<E>())
@@ -98,6 +151,11 @@ impl<E: bytemuck::Pod + Send + Sync> FlexBuf<E> {
     }
 
     /// `n` copies of `value`, like `vec![value; n]`.
+    ///
+    /// # Panics
+    ///
+    /// When the allocator has no memory for `n` elements.
+    #[must_use]
     pub fn from_elem(value: E, n: usize) -> Self {
         if bytemuck::bytes_of(&value).iter().all(|&byte| byte == 0) {
             return Self::zeroed(n);
@@ -116,6 +174,11 @@ impl<E: bytemuck::Pod + Send + Sync> FlexBuf<E> {
     }
 
     /// `n` zero elements.
+    ///
+    /// # Panics
+    ///
+    /// When the allocator has no memory for `n` elements.
+    #[must_use]
     pub fn zeroed(n: usize) -> Self {
         #[cfg(feature = "buffer-allocator")]
         if crate::allocator::allocator().is_some() {
@@ -134,6 +197,11 @@ impl<E: bytemuck::Pod + Send + Sync> FlexBuf<E> {
     }
 
     /// A copy of `data`.
+    ///
+    /// # Panics
+    ///
+    /// When the allocator has no memory for the elements.
+    #[must_use]
     pub fn from_slice(data: &[E]) -> Self {
         let mut buf = Self::with_capacity(data.len());
         buf.extend_from_slice(data);
@@ -141,6 +209,11 @@ impl<E: bytemuck::Pod + Send + Sync> FlexBuf<E> {
     }
 
     /// `f(0)`, `f(1)`, ..., `f(n - 1)`.
+    ///
+    /// # Panics
+    ///
+    /// When the allocator has no memory for `n` elements.
+    #[must_use]
     pub fn from_fn(n: usize, mut f: impl FnMut(usize) -> E) -> Self {
         let mut buf = Self::with_capacity(n);
         buf.spare_capacity_mut()
@@ -154,6 +227,7 @@ impl<E: bytemuck::Pod + Send + Sync> FlexBuf<E> {
 
     /// The elements.
     #[inline]
+    #[must_use]
     pub fn as_slice(&self) -> &[E] {
         self
     }
@@ -166,18 +240,21 @@ impl<E: bytemuck::Pod + Send + Sync> FlexBuf<E> {
 
     /// The number of elements.
     #[inline]
+    #[must_use]
     pub fn len(&self) -> usize {
         self.len
     }
 
     /// Whether the buffer has no elements.
     #[inline]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.len == 0
     }
 
     /// The number of elements the buffer holds without growing.
     #[inline]
+    #[must_use]
     pub fn capacity(&self) -> usize {
         self.capacity
     }
@@ -210,6 +287,10 @@ impl<E: bytemuck::Pod + Send + Sync> FlexBuf<E> {
     }
 
     /// Makes room for at least `additional` more elements.
+    ///
+    /// # Panics
+    ///
+    /// When the allocator has no memory for them.
     pub fn reserve(&mut self, additional: usize) {
         let required = self
             .len
@@ -228,6 +309,10 @@ impl<E: bytemuck::Pod + Send + Sync> FlexBuf<E> {
     }
 
     /// Appends `value`.
+    ///
+    /// # Panics
+    ///
+    /// When the buffer is full and the allocator has no memory to grow it.
     #[inline]
     pub fn push(&mut self, value: E) {
         if self.len == self.capacity {
@@ -239,6 +324,10 @@ impl<E: bytemuck::Pod + Send + Sync> FlexBuf<E> {
     }
 
     /// Appends a copy of `data`.
+    ///
+    /// # Panics
+    ///
+    /// When the allocator has no memory to grow the buffer.
     pub fn extend_from_slice(&mut self, data: &[E]) {
         self.reserve(data.len());
         let spare = &mut self.spare_capacity_mut()[..data.len()];
@@ -255,6 +344,7 @@ impl<E: bytemuck::Pod + Send + Sync> FlexBuf<E> {
     }
 
     /// The elements as tensor storage, without a copy.
+    #[must_use]
     pub fn into_bytes(self) -> Bytes {
         let mut bytes = self.bytes;
         // SAFETY: The first `len` elements are initialized, and the memory holds them.
@@ -266,6 +356,11 @@ impl<E: bytemuck::Pod + Send + Sync> FlexBuf<E> {
 #[cfg(feature = "rayon")]
 impl<E: bytemuck::Pod + Send + Sync> FlexBuf<E> {
     /// The elements of an indexed parallel iterator, in order, like `collect::<Vec<_>>()`.
+    ///
+    /// # Panics
+    ///
+    /// When the allocator has no memory for the elements.
+    #[must_use]
     pub fn par_collect(iter: impl rayon::iter::IndexedParallelIterator<Item = E>) -> Self {
         use rayon::iter::{IndexedParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
 

@@ -1,4 +1,3 @@
-use alloc::vec::Vec;
 use core::fmt;
 
 use burn_backend::{DType, Element, TensorData, TensorMetadata};

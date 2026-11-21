@@ -13,6 +13,7 @@
 use num_traits::Float;
 
 use alloc::vec;
+#[cfg(feature = "rayon")]
 use alloc::vec::Vec;
 use burn_backend::DType;
 use burn_std::{Bytes, Shape};

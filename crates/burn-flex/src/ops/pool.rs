@@ -8,7 +8,6 @@
 //! Supported dtypes: f32, f64, f16 (native), bf16 (via f32 conversion)
 
 use alloc::vec;
-use alloc::vec::Vec;
 use burn_backend::{DType, Element};
 use burn_std::{Bytes, ElementAdd, Shape, bf16, f16};
 

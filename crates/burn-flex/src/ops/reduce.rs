@@ -10,7 +10,7 @@ use crate::buffer::ParCollectBuf;
 use alloc::vec;
 use alloc::vec::Vec;
 use burn_backend::{DType, Element};
-use burn_std::{Bytes, Shape, bf16, f16};
+use burn_std::{Shape, bf16, f16};
 use num_traits::Float;
 
 use crate::strided_index::StridedIter;
@@ -30,9 +30,6 @@ fn assert_dim_fits_isize(dim_size: usize, dim: usize) {
 
 #[cfg(feature = "simd")]
 use crate::simd::kernels;
-
-#[cfg(feature = "simd")]
-use crate::simd::aligned;
 
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
@@ -1079,7 +1076,7 @@ fn reduce_middle_dim_f32(
     #[cfg(feature = "simd")]
     {
         // Use aligned allocation for optimal SIMD scatter-add
-        let mut result = FlexBuf::<f32>::zeroed(out_size);
+        let mut result = crate::buffer::Accumulator::<f32>::zeroed(out_size);
         kernels::scatter_add_batched(
             &data[start_offset..],
             &mut result,
@@ -1089,7 +1086,7 @@ fn reduce_middle_dim_f32(
             outer_stride as usize,
             dim_stride as usize,
         );
-        result
+        result.into_buf()
     }
 
     #[cfg(not(feature = "simd"))]
@@ -1125,7 +1122,7 @@ fn reduce_first_dim_f32(
     #[cfg(feature = "simd")]
     {
         // Use aligned allocation for optimal SIMD scatter-add
-        let mut result = FlexBuf::<f32>::zeroed(inner_size);
+        let mut result = crate::buffer::Accumulator::<f32>::zeroed(inner_size);
         kernels::scatter_add_f32(
             &data[start_offset..],
             &mut result,
@@ -1133,7 +1130,7 @@ fn reduce_first_dim_f32(
             inner_size,
             dim_stride as usize,
         );
-        result
+        result.into_buf()
     }
 
     #[cfg(not(feature = "simd"))]
@@ -1460,9 +1457,9 @@ fn sum_dim_contiguous_f32(
     if outer_size == 1 {
         #[cfg(feature = "simd")]
         {
-            let mut result = FlexBuf::<f32>::zeroed(inner_size);
+            let mut result = crate::buffer::Accumulator::<f32>::zeroed(inner_size);
             kernels::scatter_add_f32(data, &mut result, dim_size, inner_size, inner_size);
-            return result;
+            return result.into_buf();
         }
         #[cfg(not(feature = "simd"))]
         {
@@ -1482,7 +1479,7 @@ fn sum_dim_contiguous_f32(
     let out_size = outer_size * inner_size;
     #[cfg(feature = "simd")]
     {
-        let mut result = FlexBuf::<f32>::zeroed(out_size);
+        let mut result = crate::buffer::Accumulator::<f32>::zeroed(out_size);
         kernels::scatter_add_batched(
             data,
             &mut result,
@@ -1492,7 +1489,7 @@ fn sum_dim_contiguous_f32(
             dim_size * inner_size,
             inner_size,
         );
-        result
+        result.into_buf()
     }
     #[cfg(not(feature = "simd"))]
     {

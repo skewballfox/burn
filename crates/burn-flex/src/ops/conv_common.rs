@@ -1,9 +1,8 @@
 //! Shared macros and helpers for forward and transposed convolution.
 
 use crate::{FlexBuf, FlexTensor, Layout};
-use alloc::vec::Vec;
 use burn_backend::DType;
-use burn_std::{Bytes, Element, ElementAdd, Shape, bf16};
+use burn_std::{Element, ElementAdd, Shape, bf16};
 
 // ============================================================================
 // Macros for dtype wrappers

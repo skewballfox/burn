@@ -3,7 +3,6 @@
 //! Replaces platform-specific implementations (neon.rs) with a single
 //! portable implementation that auto-dispatches to NEON/AVX2/SSE/SIMD128/scalar.
 
-use alloc::vec::Vec;
 use core::mem::MaybeUninit;
 
 use macerator::{

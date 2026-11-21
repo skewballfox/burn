@@ -50,6 +50,8 @@ pub mod simd;
 pub use allocator::{allocator, set_allocator};
 pub use backend::{Flex, FlexDevice};
 pub use buffer::FlexBuf;
+#[cfg(feature = "buffer-allocator")]
+pub use burn_std::{AllocationError, BufferAllocator, FromGlobalAlloc};
 pub use layout::Layout;
 pub use qtensor::FlexQTensor;
 pub use tensor::FlexTensor;

@@ -38,8 +38,6 @@ tracing = ["burn-std/tracing", "burn-backend/tracing", "burn-ir/tracing"]
 # Tensor storage and kernel scratch from an allocator registered with `set_allocator`,
 # instead of the global allocator. For embedded targets with an arena of their own.
 buffer-allocator = ["dep:spin"]
-# Also the packing buffers of matrix multiplication, through `gemm`'s scratch API.
-buffer-allocator-gemm = ["buffer-allocator"]
 critical-section = [
     "dep:once_cell",
     "once_cell/critical-section",

@@ -11,9 +11,8 @@
 //!
 //! Not yet covered: the backward-only operations (the `*_backward` operations of pooling,
 //! convolution, deformable convolution and interpolation), the FFT, and the per-tensor metadata
-//! (the reference count and the allocation controller), which stay on the global heap. The
-//! matrix multiplication packing buffers of `gemm` come from the registered allocator only with
-//! the `buffer-allocator-gemm` feature.
+//! (the reference count and the allocation controller), which stay on the global heap, as do the
+//! packing buffers that `gemm` allocates for large matrix multiplications.
 
 use burn_std::BufferAllocator;
 

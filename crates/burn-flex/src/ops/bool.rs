@@ -7,7 +7,7 @@ use burn_backend::{
     ops::{BoolTensorOps, IntTensorOps},
     tensor::{BoolTensor, Device, FloatTensor, IndexingUpdateOp, IntTensor},
 };
-use burn_std::{BoolDType, BoolStore, Bytes, FloatDType, IntDType, Shape, Slice, bf16, f16};
+use burn_std::{BoolDType, BoolStore, FloatDType, IntDType, Shape, Slice, bf16, f16};
 
 use crate::{Flex, FlexBuf, FlexTensor, Layout};
 

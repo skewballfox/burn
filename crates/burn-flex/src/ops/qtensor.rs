@@ -14,7 +14,7 @@ use burn_backend::{
     },
     tensor::{Device, FloatTensor, IntTensor, QuantizedTensor},
 };
-use burn_std::{Bytes, Shape, Slice, bf16, f16};
+use burn_std::{Shape, Slice, bf16, f16};
 
 use super::float_storage_as_f32;
 use crate::{Flex, FlexBuf, FlexQTensor, FlexTensor, Layout, quant_codes::QuantCodes};
@@ -198,7 +198,7 @@ impl QTensorOps<Flex> for Flex {
             FloatDType::F64 => {
                 let data: FlexBuf<f64> = dequantized
                     .iter()
-                    .map(|&v| v as f64)
+                    .map(|&v| f64::from(v))
                     .collect::<FlexBuf<_>>();
                 FlexTensor::new(FlexBuf::into_bytes(data), layout, DType::F64)
             }
@@ -407,6 +407,7 @@ mod tests {
         TensorMetadata,
         quantization::{QuantStore, QuantValue},
     };
+    use burn_std::Bytes;
 
     fn data_of(tensor: QuantizedTensor<Flex>) -> TensorData {
         burn_std::reader::try_read_sync(Flex::q_into_data(tensor))

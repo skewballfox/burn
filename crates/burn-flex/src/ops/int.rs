@@ -7,7 +7,7 @@ use burn_backend::{
     ops::IntTensorOps,
     tensor::{BoolTensor, Device, FloatTensor, IntTensor},
 };
-use burn_std::{Bytes, Element, IntDType, Shape, Slice, bf16, f16};
+use burn_std::{Element, IntDType, Shape, Slice, bf16, f16};
 use num_traits::{AsPrimitive, ToPrimitive, WrappingShl, WrappingShr};
 
 use crate::Layout;

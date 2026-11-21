@@ -278,6 +278,14 @@ Reports also include the measured cost of a kernel launch.
 - Halve peak memory and speed up Flex CPU `zeros` and `repeat_dim` by allocating the output once.
   ([#6384](https://github.com/tracel-ai/burn/pull/6384))
 
+- With the new `buffer-allocator` feature, Flex tensor memory comes from an allocator the
+  application registers once with `burn_flex::set_allocator`, for example an arena in a fixed
+  memory region of a microcontroller. The outputs and kernel scratch of inference and quantized
+  operations come from it, and `from_data` copies global-heap bytes into it, while shared and static
+  bytes (weights in flash) stay zero-copy. An exhausted allocator panics. Backward-only operations,
+  the FFT, and the packing buffers of large matrix multiplications still use the global allocator. Without the feature, or without a registered
+  allocator, nothing changes.
+
 #### Fusion
 
 - Reduce fusion's CPU overhead by skipping unnecessary reduction-fuser resets.

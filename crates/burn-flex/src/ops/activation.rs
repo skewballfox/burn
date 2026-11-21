@@ -3,13 +3,11 @@
 //! Each activation is implemented as a single-pass unary operation,
 //! replacing the default multi-op compositions from Burn's trait defaults.
 
-use alloc::vec;
-use alloc::vec::Vec;
 use burn_backend::Scalar;
 use burn_backend::ops::{ActivationOps, FloatTensorOps};
 use burn_backend::tensor::FloatTensor;
 use burn_backend::{DType, TensorMetadata};
-use burn_std::{Bytes, bf16, f16};
+use burn_std::{bf16, f16};
 #[cfg(not(feature = "std"))]
 #[allow(unused_imports)]
 use num_traits::Float;

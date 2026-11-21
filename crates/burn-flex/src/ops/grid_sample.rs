@@ -6,11 +6,10 @@
 //! incidentally gives f32 a small accuracy bump at the cost of extra casts.
 
 use alloc::vec;
-use alloc::vec::Vec;
 use burn_backend::element::cast::ToElement;
 use burn_backend::ops::{GridSampleMode, GridSampleOptions, GridSamplePaddingMode};
 use burn_backend::{DType, Element};
-use burn_std::{Bytes, Shape, bf16, f16};
+use burn_std::{Shape, bf16, f16};
 
 use num_traits::{Float, NumCast};
 

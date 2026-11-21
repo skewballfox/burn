@@ -66,6 +66,33 @@ async fn main(_spawner: Spawner) {
 }
 ```
 
+### Tensor Memory in an Arena (Optional)
+To keep tensor memory apart from the rest of the program, for example in a faster memory region,
+enable the `buffer-allocator` feature of Flex and register an allocator before the first tensor is
+created:
+
+```toml
+burn-flex = { version = "0.23", default-features = false, features = ["buffer-allocator"] }
+```
+
+```rs
+use burn_flex::FromGlobalAlloc;
+use embedded_alloc::LlffHeap as Heap;
+
+// A heap of its own for tensors, apart from the global one.
+static TENSORS: FromGlobalAlloc<Heap> = FromGlobalAlloc(Heap::empty());
+
+// After `TENSORS.0.init(..)`, as for the global heap above:
+burn_flex::set_allocator(&TENSORS);
+```
+
+The outputs and kernel scratch of inference and quantized operations then come from `TENSORS`.
+Weights loaded zero-copy (shared or static bytes, such as a model in flash) stay where they are;
+other tensor data passed to `from_data` is copied into `TENSORS`. When `TENSORS` runs out of memory,
+the operation panics. Backward-only operations, the FFT, the packing buffers of large matrix
+multiplications, and per-tensor metadata still use the global allocator, so a global heap is still
+needed.
+
 ### Define the Device
 
 We use a Flex device for CPU execution:

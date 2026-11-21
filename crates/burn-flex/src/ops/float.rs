@@ -8,7 +8,7 @@ use burn_backend::{
     ops::{FloatTensorOps, GridSampleOptions, IntTensorOps},
     tensor::{BoolTensor, Device, FloatTensor, IntTensor},
 };
-use burn_std::{Bytes, IntDType, Shape, Slice, bf16, f16};
+use burn_std::{IntDType, Shape, Slice, bf16, f16};
 use num_traits::{Float, ToPrimitive};
 
 use crate::Layout;
@@ -934,7 +934,7 @@ impl FloatTensorOps<Flex> for Flex {
 
     fn float_cast(tensor: FloatTensor<Flex>, dtype: FloatDType) -> FloatTensor<Flex> {
         use crate::Layout;
-        use burn_std::{Bytes, bf16, f16};
+        use burn_std::{bf16, f16};
 
         let src_dtype = tensor.dtype();
         let target_dtype = DType::from(dtype);

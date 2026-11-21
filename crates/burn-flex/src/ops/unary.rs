@@ -1,8 +1,7 @@
 //! Unary tensor operations (exp, log, sqrt, sin, cos, etc.).
 
-use alloc::vec::Vec;
 use burn_backend::DType;
-use burn_std::{BoolDType, Bytes, bf16, f16};
+use burn_std::{BoolDType, bf16, f16};
 #[cfg(not(feature = "std"))]
 #[allow(unused_imports)]
 use num_traits::Float;

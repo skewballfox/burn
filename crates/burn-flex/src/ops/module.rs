@@ -14,7 +14,7 @@ use burn_backend::{
     },
     tensor::{BoolTensor, FloatTensor, IntTensor},
 };
-use burn_std::{Bytes, IntDType, Shape};
+use burn_std::{IntDType, Shape};
 use bytemuck::Pod;
 
 /// Cast a tensor from half-precision type E to f32.

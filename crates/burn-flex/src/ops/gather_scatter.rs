@@ -7,7 +7,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 use burn_backend::tensor::IndexingUpdateOp;
 use burn_backend::{DType, Element};
-use burn_std::{Bytes, Shape};
+use burn_std::Shape;
 use bytemuck::Pod;
 
 #[cfg(feature = "rayon")]

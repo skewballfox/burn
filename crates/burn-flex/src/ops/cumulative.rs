@@ -2,7 +2,6 @@
 
 use alloc::vec;
 use burn_backend::Element;
-use burn_std::Bytes;
 use bytemuck::Pod;
 use num_traits::{Bounded, Num};
 

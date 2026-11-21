@@ -15,7 +15,7 @@ use alloc::vec;
 use burn_backend::DType;
 use burn_backend::ops::ConvTransposeOptions;
 use burn_backend::ops::conv::calculate_conv_transpose_output_size;
-use burn_std::{Bytes, Shape, f16};
+use burn_std::{Shape, f16};
 
 use crate::{FlexBuf, FlexTensor, Layout};
 

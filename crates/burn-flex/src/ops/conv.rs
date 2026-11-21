@@ -29,7 +29,7 @@ use alloc::vec::Vec;
 use burn_backend::ops::ConvOptions;
 use burn_backend::ops::conv::calculate_conv_output_size;
 use burn_backend::{DType, ElementConversion};
-use burn_std::{Bytes, Shape, f16};
+use burn_std::{Shape, f16};
 
 use crate::{FlexBuf, FlexTensor, Layout};
 
