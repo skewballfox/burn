@@ -5,7 +5,7 @@ use burn_backend::{DType, Element, TensorData, TensorMetadata};
 use burn_std::sync::Arc;
 use burn_std::{Bytes, Shape, bf16, f16};
 
-use crate::{FlexDevice, layout::Layout};
+use crate::{FlexBuf, FlexDevice, layout::Layout};
 
 /// CPU tensor primitive for the Flex backend.
 ///
@@ -54,6 +54,8 @@ impl FlexTensor {
                 .expect("Failed to read device data into Flex");
         }
         let (bytes, shape, dtype) = data.into_parts();
+        #[cfg(feature = "buffer-allocator")]
+        let bytes = crate::buffer::into_registered(bytes);
         let layout = Layout::contiguous(shape);
         Self {
             data: Arc::new(bytes),
@@ -269,9 +271,7 @@ impl FlexTensor {
             core::mem::size_of::<E>(),
             "filled_typed: dtype size mismatch"
         );
-        let n = shape.num_elements();
-        let data = alloc::vec![value; n];
-        let bytes = Bytes::from_elems(data);
+        let bytes = FlexBuf::from_elem(value, shape.num_elements()).into_bytes();
         Self {
             data: Arc::new(bytes),
             layout: Layout::contiguous(shape),
@@ -330,7 +330,7 @@ impl FlexTensor {
     fn copy_contiguous<E: Element + bytemuck::Pod>(&self) -> Self {
         let src: &[E] = bytemuck::cast_slice(&self.data);
         let n = self.layout.num_elements();
-        let mut dst = Vec::with_capacity(n);
+        let mut dst = FlexBuf::with_capacity(n);
 
         // Squeeze size-1 dims and merge adjacent stride-contiguous
         // runs so e.g. a permuted `[N, H, W, C]` ConvNeXt layer-norm
@@ -410,7 +410,7 @@ impl FlexTensor {
             }
         }
 
-        let bytes = Bytes::from_elems(dst);
+        let bytes = dst.into_bytes();
         let layout = Layout::contiguous(self.layout.shape().clone());
         Self {
             data: Arc::new(bytes),
@@ -945,14 +945,13 @@ pub(crate) fn dtype_size(dtype: DType) -> usize {
 }
 
 /// Zeroed storage for `num_elements` values of `dtype`, allocated with the
-/// element's alignment. `Bytes::from_bytes_vec` would copy a `Vec<u8>` into a
-/// second, 16-byte aligned buffer.
+/// element's alignment.
 pub(crate) fn zeroed_bytes(num_elements: usize, dtype: DType) -> Bytes {
     match dtype_size(dtype) {
-        8 => Bytes::from_elems(alloc::vec![0u64; num_elements]),
-        4 => Bytes::from_elems(alloc::vec![0u32; num_elements]),
-        2 => Bytes::from_elems(alloc::vec![0u16; num_elements]),
-        1 => Bytes::from_elems(alloc::vec![0u8; num_elements]),
+        8 => FlexBuf::<u64>::zeroed(num_elements).into_bytes(),
+        4 => FlexBuf::<u32>::zeroed(num_elements).into_bytes(),
+        2 => FlexBuf::<u16>::zeroed(num_elements).into_bytes(),
+        1 => FlexBuf::<u8>::zeroed(num_elements).into_bytes(),
         size => unreachable!("burn-flex: unsupported element size {size}"),
     }
 }
