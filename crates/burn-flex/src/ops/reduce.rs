@@ -5,6 +5,8 @@
 //! - Portable SIMD via macerator (NEON, AVX2, SIMD128, scalar fallback)
 //! - Rayon parallelism for large tensors
 
+#[cfg(feature = "rayon")]
+use crate::buffer::ParCollectBuf;
 use alloc::vec;
 use alloc::vec::Vec;
 use burn_backend::{DType, Element};
@@ -12,7 +14,7 @@ use burn_std::{Bytes, Shape, bf16, f16};
 use num_traits::Float;
 
 use crate::strided_index::StridedIter;
-use crate::{FlexTensor, Layout};
+use crate::{FlexBuf, FlexTensor, Layout};
 
 use super::{INDEX_DTYPE, float_storage_as_f32};
 
@@ -96,7 +98,7 @@ fn sum_f32(tensor: &FlexTensor) -> FlexTensor {
         }
     };
 
-    let bytes = Bytes::from_elems(vec![result]);
+    let bytes = FlexBuf::from_slice(&[result]).into_bytes();
     FlexTensor::new(bytes, Layout::contiguous(Shape::from(vec![1])), DType::F32)
 }
 
@@ -157,7 +159,7 @@ fn sum_impl<E: Element + bytemuck::Pod + Default + core::iter::Sum>(
         }
     };
 
-    let bytes = Bytes::from_elems(vec![result]);
+    let bytes = FlexBuf::from_slice(&[result]).into_bytes();
     FlexTensor::new(
         bytes,
         Layout::contiguous(Shape::from(vec![1])),
@@ -188,7 +190,7 @@ macro_rules! widening_scalar_reduce {
             };
             // Truncate back to target type (wrapping, matches PyTorch)
             let result: E = truncate_i64_to_pod(total);
-            let bytes = Bytes::from_elems(vec![result]);
+            let bytes = FlexBuf::from_slice(&[result]).into_bytes();
             FlexTensor::new(
                 bytes,
                 Layout::contiguous(Shape::from(vec![1])),
@@ -233,7 +235,7 @@ where
         }
     };
 
-    let bytes = Bytes::from_elems(vec![from_f32(result)]);
+    let bytes = FlexBuf::from_slice(&[from_f32(result)]).into_bytes();
     FlexTensor::new(bytes, Layout::contiguous(Shape::from(vec![1])), E::dtype())
 }
 
@@ -379,7 +381,7 @@ fn prod_impl<E: Element + bytemuck::Pod + Default + core::iter::Product>(
         }
     };
 
-    let bytes = Bytes::from_elems(vec![result]);
+    let bytes = FlexBuf::from_slice(&[result]).into_bytes();
     FlexTensor::new(
         bytes,
         Layout::contiguous(Shape::from(vec![1])),
@@ -589,7 +591,7 @@ fn max_f32_reduce(tensor: &FlexTensor) -> FlexTensor {
         }
     };
 
-    let bytes = Bytes::from_elems(vec![result]);
+    let bytes = FlexBuf::from_slice(&[result]).into_bytes();
     FlexTensor::new(bytes, Layout::contiguous(Shape::from(vec![1])), DType::F32)
 }
 
@@ -625,7 +627,7 @@ fn min_f32_reduce(tensor: &FlexTensor) -> FlexTensor {
         }
     };
 
-    let bytes = Bytes::from_elems(vec![result]);
+    let bytes = FlexBuf::from_slice(&[result]).into_bytes();
     FlexTensor::new(bytes, Layout::contiguous(Shape::from(vec![1])), DType::F32)
 }
 
@@ -662,7 +664,7 @@ fn float_extremum_f64_reduce<const MAX: bool>(tensor: &FlexTensor) -> FlexTensor
         }
     };
 
-    let bytes = Bytes::from_elems(vec![result]);
+    let bytes = FlexBuf::from_slice(&[result]).into_bytes();
     FlexTensor::new(bytes, Layout::contiguous(Shape::from(vec![1])), DType::F64)
 }
 
@@ -685,7 +687,7 @@ fn max_impl<E: Element + bytemuck::Pod + PartialOrd>(tensor: &FlexTensor) -> Fle
         }
     };
 
-    let bytes = Bytes::from_elems(vec![result]);
+    let bytes = FlexBuf::from_slice(&[result]).into_bytes();
     FlexTensor::new(
         bytes,
         Layout::contiguous(Shape::from(vec![1])),
@@ -712,7 +714,7 @@ fn min_impl<E: Element + bytemuck::Pod + PartialOrd>(tensor: &FlexTensor) -> Fle
         }
     };
 
-    let bytes = Bytes::from_elems(vec![result]);
+    let bytes = FlexBuf::from_slice(&[result]).into_bytes();
     FlexTensor::new(
         bytes,
         Layout::contiguous(Shape::from(vec![1])),
@@ -888,7 +890,7 @@ fn reduce_dim_f32(tensor: &FlexTensor, dim: usize, op: ReduceOp) -> FlexTensor {
     // see `outer_size == 0` or `inner_size == 0`.
     if out_size == 0 {
         return FlexTensor::new(
-            Bytes::from_elems(Vec::<f32>::new()),
+            FlexBuf::<f32>::with_capacity(0).into_bytes(),
             Layout::contiguous(Shape::from(out_shape)),
             DType::F32,
         );
@@ -912,7 +914,7 @@ fn reduce_dim_f32(tensor: &FlexTensor, dim: usize, op: ReduceOp) -> FlexTensor {
     // Check if inner dimension is contiguous (stride = 1) and no negative strides
     let inner_contiguous = !has_negative_strides && (dim + 1 >= ndims || strides[ndims - 1] == 1);
 
-    let result: Vec<f32> = if inner_contiguous && dim == ndims - 1 && dim_stride == 1 {
+    let result: FlexBuf<f32> = if inner_contiguous && dim == ndims - 1 && dim_stride == 1 {
         // Reducing last dimension with contiguous data: use SIMD.
         // `reduce_last_dim_f32` reads each row as `&data[start..start + dim_size]`,
         // which only matches the logical row when the reduce dim itself has
@@ -961,7 +963,7 @@ fn reduce_dim_f32(tensor: &FlexTensor, dim: usize, op: ReduceOp) -> FlexTensor {
         // use the stride-aware branch below.
         #[cfg(feature = "simd")]
         {
-            let mut result = vec![0.0f32; inner_size];
+            let mut result = FlexBuf::from_elem(0.0f32, inner_size);
             kernels::sum_rows_f32(
                 &data[start_offset..],
                 &mut result,
@@ -973,7 +975,7 @@ fn reduce_dim_f32(tensor: &FlexTensor, dim: usize, op: ReduceOp) -> FlexTensor {
         #[cfg(not(feature = "simd"))]
         {
             let inner_stride: isize = if dim + 1 < ndims { strides[dim + 1] } else { 1 };
-            let mut result = Vec::with_capacity(out_size);
+            let mut result = FlexBuf::with_capacity(out_size);
             for inner in 0..inner_size {
                 let base = (start_offset as isize + inner as isize * inner_stride) as usize;
                 let slice = &data[base..base + dim_size];
@@ -1004,7 +1006,7 @@ fn reduce_dim_f32(tensor: &FlexTensor, dim: usize, op: ReduceOp) -> FlexTensor {
 
         #[cfg(feature = "simd")]
         {
-            let mut result = vec![0.0f32; out_size];
+            let mut result = FlexBuf::from_elem(0.0f32, out_size);
             kernels::sum_rows_at_f32(data, starts, dim_size, &mut result);
             result
         }
@@ -1018,7 +1020,7 @@ fn reduce_dim_f32(tensor: &FlexTensor, dim: usize, op: ReduceOp) -> FlexTensor {
         // Contiguous: use flat index arithmetic (safe for any ndims).
         // outer_size and inner_size are guaranteed positive by the out_size == 0
         // early return above.
-        let mut result = Vec::with_capacity(out_size);
+        let mut result = FlexBuf::with_capacity(out_size);
         for outer in 0..outer_size {
             for inner in 0..inner_size {
                 let mut acc = init;
@@ -1035,7 +1037,7 @@ fn reduce_dim_f32(tensor: &FlexTensor, dim: usize, op: ReduceOp) -> FlexTensor {
         let outer_stride: isize = if dim > 0 { strides[dim - 1] } else { 0 };
         let inner_stride: isize = if dim + 1 < ndims { strides[dim + 1] } else { 1 };
 
-        let mut result = Vec::with_capacity(out_size);
+        let mut result = FlexBuf::with_capacity(out_size);
         for outer in 0..outer_size {
             for inner in 0..inner_size {
                 let base = start_offset as isize
@@ -1052,7 +1054,7 @@ fn reduce_dim_f32(tensor: &FlexTensor, dim: usize, op: ReduceOp) -> FlexTensor {
         result
     };
 
-    let bytes = Bytes::from_elems(result);
+    let bytes = FlexBuf::into_bytes(result);
     FlexTensor::new(
         bytes,
         Layout::contiguous(Shape::from(out_shape)),
@@ -1071,13 +1073,13 @@ fn reduce_middle_dim_f32(
     inner_size: usize, // columns (output per batch)
     outer_stride: isize,
     dim_stride: isize,
-) -> Vec<f32> {
+) -> FlexBuf<f32> {
     let out_size = outer_size * inner_size;
 
     #[cfg(feature = "simd")]
     {
         // Use aligned allocation for optimal SIMD scatter-add
-        let mut result = aligned::alloc_aligned_zeroed::<f32>(out_size);
+        let mut result = FlexBuf::<f32>::zeroed(out_size);
         kernels::scatter_add_batched(
             &data[start_offset..],
             &mut result,
@@ -1087,12 +1089,12 @@ fn reduce_middle_dim_f32(
             outer_stride as usize,
             dim_stride as usize,
         );
-        aligned::to_vec(result)
+        result
     }
 
     #[cfg(not(feature = "simd"))]
     {
-        let mut result = vec![0.0f32; out_size];
+        let mut result = FlexBuf::from_elem(0.0f32, out_size);
         let start = start_offset as isize;
         for batch in 0..outer_size {
             let batch_start = (start + batch as isize * outer_stride) as usize;
@@ -1119,11 +1121,11 @@ fn reduce_first_dim_f32(
     dim_size: usize,   // number of rows to sum
     inner_size: usize, // number of columns (output positions)
     dim_stride: isize, // stride between rows
-) -> Vec<f32> {
+) -> FlexBuf<f32> {
     #[cfg(feature = "simd")]
     {
         // Use aligned allocation for optimal SIMD scatter-add
-        let mut result = aligned::alloc_aligned_zeroed::<f32>(inner_size);
+        let mut result = FlexBuf::<f32>::zeroed(inner_size);
         kernels::scatter_add_f32(
             &data[start_offset..],
             &mut result,
@@ -1131,12 +1133,12 @@ fn reduce_first_dim_f32(
             inner_size,
             dim_stride as usize,
         );
-        aligned::to_vec(result)
+        result
     }
 
     #[cfg(not(feature = "simd"))]
     {
-        let mut result = vec![0.0f32; inner_size];
+        let mut result = FlexBuf::from_elem(0.0f32, inner_size);
         let start = start_offset as isize;
         for row in 0..dim_size {
             let row_start = (start + row as isize * dim_stride) as usize;
@@ -1160,7 +1162,7 @@ fn reduce_last_dim_f32(
     dim_size: usize,
     outer_stride: isize,
     op: ReduceOp,
-) -> Vec<f32> {
+) -> FlexBuf<f32> {
     // `outer_size > 0` is guaranteed by the out_size == 0 early return in
     // `reduce_dim_f32`.
     let rows = outer_size;
@@ -1168,7 +1170,7 @@ fn reduce_last_dim_f32(
     // Contiguous Sum: batch all rows in one kernel call to avoid per-row overhead.
     #[cfg(feature = "simd")]
     if matches!(op, ReduceOp::Sum) && outer_stride == dim_size as isize {
-        let mut result = vec![0.0f32; rows];
+        let mut result = FlexBuf::from_elem(0.0f32, rows);
         kernels::sum_rows_f32(&data[start_offset..], &mut result, rows, dim_size);
         return result;
     }
@@ -1179,7 +1181,7 @@ fn reduce_last_dim_f32(
 
     #[cfg(feature = "simd")]
     if matches!(op, ReduceOp::Sum) {
-        let mut result = vec![0.0f32; rows];
+        let mut result = FlexBuf::from_elem(0.0f32, rows);
         kernels::sum_rows_at_f32(data, starts, dim_size, &mut result);
         return result;
     }
@@ -1232,7 +1234,7 @@ where
     // outputs when `outer_size == 0` or `inner_size == 0`.
     if out_size == 0 {
         return FlexTensor::new(
-            Bytes::from_elems(Vec::<E>::new()),
+            FlexBuf::<E>::with_capacity(0).into_bytes(),
             Layout::contiguous(Shape::from(out_shape)),
             tensor.dtype(),
         );
@@ -1244,7 +1246,7 @@ where
     let data: &[E] = tensor.storage();
     let start_offset = tensor.layout().start_offset();
 
-    let mut result: Vec<E> = Vec::with_capacity(out_size);
+    let mut result: FlexBuf<E> = FlexBuf::with_capacity(out_size);
 
     if tensor.is_contiguous() {
         // Contiguous: use flat index arithmetic (safe for any ndims).
@@ -1280,7 +1282,7 @@ where
         }
     }
 
-    let bytes = Bytes::from_elems(result);
+    let bytes = FlexBuf::into_bytes(result);
     FlexTensor::new(
         bytes,
         Layout::contiguous(Shape::from(out_shape)),
@@ -1314,7 +1316,7 @@ where
     // Empty output: skip the loop entirely for zero-sized non-reduced dims.
     if out_size == 0 {
         return FlexTensor::new(
-            Bytes::from_elems(Vec::<E>::new()),
+            FlexBuf::<E>::with_capacity(0).into_bytes(),
             Layout::contiguous(Shape::from(out_shape)),
             tensor.dtype(),
         );
@@ -1326,7 +1328,7 @@ where
     let data: &[E] = tensor.storage();
     let start_offset = tensor.layout().start_offset();
 
-    let mut result: Vec<E> = Vec::with_capacity(out_size);
+    let mut result: FlexBuf<E> = FlexBuf::with_capacity(out_size);
 
     for outer in 0..outer_size {
         for inner in 0..inner_size {
@@ -1341,7 +1343,7 @@ where
         }
     }
 
-    let bytes = Bytes::from_elems(result);
+    let bytes = FlexBuf::into_bytes(result);
     FlexTensor::new(
         bytes,
         Layout::contiguous(Shape::from(out_shape)),
@@ -1383,7 +1385,7 @@ where
     // Empty output: skip the loop entirely for zero-sized non-reduced dims.
     if out_size == 0 {
         return FlexTensor::new(
-            Bytes::from_elems(Vec::<E>::new()),
+            FlexBuf::<E>::with_capacity(0).into_bytes(),
             Layout::contiguous(Shape::from(out_shape)),
             E::dtype(),
         );
@@ -1395,7 +1397,7 @@ where
     let data: &[E] = tensor.storage();
     let start_offset = tensor.layout().start_offset();
 
-    let mut result: Vec<E> = Vec::with_capacity(out_size);
+    let mut result: FlexBuf<E> = FlexBuf::with_capacity(out_size);
 
     for outer in 0..outer_size {
         for inner in 0..inner_size {
@@ -1408,7 +1410,7 @@ where
         }
     }
 
-    let bytes = Bytes::from_elems(result);
+    let bytes = FlexBuf::into_bytes(result);
     FlexTensor::new(
         bytes,
         Layout::contiguous(Shape::from(out_shape)),
@@ -1428,12 +1430,12 @@ fn sum_dim_contiguous_f32(
     outer_size: usize,
     dim_size: usize,
     inner_size: usize,
-) -> Vec<f32> {
+) -> FlexBuf<f32> {
     // Empty output: if any non-reduced dim has size 0, the result is empty.
     // Returning early avoids indexing past an empty `data` slice in the SIMD
     // kernels and keeps the output length in sync with the caller's out_shape.
     if outer_size == 0 || inner_size == 0 {
-        return Vec::new();
+        return FlexBuf::with_capacity(0);
     }
 
     // Last-dim: each output is the sum of a contiguous run of dim_size elements.
@@ -1441,7 +1443,7 @@ fn sum_dim_contiguous_f32(
         let rows = outer_size;
         #[cfg(feature = "simd")]
         {
-            let mut result = vec![0.0f32; rows];
+            let mut result = FlexBuf::from_elem(0.0f32, rows);
             kernels::sum_rows_f32(data, &mut result, rows, dim_size);
             return result;
         }
@@ -1458,13 +1460,13 @@ fn sum_dim_contiguous_f32(
     if outer_size == 1 {
         #[cfg(feature = "simd")]
         {
-            let mut result = aligned::alloc_aligned_zeroed::<f32>(inner_size);
+            let mut result = FlexBuf::<f32>::zeroed(inner_size);
             kernels::scatter_add_f32(data, &mut result, dim_size, inner_size, inner_size);
-            return aligned::to_vec(result);
+            return result;
         }
         #[cfg(not(feature = "simd"))]
         {
-            let mut result = vec![0.0f32; inner_size];
+            let mut result = FlexBuf::from_elem(0.0f32, inner_size);
             for row in 0..dim_size {
                 let row_start = row * inner_size;
                 for c in 0..inner_size {
@@ -1480,7 +1482,7 @@ fn sum_dim_contiguous_f32(
     let out_size = outer_size * inner_size;
     #[cfg(feature = "simd")]
     {
-        let mut result = aligned::alloc_aligned_zeroed::<f32>(out_size);
+        let mut result = FlexBuf::<f32>::zeroed(out_size);
         kernels::scatter_add_batched(
             data,
             &mut result,
@@ -1490,11 +1492,11 @@ fn sum_dim_contiguous_f32(
             dim_size * inner_size,
             inner_size,
         );
-        aligned::to_vec(result)
+        result
     }
     #[cfg(not(feature = "simd"))]
     {
-        let mut result = vec![0.0f32; out_size];
+        let mut result = FlexBuf::from_elem(0.0f32, out_size);
         for outer in 0..outer_size {
             let out_base = outer * inner_size;
             for d in 0..dim_size {
@@ -1540,12 +1542,12 @@ where
     let divisor = dim_size as f32;
 
     let sums = sum_dim_contiguous_f32(&data, outer_size, dim_size, inner_size);
-    let result: Vec<E> = sums
+    let result: FlexBuf<E> = sums
         .into_iter()
         .map(|s| E::from_elem(s / divisor))
-        .collect();
+        .collect::<FlexBuf<_>>();
 
-    let bytes = Bytes::from_elems(result);
+    let bytes = FlexBuf::into_bytes(result);
     FlexTensor::new(
         bytes,
         Layout::contiguous(Shape::from(out_shape)),
@@ -1568,7 +1570,7 @@ where
     let acc = sum_f32_contiguous(&data);
 
     let mean = acc / (n as f32);
-    let bytes = Bytes::from_elems(vec![E::from_elem(mean)]);
+    let bytes = FlexBuf::from_slice(&[E::from_elem(mean)]).into_bytes();
     FlexTensor::new(bytes, Layout::contiguous(Shape::from(vec![1])), E::dtype())
 }
 
@@ -1803,7 +1805,6 @@ pub fn min_dim_with_indices(tensor: FlexTensor, dim: usize) -> (FlexTensor, Flex
 // work (a single comparison + conditional store) is cheap enough that rayon overhead
 // is amortized at smaller sizes. 32K elements * ~1.5ns/elem = ~48µs of serial work,
 // enough to justify thread-pool dispatch.
-#[cfg(feature = "rayon")]
 const EXTREMUM_PARALLEL_THRESHOLD: usize = 32 * 1024;
 
 /// Minimum row length for the 2-pass SIMD extremum path (reduce + scan).
@@ -1846,17 +1847,20 @@ where
     };
 
     #[cfg(feature = "rayon")]
-    let values: Vec<f32> = if outer_size * dim_size >= EXTREMUM_PARALLEL_THRESHOLD {
-        (0..outer_size).into_par_iter().map(&reduce_row).collect()
+    let values: FlexBuf<f32> = if outer_size * dim_size >= EXTREMUM_PARALLEL_THRESHOLD {
+        (0..outer_size)
+            .into_par_iter()
+            .map(&reduce_row)
+            .collect_buf()
     } else {
         (0..outer_size).map(reduce_row).collect()
     };
 
     #[cfg(not(feature = "rayon"))]
-    let values: Vec<f32> = (0..outer_size).map(reduce_row).collect();
+    let values: FlexBuf<f32> = (0..outer_size).map(reduce_row).collect::<FlexBuf<_>>();
 
     FlexTensor::new(
-        Bytes::from_elems(values),
+        FlexBuf::into_bytes(values),
         Layout::contiguous(Shape::from(out_shape)),
         DType::F32,
     )
@@ -1900,17 +1904,17 @@ where
     };
 
     #[cfg(feature = "rayon")]
-    let indices: Vec<isize> = if outer_size * dim_size >= EXTREMUM_PARALLEL_THRESHOLD {
-        (0..outer_size).into_par_iter().map(find_row).collect()
+    let indices: FlexBuf<isize> = if outer_size * dim_size >= EXTREMUM_PARALLEL_THRESHOLD {
+        (0..outer_size).into_par_iter().map(find_row).collect_buf()
     } else {
         (0..outer_size).map(find_row).collect()
     };
 
     #[cfg(not(feature = "rayon"))]
-    let indices: Vec<isize> = (0..outer_size).map(find_row).collect();
+    let indices: FlexBuf<isize> = (0..outer_size).map(find_row).collect::<FlexBuf<_>>();
 
     FlexTensor::new(
-        Bytes::from_elems(indices),
+        FlexBuf::into_bytes(indices),
         Layout::contiguous(Shape::from(out_shape)),
         INDEX_DTYPE,
     )
@@ -1952,24 +1956,19 @@ where
         (best, best_idx)
     };
 
-    #[cfg(feature = "rayon")]
-    let (values, indices): (Vec<f32>, Vec<isize>) =
-        if outer_size * dim_size >= EXTREMUM_PARALLEL_THRESHOLD {
-            (0..outer_size).into_par_iter().map(find_row).unzip()
-        } else {
-            (0..outer_size).map(find_row).unzip()
-        };
-
-    #[cfg(not(feature = "rayon"))]
-    let (values, indices): (Vec<f32>, Vec<isize>) = (0..outer_size).map(find_row).unzip();
+    let (values, indices) = crate::buffer::unzip_from_fn(
+        outer_size,
+        outer_size * dim_size >= EXTREMUM_PARALLEL_THRESHOLD,
+        find_row,
+    );
 
     let val_tensor = FlexTensor::new(
-        Bytes::from_elems(values),
+        FlexBuf::into_bytes(values),
         Layout::contiguous(Shape::from(out_shape.clone())),
         DType::F32,
     );
     let idx_tensor = FlexTensor::new(
-        Bytes::from_elems(indices),
+        FlexBuf::into_bytes(indices),
         Layout::contiguous(Shape::from(out_shape)),
         INDEX_DTYPE,
     );
@@ -2000,17 +1999,20 @@ fn extremum_dim_f32_last_simd(
     };
 
     #[cfg(feature = "rayon")]
-    let values: Vec<f32> = if outer_size * dim_size >= EXTREMUM_PARALLEL_THRESHOLD {
-        (0..outer_size).into_par_iter().map(reduce_row).collect()
+    let values: FlexBuf<f32> = if outer_size * dim_size >= EXTREMUM_PARALLEL_THRESHOLD {
+        (0..outer_size)
+            .into_par_iter()
+            .map(reduce_row)
+            .collect_buf()
     } else {
         (0..outer_size).map(reduce_row).collect()
     };
 
     #[cfg(not(feature = "rayon"))]
-    let values: Vec<f32> = (0..outer_size).map(reduce_row).collect();
+    let values: FlexBuf<f32> = (0..outer_size).map(reduce_row).collect::<FlexBuf<_>>();
 
     FlexTensor::new(
-        Bytes::from_elems(values),
+        FlexBuf::into_bytes(values),
         Layout::contiguous(Shape::from(out_shape)),
         DType::F32,
     )
@@ -2051,24 +2053,19 @@ fn extremum_dim_with_indices_f32_last_simd(
         (ext, 0)
     };
 
-    #[cfg(feature = "rayon")]
-    let (values, indices): (Vec<f32>, Vec<isize>) =
-        if outer_size * dim_size >= EXTREMUM_PARALLEL_THRESHOLD {
-            (0..outer_size).into_par_iter().map(find_row).unzip()
-        } else {
-            (0..outer_size).map(find_row).unzip()
-        };
-
-    #[cfg(not(feature = "rayon"))]
-    let (values, indices): (Vec<f32>, Vec<isize>) = (0..outer_size).map(find_row).unzip();
+    let (values, indices) = crate::buffer::unzip_from_fn(
+        outer_size,
+        outer_size * dim_size >= EXTREMUM_PARALLEL_THRESHOLD,
+        find_row,
+    );
 
     let val_tensor = FlexTensor::new(
-        Bytes::from_elems(values),
+        FlexBuf::into_bytes(values),
         Layout::contiguous(Shape::from(out_shape.clone())),
         DType::F32,
     );
     let idx_tensor = FlexTensor::new(
-        Bytes::from_elems(indices),
+        FlexBuf::into_bytes(indices),
         Layout::contiguous(Shape::from(out_shape)),
         INDEX_DTYPE,
     );
@@ -2105,17 +2102,17 @@ fn extremum_indices_f32_last_simd(
     };
 
     #[cfg(feature = "rayon")]
-    let indices: Vec<isize> = if outer_size * dim_size >= EXTREMUM_PARALLEL_THRESHOLD {
-        (0..outer_size).into_par_iter().map(find_row).collect()
+    let indices: FlexBuf<isize> = if outer_size * dim_size >= EXTREMUM_PARALLEL_THRESHOLD {
+        (0..outer_size).into_par_iter().map(find_row).collect_buf()
     } else {
         (0..outer_size).map(find_row).collect()
     };
 
     #[cfg(not(feature = "rayon"))]
-    let indices: Vec<isize> = (0..outer_size).map(find_row).collect();
+    let indices: FlexBuf<isize> = (0..outer_size).map(find_row).collect::<FlexBuf<_>>();
 
     FlexTensor::new(
-        Bytes::from_elems(indices),
+        FlexBuf::into_bytes(indices),
         Layout::contiguous(Shape::from(out_shape)),
         INDEX_DTYPE,
     )
@@ -2156,17 +2153,17 @@ where
     };
 
     #[cfg(feature = "rayon")]
-    let values: Vec<E> = if out_size * dim_size >= EXTREMUM_PARALLEL_THRESHOLD {
-        (0..out_size).into_par_iter().map(&find).collect()
+    let values: FlexBuf<E> = if out_size * dim_size >= EXTREMUM_PARALLEL_THRESHOLD {
+        (0..out_size).into_par_iter().map(&find).collect_buf()
     } else {
         (0..out_size).map(find).collect()
     };
 
     #[cfg(not(feature = "rayon"))]
-    let values: Vec<E> = (0..out_size).map(find).collect();
+    let values: FlexBuf<E> = (0..out_size).map(find).collect::<FlexBuf<_>>();
 
     FlexTensor::new(
-        Bytes::from_elems(values),
+        FlexBuf::into_bytes(values),
         Layout::contiguous(Shape::from(out_shape)),
         E::dtype(),
     )
@@ -2212,24 +2209,19 @@ where
         (best, best_idx)
     };
 
-    #[cfg(feature = "rayon")]
-    let (values, indices): (Vec<E>, Vec<isize>) =
-        if out_size * dim_size >= EXTREMUM_PARALLEL_THRESHOLD {
-            (0..out_size).into_par_iter().map(&find).unzip()
-        } else {
-            (0..out_size).map(find).unzip()
-        };
-
-    #[cfg(not(feature = "rayon"))]
-    let (values, indices): (Vec<E>, Vec<isize>) = (0..out_size).map(find).unzip();
+    let (values, indices) = crate::buffer::unzip_from_fn(
+        out_size,
+        out_size * dim_size >= EXTREMUM_PARALLEL_THRESHOLD,
+        find,
+    );
 
     let val_tensor = FlexTensor::new(
-        Bytes::from_elems(values),
+        FlexBuf::into_bytes(values),
         Layout::contiguous(Shape::from(out_shape.clone())),
         E::dtype(),
     );
     let idx_tensor = FlexTensor::new(
-        Bytes::from_elems(indices),
+        FlexBuf::into_bytes(indices),
         Layout::contiguous(Shape::from(out_shape)),
         INDEX_DTYPE,
     );
@@ -2277,17 +2269,17 @@ where
     };
 
     #[cfg(feature = "rayon")]
-    let values: Vec<E> = if out_size * dim_size >= EXTREMUM_PARALLEL_THRESHOLD {
-        (0..out_size).into_par_iter().map(&find).collect()
+    let values: FlexBuf<E> = if out_size * dim_size >= EXTREMUM_PARALLEL_THRESHOLD {
+        (0..out_size).into_par_iter().map(&find).collect_buf()
     } else {
         (0..out_size).map(find).collect()
     };
 
     #[cfg(not(feature = "rayon"))]
-    let values: Vec<E> = (0..out_size).map(find).collect();
+    let values: FlexBuf<E> = (0..out_size).map(find).collect::<FlexBuf<_>>();
 
     FlexTensor::new(
-        Bytes::from_elems(values),
+        FlexBuf::into_bytes(values),
         Layout::contiguous(Shape::from(out_shape)),
         E::dtype(),
     )
@@ -2335,24 +2327,19 @@ where
         (from_f32(best), best_idx)
     };
 
-    #[cfg(feature = "rayon")]
-    let (values, indices): (Vec<E>, Vec<isize>) =
-        if out_size * dim_size >= EXTREMUM_PARALLEL_THRESHOLD {
-            (0..out_size).into_par_iter().map(&find).unzip()
-        } else {
-            (0..out_size).map(find).unzip()
-        };
-
-    #[cfg(not(feature = "rayon"))]
-    let (values, indices): (Vec<E>, Vec<isize>) = (0..out_size).map(find).unzip();
+    let (values, indices) = crate::buffer::unzip_from_fn(
+        out_size,
+        out_size * dim_size >= EXTREMUM_PARALLEL_THRESHOLD,
+        find,
+    );
 
     let val_tensor = FlexTensor::new(
-        Bytes::from_elems(values),
+        FlexBuf::into_bytes(values),
         Layout::contiguous(Shape::from(out_shape.clone())),
         E::dtype(),
     );
     let idx_tensor = FlexTensor::new(
-        Bytes::from_elems(indices),
+        FlexBuf::into_bytes(indices),
         Layout::contiguous(Shape::from(out_shape)),
         INDEX_DTYPE,
     );

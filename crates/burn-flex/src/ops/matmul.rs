@@ -10,7 +10,7 @@ use alloc::vec::Vec;
 use burn_backend::{DType, Element};
 use burn_std::{Bytes, Shape, bf16, f16};
 
-use crate::{FlexTensor, Layout};
+use crate::{FlexBuf, FlexTensor, Layout};
 
 /// Types that can be used with gemm-based matmul.
 /// Only implement for types that `gemm::gemm` dispatches on via TypeId (f32, f64, f16).
@@ -458,17 +458,25 @@ fn matmul_bf16(lhs: FlexTensor, rhs: FlexTensor) -> FlexTensor {
     let rhs_shape = rhs.layout().shape();
 
     // Convert bf16 -> f32
-    let lhs_f32: Vec<f32> = lhs.storage::<bf16>().iter().map(|x| x.to_f32()).collect();
-    let rhs_f32: Vec<f32> = rhs.storage::<bf16>().iter().map(|x| x.to_f32()).collect();
+    let lhs_f32: FlexBuf<f32> = lhs
+        .storage::<bf16>()
+        .iter()
+        .map(|x| x.to_f32())
+        .collect::<FlexBuf<_>>();
+    let rhs_f32: FlexBuf<f32> = rhs
+        .storage::<bf16>()
+        .iter()
+        .map(|x| x.to_f32())
+        .collect::<FlexBuf<_>>();
 
     // Create f32 tensors
     let lhs_f32_tensor = FlexTensor::new(
-        Bytes::from_elems(lhs_f32),
+        FlexBuf::into_bytes(lhs_f32),
         Layout::contiguous(lhs_shape.clone()),
         DType::F32,
     );
     let rhs_f32_tensor = FlexTensor::new(
-        Bytes::from_elems(rhs_f32),
+        FlexBuf::into_bytes(rhs_f32),
         Layout::contiguous(rhs_shape.clone()),
         DType::F32,
     );
@@ -477,14 +485,14 @@ fn matmul_bf16(lhs: FlexTensor, rhs: FlexTensor) -> FlexTensor {
     let result_f32 = matmul_gemm::<f32>(lhs_f32_tensor, rhs_f32_tensor);
 
     // Convert f32 -> bf16
-    let result_bf16: Vec<bf16> = result_f32
+    let result_bf16: FlexBuf<bf16> = result_f32
         .storage::<f32>()
         .iter()
         .map(|x| bf16::from_f32(*x))
-        .collect();
+        .collect::<FlexBuf<_>>();
 
     FlexTensor::new(
-        Bytes::from_elems(result_bf16),
+        FlexBuf::into_bytes(result_bf16),
         result_f32.layout().clone(),
         DType::BF16,
     )
@@ -555,7 +563,7 @@ fn matmul_2d_i32(lhs: &FlexTensor, rhs: &FlexTensor) -> FlexTensor {
         }
     }
 
-    let mut output = vec![0i32; m * n];
+    let mut output = FlexBuf::from_elem(0i32, m * n);
 
     #[cfg(feature = "rayon")]
     if m * k * n >= PARALLEL_THRESHOLD && m > 1 && n > 0 {
@@ -581,7 +589,7 @@ fn matmul_2d_i32(lhs: &FlexTensor, rhs: &FlexTensor) -> FlexTensor {
 
     let out_shape = Shape::from(vec![m, n]);
     FlexTensor::new(
-        Bytes::from_elems(output),
+        FlexBuf::into_bytes(output),
         Layout::contiguous(out_shape),
         DType::I32,
     )
@@ -710,7 +718,7 @@ fn matmul_batched_i32(lhs: FlexTensor, rhs: FlexTensor) -> FlexTensor {
         }
     }
 
-    let mut output = vec![0i32; batch_size * out_matrix_size];
+    let mut output = FlexBuf::from_elem(0i32, batch_size * out_matrix_size);
 
     let run_one = |b: usize, out_slice: &mut [i32]| {
         let lhs_batch_idx = batch_index_to_offset(b, &broadcast_shape, &lhs_strides);
@@ -747,7 +755,7 @@ fn matmul_batched_i32(lhs: FlexTensor, rhs: FlexTensor) -> FlexTensor {
     }
 
     FlexTensor::new(
-        Bytes::from_elems(output),
+        FlexBuf::into_bytes(output),
         Layout::contiguous(out_shape),
         DType::I32,
     )
@@ -782,7 +790,7 @@ fn matmul_2d_i64(lhs: &FlexTensor, rhs: &FlexTensor) -> FlexTensor {
     let lhs_data: &[i64] = lhs.storage();
     let rhs_data: &[i64] = rhs.storage();
 
-    let mut output = vec![0i64; m * n];
+    let mut output = FlexBuf::from_elem(0i64, m * n);
 
     let run_row = |i: usize, row_out: &mut [i64]| {
         let lhs_row = &lhs_data[i * k..(i + 1) * k];
@@ -816,7 +824,7 @@ fn matmul_2d_i64(lhs: &FlexTensor, rhs: &FlexTensor) -> FlexTensor {
 
     let out_shape = Shape::from(vec![m, n]);
     FlexTensor::new(
-        Bytes::from_elems(output),
+        FlexBuf::into_bytes(output),
         Layout::contiguous(out_shape),
         DType::I64,
     )
@@ -852,7 +860,7 @@ fn matmul_batched_i64(lhs: FlexTensor, rhs: FlexTensor) -> FlexTensor {
     let lhs_data: &[i64] = lhs.storage();
     let rhs_data: &[i64] = rhs.storage();
 
-    let mut output = vec![0i64; batch_size * out_matrix_size];
+    let mut output = FlexBuf::from_elem(0i64, batch_size * out_matrix_size);
 
     let run_one = |b: usize, out_slice: &mut [i64]| {
         let lhs_batch_idx = batch_index_to_offset(b, &broadcast_shape, &lhs_strides);
@@ -893,7 +901,7 @@ fn matmul_batched_i64(lhs: FlexTensor, rhs: FlexTensor) -> FlexTensor {
     }
 
     FlexTensor::new(
-        Bytes::from_elems(output),
+        FlexBuf::into_bytes(output),
         Layout::contiguous(out_shape),
         DType::I64,
     )

@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use burn_backend::{DType, Element};
 use burn_std::{Bytes, Shape, bf16, f16};
 
-use crate::{FlexTensor, Layout};
+use crate::{FlexBuf, FlexTensor, Layout};
 
 /// Concatenate tensors along the given dimension.
 pub fn cat(tensors: Vec<FlexTensor>, dim: usize) -> FlexTensor {
@@ -77,7 +77,7 @@ fn cat_impl<E: Element + bytemuck::Pod>(tensors: Vec<FlexTensor>, dim: usize) ->
         return FlexTensor::new(bytes, Layout::contiguous(out_shape), dtype);
     }
 
-    let mut output: Vec<E> = Vec::with_capacity(total_elements);
+    let mut output: FlexBuf<E> = FlexBuf::with_capacity(total_elements);
 
     // Fast path: dim 0, all contiguous
     if dim == 0
@@ -114,6 +114,6 @@ fn cat_impl<E: Element + bytemuck::Pod>(tensors: Vec<FlexTensor>, dim: usize) ->
         }
     }
 
-    let bytes = Bytes::from_elems(output);
+    let bytes = FlexBuf::into_bytes(output);
     FlexTensor::new(bytes, Layout::contiguous(out_shape), dtype)
 }

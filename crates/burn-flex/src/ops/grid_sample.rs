@@ -14,7 +14,7 @@ use burn_std::{Bytes, Shape, bf16, f16};
 
 use num_traits::{Float, NumCast};
 
-use crate::{FlexTensor, Layout};
+use crate::{FlexBuf, FlexTensor, Layout};
 
 /// Grid sample 2D (bilinear and nearest-neighbor interpolation).
 ///
@@ -69,7 +69,7 @@ where
 
     let out_shape = Shape::from(vec![batch_size, channels, h_out, w_out]);
     let out_len = batch_size * channels * h_out * w_out;
-    let mut output: Vec<T> = vec![T::zero(); out_len];
+    let mut output: FlexBuf<T> = FlexBuf::from_elem(T::zero(), out_len);
 
     let align = options.align_corners;
     let pad_mode = options.padding_mode;
@@ -176,7 +176,7 @@ where
         }
     }
 
-    let bytes = Bytes::from_elems(output);
+    let bytes = FlexBuf::into_bytes(output);
     FlexTensor::new(bytes, Layout::contiguous(out_shape), T::dtype())
 }
 

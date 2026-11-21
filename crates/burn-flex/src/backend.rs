@@ -376,7 +376,7 @@ mod tests {
         // the dtype tag across the op. from_data would produce Bool(Native),
         // so we use make_bool_tensor to get the U8 tag.
         let t_u8 = crate::ops::comparison::make_bool_tensor(
-            alloc::vec![1, 0, 1],
+            crate::FlexBuf::from_slice(&[1, 0, 1]),
             burn_std::Shape::from(alloc::vec![3]),
             burn_std::BoolDType::U8,
         );

@@ -17,7 +17,7 @@ use burn_std::Bytes;
 use bytemuck::Pod;
 use num_traits::Float;
 
-use crate::{FlexTensor, Layout};
+use crate::{FlexBuf, FlexTensor, Layout};
 
 /// KV tile size for flash attention.
 ///
@@ -204,9 +204,9 @@ fn cast_to_f32<E: burn_backend::Element + Pod + Copy>(
     let tensor = tensor.to_contiguous();
     let shape = tensor.layout().shape().clone();
     let data: &[E] = tensor.storage();
-    let f32_data: Vec<f32> = data.iter().map(|&v| to_f32(v)).collect();
+    let f32_data: FlexBuf<f32> = data.iter().map(|&v| to_f32(v)).collect::<FlexBuf<_>>();
     FlexTensor::new(
-        Bytes::from_elems(f32_data),
+        FlexBuf::into_bytes(f32_data),
         Layout::contiguous(shape),
         DType::F32,
     )
@@ -219,9 +219,9 @@ fn cast_from_f32<E: burn_backend::Element + Pod + Copy>(
     let tensor = tensor.to_contiguous();
     let shape = tensor.layout().shape().clone();
     let data: &[f32] = tensor.storage();
-    let half_data: Vec<E> = data.iter().map(|&v| from_f32(v)).collect();
+    let half_data: FlexBuf<E> = data.iter().map(|&v| from_f32(v)).collect::<FlexBuf<_>>();
     FlexTensor::new(
-        Bytes::from_elems(half_data),
+        FlexBuf::into_bytes(half_data),
         Layout::contiguous(shape),
         E::dtype(),
     )
@@ -329,7 +329,7 @@ where
         .map(|b| (b.batch_step, b.head_step))
         .unwrap_or((0, 0));
 
-    let mut output = vec![T::zero(); batch * heads * seq_q * val_dim];
+    let mut output = FlexBuf::from_elem(T::zero(), batch * heads * seq_q * val_dim);
 
     // 4D strides for contiguous layout
     let q_head_stride = seq_q * head_dim;
@@ -343,7 +343,7 @@ where
 
     if output.is_empty() || seq_kv == 0 {
         return FlexTensor::new(
-            Bytes::from_elems(output),
+            FlexBuf::into_bytes(output),
             Layout::contiguous(burn_std::Shape::from(vec![batch, heads, seq_q, val_dim])),
             T::dtype(),
         );
@@ -408,7 +408,7 @@ where
 
     let shape = burn_std::Shape::from(vec![batch, heads, seq_q, val_dim]);
     FlexTensor::new(
-        Bytes::from_elems(output),
+        FlexBuf::into_bytes(output),
         Layout::contiguous(shape),
         T::dtype(),
     )
@@ -838,7 +838,7 @@ where
         .map(|b| (b.batch_step, b.head_step))
         .unwrap_or((0, 0));
 
-    let mut output = vec![T::zero(); batch * heads * seq_q * val_dim];
+    let mut output = FlexBuf::from_elem(T::zero(), batch * heads * seq_q * val_dim);
 
     let q_head_stride = seq_q * head_dim;
     let q_batch_stride = heads * q_head_stride;
@@ -851,7 +851,7 @@ where
 
     if output.is_empty() || seq_kv == 0 {
         return FlexTensor::new(
-            Bytes::from_elems(output),
+            FlexBuf::into_bytes(output),
             Layout::contiguous(burn_std::Shape::from(vec![batch, heads, seq_q, val_dim])),
             T::dtype(),
         );
@@ -918,7 +918,7 @@ where
 
     let shape = burn_std::Shape::from(vec![batch, heads, seq_q, val_dim]);
     FlexTensor::new(
-        Bytes::from_elems(output),
+        FlexBuf::into_bytes(output),
         Layout::contiguous(shape),
         T::dtype(),
     )

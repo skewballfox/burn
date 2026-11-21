@@ -18,7 +18,7 @@ use burn_backend::ops::{CoordinateTransformMode, InterpolateMode, InterpolateOpt
 use burn_std::{Bytes, Shape, bf16, f16};
 use num_traits::Float;
 
-use crate::{FlexTensor, Layout};
+use crate::{FlexBuf, FlexTensor, Layout};
 
 // ============================================================================
 // Macros for dtype wrappers
@@ -291,7 +291,7 @@ where
     }
 
     let output = {
-        let mut output: Vec<T> = Vec::with_capacity(out_numel);
+        let mut output: FlexBuf<T> = FlexBuf::with_capacity(out_numel);
         #[allow(clippy::uninit_vec)]
         unsafe {
             output.set_len(out_numel);
@@ -345,7 +345,7 @@ where
     };
 
     FlexTensor::new(
-        Bytes::from_elems(output),
+        FlexBuf::into_bytes(output),
         Layout::contiguous(Shape::from(vec![batch, channels, out_height, out_width])),
         x.dtype(),
     )
@@ -454,7 +454,7 @@ where
         {
             use rayon::prelude::*;
 
-            let mut output = vec![T::zero(); out_numel];
+            let mut output = FlexBuf::from_elem(T::zero(), out_numel);
             let out_ptr = crate::ops::SendMutPtr::new(output.as_mut_ptr());
 
             (0..batch).into_par_iter().for_each(|b| {
@@ -477,7 +477,7 @@ where
         }
         #[cfg(not(feature = "rayon"))]
         {
-            let mut output = vec![T::zero(); out_numel];
+            let mut output: FlexBuf<_> = FlexBuf::from_elem(T::zero(), out_numel);
 
             for b in 0..batch {
                 for c in 0..channels {
@@ -497,7 +497,7 @@ where
     };
 
     FlexTensor::new(
-        Bytes::from_elems(output),
+        FlexBuf::into_bytes(output),
         Layout::contiguous(Shape::from(vec![batch, channels, out_height, out_width])),
         x.dtype(),
     )
@@ -628,7 +628,7 @@ where
         {
             use rayon::prelude::*;
 
-            let mut output = vec![T::zero(); out_numel];
+            let mut output = FlexBuf::from_elem(T::zero(), out_numel);
             let out_ptr = crate::ops::SendMutPtr::new(output.as_mut_ptr());
             let num_bc_pairs = batch * channels;
 
@@ -680,7 +680,7 @@ where
         }
         #[cfg(not(feature = "rayon"))]
         {
-            let mut output = vec![T::zero(); out_numel];
+            let mut output: FlexBuf<_> = FlexBuf::from_elem(T::zero(), out_numel);
 
             for b in 0..batch {
                 for c in 0..channels {
@@ -700,7 +700,7 @@ where
     };
 
     FlexTensor::new(
-        Bytes::from_elems(output),
+        FlexBuf::into_bytes(output),
         Layout::contiguous(Shape::from(vec![batch, channels, out_height, out_width])),
         x.dtype(),
     )
@@ -847,7 +847,7 @@ where
         {
             use rayon::prelude::*;
 
-            let mut output = vec![T::zero(); out_numel];
+            let mut output = FlexBuf::from_elem(T::zero(), out_numel);
             let out_ptr = crate::ops::SendMutPtr::new(output.as_mut_ptr());
 
             let total_rows = batch * channels * out_height;
@@ -876,7 +876,7 @@ where
         }
         #[cfg(not(feature = "rayon"))]
         {
-            let mut output = vec![T::zero(); out_numel];
+            let mut output: FlexBuf<_> = FlexBuf::from_elem(T::zero(), out_numel);
 
             for b in 0..batch {
                 for c in 0..channels {
@@ -896,7 +896,7 @@ where
     };
 
     FlexTensor::new(
-        Bytes::from_elems(output),
+        FlexBuf::into_bytes(output),
         Layout::contiguous(Shape::from(vec![batch, channels, out_height, out_width])),
         x.dtype(),
     )
@@ -1219,9 +1219,9 @@ where
 fn convert_bf16_to_f32(x: &FlexTensor) -> FlexTensor {
     let x = x.clone().to_contiguous();
     let input = x.storage::<bf16>();
-    let output: Vec<f32> = input.iter().map(|v| v.to_f32()).collect();
+    let output: FlexBuf<f32> = input.iter().map(|v| v.to_f32()).collect::<FlexBuf<_>>();
     FlexTensor::new(
-        Bytes::from_elems(output),
+        FlexBuf::into_bytes(output),
         Layout::contiguous(x.layout().shape().clone()),
         DType::F32,
     )
@@ -1230,9 +1230,12 @@ fn convert_bf16_to_f32(x: &FlexTensor) -> FlexTensor {
 fn convert_f32_to_bf16(x: &FlexTensor) -> FlexTensor {
     let x = x.clone().to_contiguous();
     let input = x.storage::<f32>();
-    let output: Vec<bf16> = input.iter().map(|v| bf16::from_f32(*v)).collect();
+    let output: FlexBuf<bf16> = input
+        .iter()
+        .map(|v| bf16::from_f32(*v))
+        .collect::<FlexBuf<_>>();
     FlexTensor::new(
-        Bytes::from_elems(output),
+        FlexBuf::into_bytes(output),
         Layout::contiguous(x.layout().shape().clone()),
         DType::BF16,
     )

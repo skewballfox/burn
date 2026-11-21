@@ -9,7 +9,7 @@ use burn_std::{BoolDType, BoolStore, Bytes, Shape, bf16, f16};
 use bytemuck::Pod;
 
 use crate::strided_index::StridedIter;
-use crate::{FlexTensor, Layout};
+use crate::{FlexBuf, FlexTensor, Layout};
 
 use crate::simd;
 
@@ -75,7 +75,7 @@ where
         let l_slice = &lhs_storage[l_start..l_end];
         let r_slice = &rhs_storage[r_start..r_end];
 
-        let mut result = vec![0u8; l_slice.len()];
+        let mut result: FlexBuf<_> = FlexBuf::from_elem(0u8, l_slice.len());
         simd::cmp_f32(l_slice, r_slice, &mut result, simd_op);
 
         return make_bool_tensor(result, shape, out_dtype);
@@ -102,10 +102,10 @@ where
 /// runs; returns `None` for anything else (general strided inner,
 /// negative strides) so the caller's generic path takes over.
 #[cfg(feature = "simd")]
-fn try_zip_cmp_f32(lhs: &FlexTensor, rhs: &FlexTensor, op: simd::CmpOp) -> Option<Vec<u8>> {
+fn try_zip_cmp_f32(lhs: &FlexTensor, rhs: &FlexTensor, op: simd::CmpOp) -> Option<FlexBuf<u8>> {
     let numel = lhs.layout().num_elements();
     if numel == 0 {
-        return Some(Vec::new());
+        return Some(FlexBuf::with_capacity(0));
     }
     let nest = crate::zip::collapse_for_zip(lhs.layout(), rhs.layout())?;
     if nest.ndim == 0 {
@@ -123,7 +123,7 @@ fn try_zip_cmp_f32(lhs: &FlexTensor, rhs: &FlexTensor, op: simd::CmpOp) -> Optio
     }
     let lhs_storage: &[f32] = lhs.storage();
     let rhs_storage: &[f32] = rhs.storage();
-    let mut out = vec![0u8; numel];
+    let mut out = FlexBuf::from_elem(0u8, numel);
     let mut pos = 0usize;
     match (l_st, r_st) {
         (1, 1) => nest.for_each_run(|lb, rb| {
@@ -242,7 +242,7 @@ where
         let lhs_storage: &[f32] = lhs.storage();
         let l_slice = &lhs_storage[start..end];
 
-        let mut result = vec![0u8; l_slice.len()];
+        let mut result = FlexBuf::from_elem(0u8, l_slice.len());
         simd::cmp_scalar_f32(l_slice, rhs, &mut result, simd_op);
 
         return make_bool_tensor(result, shape, out_dtype);
@@ -281,7 +281,7 @@ where
     let lhs_storage: &[E] = lhs.storage();
     let rhs_storage: &[E] = rhs.storage();
 
-    let result: Vec<u8> = match (
+    let result: FlexBuf<u8> = match (
         lhs.layout().contiguous_offsets(),
         rhs.layout().contiguous_offsets(),
     ) {
@@ -336,7 +336,7 @@ where
     let shape = lhs.layout().shape().clone();
     let lhs_storage: &[E] = lhs.storage();
 
-    let result: Vec<u8> = match lhs.layout().contiguous_offsets() {
+    let result: FlexBuf<u8> = match lhs.layout().contiguous_offsets() {
         Some((start, end)) => lhs_storage[start..end]
             .iter()
             .map(|&a| cmp(a, rhs) as u8)
@@ -349,14 +349,18 @@ where
     make_bool_tensor(result, shape, out_dtype)
 }
 
-/// Build a bool `FlexTensor` from a `Vec<u8>` of 0/1 bytes, tagged with the
+/// Build a bool `FlexTensor` from a buffer of 0/1 bytes, tagged with the
 /// requested output dtype.
 ///
 /// burn-flex stores bools as 1 byte per element, so only Native and U8 are
 /// supported. `Bool(U32)` would require 4-byte-per-element storage throughout
 /// the backend; `dtype_usage` declares it unsupported and this function panics
 /// if it's requested.
-pub(crate) fn make_bool_tensor(data: Vec<u8>, shape: Shape, out_dtype: BoolDType) -> FlexTensor {
+pub(crate) fn make_bool_tensor(
+    data: FlexBuf<u8>,
+    shape: Shape,
+    out_dtype: BoolDType,
+) -> FlexTensor {
     let store = match out_dtype {
         BoolDType::Native => BoolStore::Native,
         BoolDType::U8 => BoolStore::U8,
@@ -365,7 +369,7 @@ pub(crate) fn make_bool_tensor(data: Vec<u8>, shape: Shape, out_dtype: BoolDType
              Use a backend that declares Bool(U32) support, or work with Bool(Native)/Bool(U8)."
         ),
     };
-    let bytes = Bytes::from_elems(data);
+    let bytes = FlexBuf::into_bytes(data);
     FlexTensor::new(bytes, Layout::contiguous(shape), DType::Bool(store))
 }
 
@@ -691,7 +695,7 @@ pub fn bool_not_equal(lhs: FlexTensor, rhs: FlexTensor, out_dtype: BoolDType) ->
     let shape = lhs.layout().shape().clone();
     let lhs_data: &[u8] = lhs.bytes();
     let rhs_data: &[u8] = rhs.bytes();
-    let result: Vec<u8> = match (
+    let result: FlexBuf<u8> = match (
         lhs.layout().contiguous_offsets(),
         rhs.layout().contiguous_offsets(),
     ) {
@@ -718,10 +722,10 @@ pub fn bool_not_equal_elem(lhs: FlexTensor, rhs: bool, out_dtype: BoolDType) -> 
     let shape = lhs.layout().shape().clone();
     let lhs = lhs.to_contiguous();
     let data: &[u8] = lhs.bytes();
-    let result: Vec<u8> = data
+    let result: FlexBuf<u8> = data
         .iter()
         .map(|&a| if a != rhs_val { 1 } else { 0 })
-        .collect();
+        .collect::<FlexBuf<_>>();
     make_bool_tensor(result, shape, out_dtype)
 }
 
@@ -835,7 +839,11 @@ pub fn all_bool_dim(tensor: FlexTensor, dim: usize, out_dtype: BoolDType) -> Fle
 
 fn bool_scalar(val: bool, out_dtype: BoolDType) -> FlexTensor {
     let byte: u8 = if val { 1 } else { 0 };
-    make_bool_tensor(alloc::vec![byte], Shape::from(alloc::vec![1]), out_dtype)
+    make_bool_tensor(
+        FlexBuf::from_slice(&[byte]),
+        Shape::from(alloc::vec![1]),
+        out_dtype,
+    )
 }
 
 fn iter_elements<'a, E: Element + Pod + 'a>(
@@ -872,7 +880,7 @@ fn reduce_bool_dim_with(
     let inner_size: usize = shape[dim + 1..].iter().product();
 
     let out_size = outer_size.max(1) * inner_size.max(1);
-    let mut result: Vec<u8> = Vec::with_capacity(out_size);
+    let mut result: FlexBuf<u8> = FlexBuf::with_capacity(out_size);
 
     for outer in 0..outer_size.max(1) {
         for inner in 0..inner_size.max(1) {

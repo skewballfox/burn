@@ -17,7 +17,7 @@ use burn_backend::{
 use burn_std::{Bytes, Shape, Slice, bf16, f16};
 
 use super::float_storage_as_f32;
-use crate::{Flex, FlexQTensor, FlexTensor, Layout, quant_codes::QuantCodes};
+use crate::{Flex, FlexBuf, FlexQTensor, FlexTensor, Layout, quant_codes::QuantCodes};
 
 /// The blocks over `shape`, which must be a whole number of blocks along every axis.
 fn block_layout(shape: &Shape, block: &BlockSize) -> BlockLayout {
@@ -107,7 +107,7 @@ impl QTensorOps<Flex> for Flex {
                     .into_iter()
                     .map(|alpha| validated_scale(2.0 * alpha / range, scheme.scale_dtype()))
                     .collect();
-                let quantized = scheme
+                let quantized: FlexBuf<_> = scheme
                     .value
                     .encode_all(&float_data, |index| scales[blocks.block_of(index)]);
 
@@ -115,7 +115,7 @@ impl QTensorOps<Flex> for Flex {
             }
         };
 
-        let bytes = Bytes::from_elems(quantized);
+        let bytes = FlexBuf::into_bytes(quantized);
         let layout = Layout::contiguous(shape);
         let qt = FlexTensor::new(bytes, layout, DType::I8);
 
@@ -150,7 +150,7 @@ impl QTensorOps<Flex> for Flex {
             validated_scale(float_storage_as_f32(&global)[0], dtype)
         });
 
-        let quantized = match scheme.block_size() {
+        let quantized: FlexBuf<_> = match scheme.block_size() {
             None => {
                 let scale = scales[0];
                 scheme.value.encode_all(&float_data, move |_| scale)
@@ -164,7 +164,7 @@ impl QTensorOps<Flex> for Flex {
             }
         };
 
-        let bytes = Bytes::from_elems(quantized);
+        let bytes = FlexBuf::into_bytes(quantized);
         let layout = Layout::contiguous(shape);
         let qt = FlexTensor::new(bytes, layout, DType::I8);
 
@@ -176,7 +176,7 @@ impl QTensorOps<Flex> for Flex {
         let qt = tensor.tensor.to_contiguous();
         let q_data: &[i8] = qt.storage();
 
-        let dequantized = match tensor.scheme.block_size() {
+        let dequantized: FlexBuf<_> = match tensor.scheme.block_size() {
             None => {
                 let scale = tensor.scales[0];
                 tensor.scheme.value.decode_all(q_data, move |_| scale)
@@ -193,19 +193,28 @@ impl QTensorOps<Flex> for Flex {
         let layout = Layout::contiguous(shape);
         match dtype {
             FloatDType::F32 | FloatDType::Flex32 => {
-                FlexTensor::new(Bytes::from_elems(dequantized), layout, DType::F32)
+                FlexTensor::new(FlexBuf::into_bytes(dequantized), layout, DType::F32)
             }
             FloatDType::F64 => {
-                let data: Vec<f64> = dequantized.iter().map(|&v| v as f64).collect();
-                FlexTensor::new(Bytes::from_elems(data), layout, DType::F64)
+                let data: FlexBuf<f64> = dequantized
+                    .iter()
+                    .map(|&v| v as f64)
+                    .collect::<FlexBuf<_>>();
+                FlexTensor::new(FlexBuf::into_bytes(data), layout, DType::F64)
             }
             FloatDType::F16 => {
-                let data: Vec<f16> = dequantized.iter().map(|&v| f16::from_f32(v)).collect();
-                FlexTensor::new(Bytes::from_elems(data), layout, DType::F16)
+                let data: FlexBuf<f16> = dequantized
+                    .iter()
+                    .map(|&v| f16::from_f32(v))
+                    .collect::<FlexBuf<_>>();
+                FlexTensor::new(FlexBuf::into_bytes(data), layout, DType::F16)
             }
             FloatDType::BF16 => {
-                let data: Vec<bf16> = dequantized.iter().map(|&v| bf16::from_f32(v)).collect();
-                FlexTensor::new(Bytes::from_elems(data), layout, DType::BF16)
+                let data: FlexBuf<bf16> = dequantized
+                    .iter()
+                    .map(|&v| bf16::from_f32(v))
+                    .collect::<FlexBuf<_>>();
+                FlexTensor::new(FlexBuf::into_bytes(data), layout, DType::BF16)
             }
         }
     }

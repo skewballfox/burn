@@ -17,7 +17,7 @@ use burn_backend::ops::ConvTransposeOptions;
 use burn_backend::ops::conv::calculate_conv_transpose_output_size;
 use burn_std::{Bytes, Shape, f16};
 
-use crate::{FlexTensor, Layout};
+use crate::{FlexBuf, FlexTensor, Layout};
 
 use super::conv_common::{add_bias, squeeze_3d_to_1d, squeeze_3d_to_2d};
 
@@ -332,7 +332,7 @@ fn conv_transpose3d_impl<
             dtype,
         );
     }
-    let mut output = vec![zero; output_size];
+    let mut output = FlexBuf::from_elem(zero, output_size);
 
     let group_chunk_len = out_channels_per_group * out_spatial;
     #[cfg(feature = "rayon")]
@@ -534,7 +534,7 @@ fn conv_transpose3d_impl<
 
     let out_shape = Shape::from(vec![batch_size, out_channels, out_d, out_h, out_w]);
     FlexTensor::new(
-        Bytes::from_elems(output),
+        FlexBuf::into_bytes(output),
         Layout::contiguous(out_shape),
         dtype,
     )

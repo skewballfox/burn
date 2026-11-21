@@ -17,7 +17,7 @@ use alloc::vec::Vec;
 use burn_backend::DType;
 use burn_std::{Bytes, Shape};
 
-use crate::{FlexTensor, Layout};
+use crate::{FlexBuf, FlexTensor, Layout};
 
 /// Build deformable im2col matrix for one batch sample and weight group.
 ///
@@ -170,7 +170,7 @@ pub fn deform_conv2d_f32(
 
     // Flatten weights to [channels_out, col_len] for GEMM
     // Layout: [oc, ic, kh, kw] -> [oc, kh * kw * ic]
-    let mut w_flat = vec![0.0f32; channels_out * col_len];
+    let mut w_flat = FlexBuf::from_elem(0.0f32, channels_out * col_len);
     for oc in 0..channels_out {
         for kh in 0..kernel_h {
             for kw in 0..kernel_w {
@@ -193,10 +193,10 @@ pub fn deform_conv2d_f32(
     let output = {
         use rayon::prelude::*;
 
-        let results: Vec<Vec<f32>> = (0..batch)
+        let results: Vec<FlexBuf<f32>> = (0..batch)
             .into_par_iter()
             .map(|b| {
-                let mut batch_output = vec![0.0f32; channels_out * spatial_out];
+                let mut batch_output = FlexBuf::from_elem(0.0f32, channels_out * spatial_out);
 
                 // Process each weight group
                 for g in 0..weight_groups {
@@ -204,7 +204,7 @@ pub fn deform_conv2d_f32(
                     let oc_start = g * out_channels_per_weight_group;
 
                     // Build deformable im2col for this batch and group
-                    let mut col = vec![0.0f32; col_len * spatial_out];
+                    let mut col = FlexBuf::from_elem(0.0f32, col_len * spatial_out);
 
                     deform_im2col_f32(
                         &mut col,
@@ -267,7 +267,7 @@ pub fn deform_conv2d_f32(
             .collect();
 
         // Flatten results
-        let mut output = vec![0.0f32; batch * channels_out * spatial_out];
+        let mut output = FlexBuf::from_elem(0.0f32, batch * channels_out * spatial_out);
         for (b, batch_out) in results.into_iter().enumerate() {
             let start = b * channels_out * spatial_out;
             output[start..start + channels_out * spatial_out].copy_from_slice(&batch_out);
@@ -277,7 +277,7 @@ pub fn deform_conv2d_f32(
 
     #[cfg(not(feature = "rayon"))]
     let output = {
-        let mut output = vec![0.0f32; batch * channels_out * spatial_out];
+        let mut output: FlexBuf<_> = FlexBuf::from_elem(0.0f32, batch * channels_out * spatial_out);
 
         for b in 0..batch {
             // Process each weight group
@@ -286,7 +286,7 @@ pub fn deform_conv2d_f32(
                 let oc_start = g * out_channels_per_weight_group;
 
                 // Build deformable im2col for this batch and group
-                let mut col = vec![0.0f32; col_len * spatial_out];
+                let mut col = FlexBuf::from_elem(0.0f32, col_len * spatial_out);
 
                 deform_im2col_f32(
                     &mut col,
@@ -352,7 +352,7 @@ pub fn deform_conv2d_f32(
 
     let out_shape = Shape::from(vec![batch, channels_out, out_h, out_w]);
     FlexTensor::new(
-        Bytes::from_elems(output),
+        FlexBuf::into_bytes(output),
         Layout::contiguous(out_shape),
         DType::F32,
     )
@@ -360,8 +360,8 @@ pub fn deform_conv2d_f32(
 
 /// GEMM: C = A @ B where A is [m, k], B is [k, n], result C is [m, n]
 #[inline]
-fn gemm_f32(a: &[f32], b: &[f32], m: usize, k: usize, n: usize) -> Vec<f32> {
-    let mut c = vec![0.0f32; m * n];
+fn gemm_f32(a: &[f32], b: &[f32], m: usize, k: usize, n: usize) -> FlexBuf<f32> {
+    let mut c = FlexBuf::from_elem(0.0f32, m * n);
     unsafe {
         gemm::gemm(
             m,
@@ -807,7 +807,7 @@ pub fn deform_conv2d_f64(
     let col_len = channels_per_weight_group * kernel_h * kernel_w;
 
     // Flatten weights
-    let mut w_flat = vec![0.0f64; channels_out * col_len];
+    let mut w_flat = FlexBuf::from_elem(0.0f64, channels_out * col_len);
     for oc in 0..channels_out {
         for kh in 0..kernel_h {
             for kw in 0..kernel_w {
@@ -826,14 +826,14 @@ pub fn deform_conv2d_f64(
         }
     }
 
-    let mut output = vec![0.0f64; batch * channels_out * spatial_out];
+    let mut output = FlexBuf::from_elem(0.0f64, batch * channels_out * spatial_out);
 
     for b in 0..batch {
         for g in 0..weight_groups {
             let ic_start = g * channels_per_weight_group;
             let oc_start = g * out_channels_per_weight_group;
 
-            let mut col = vec![0.0f64; col_len * spatial_out];
+            let mut col = FlexBuf::from_elem(0.0f64, col_len * spatial_out);
 
             for oh in 0..out_h {
                 for ow in 0..out_w {
@@ -933,15 +933,15 @@ pub fn deform_conv2d_f64(
 
     let out_shape = Shape::from(vec![batch, channels_out, out_h, out_w]);
     FlexTensor::new(
-        Bytes::from_elems(output),
+        FlexBuf::into_bytes(output),
         Layout::contiguous(out_shape),
         DType::F64,
     )
 }
 
 #[inline]
-fn gemm_f64(a: &[f64], b: &[f64], m: usize, k: usize, n: usize) -> Vec<f64> {
-    let mut c = vec![0.0f64; m * n];
+fn gemm_f64(a: &[f64], b: &[f64], m: usize, k: usize, n: usize) -> FlexBuf<f64> {
+    let mut c = FlexBuf::from_elem(0.0f64, m * n);
     unsafe {
         gemm::gemm(
             m,

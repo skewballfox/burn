@@ -1,4 +1,4 @@
-use alloc::vec::Vec;
+use crate::FlexBuf;
 use burn_backend::quantization::QuantValue;
 use burn_std::{e2m1, e4m3, e5m2};
 
@@ -10,14 +10,14 @@ use burn_std::{e2m1, e4m3, e5m2};
 pub trait QuantCodes {
     /// The code of each value divided by its scale, `scale_of` giving the scale at an index:
     /// clamped to the type's range, then rounded to the nearest representable value, ties to even.
-    fn encode_all(&self, values: &[f32], scale_of: impl Fn(usize) -> f32) -> Vec<i8>;
+    fn encode_all(&self, values: &[f32], scale_of: impl Fn(usize) -> f32) -> FlexBuf<i8>;
 
     /// The value each code stands for, times the scale `scale_of` gives at its index.
-    fn decode_all(&self, codes: &[i8], scale_of: impl Fn(usize) -> f32) -> Vec<f32>;
+    fn decode_all(&self, codes: &[i8], scale_of: impl Fn(usize) -> f32) -> FlexBuf<f32>;
 }
 
 impl QuantCodes for QuantValue {
-    fn encode_all(&self, values: &[f32], scale_of: impl Fn(usize) -> f32) -> Vec<i8> {
+    fn encode_all(&self, values: &[f32], scale_of: impl Fn(usize) -> f32) -> FlexBuf<i8> {
         let (min, max) = self.range();
         let scaled = values
             .iter()
@@ -42,7 +42,7 @@ impl QuantCodes for QuantValue {
         }
     }
 
-    fn decode_all(&self, codes: &[i8], scale_of: impl Fn(usize) -> f32) -> Vec<f32> {
+    fn decode_all(&self, codes: &[i8], scale_of: impl Fn(usize) -> f32) -> FlexBuf<f32> {
         let codes = codes.iter().enumerate();
         match self {
             QuantValue::E4M3 => codes

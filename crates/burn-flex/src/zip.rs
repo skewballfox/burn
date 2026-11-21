@@ -21,6 +21,7 @@
 //! faults from first-touching it, which at multi-megabyte sizes costs
 //! several times the arithmetic itself.
 
+use crate::FlexBuf;
 use crate::layout::Layout;
 use alloc::vec::Vec;
 
@@ -198,19 +199,20 @@ pub(crate) fn zip_map<L, R, Out, F>(
     rhs: &[R],
     rhs_layout: &Layout,
     op: F,
-) -> Option<Vec<Out>>
+) -> Option<FlexBuf<Out>>
 where
     L: Copy,
     R: Copy,
+    Out: bytemuck::Pod + Send + Sync,
     F: Fn(L, R) -> Out,
 {
     let numel = lhs_layout.num_elements();
     if numel == 0 {
-        return Some(Vec::new());
+        return Some(FlexBuf::with_capacity(0));
     }
     let nest = collapse_for_zip(lhs_layout, rhs_layout)?;
 
-    let mut out: Vec<Out> = Vec::with_capacity(numel);
+    let mut out: FlexBuf<Out> = FlexBuf::with_capacity(numel);
     if nest.ndim == 0 {
         // All dims were size 1: a single element.
         out.push(op(lhs[nest.lhs_offset], rhs[nest.rhs_offset]));
@@ -467,20 +469,21 @@ pub(crate) fn zip3_map<A, B, C, R, F>(
     c: &[C],
     c_layout: &Layout,
     op: F,
-) -> Option<Vec<R>>
+) -> Option<FlexBuf<R>>
 where
     A: Copy,
     B: Copy,
     C: Copy,
+    R: bytemuck::Pod + Send + Sync,
     F: Fn(A, B, C) -> R,
 {
     let numel = a_layout.num_elements();
     if numel == 0 {
-        return Some(Vec::new());
+        return Some(FlexBuf::with_capacity(0));
     }
     let nest = collapse_for_zip3(a_layout, b_layout, c_layout)?;
 
-    let mut out: Vec<R> = Vec::with_capacity(numel);
+    let mut out: FlexBuf<R> = FlexBuf::with_capacity(numel);
     if nest.ndim == 0 {
         out.push(op(a[nest.a_offset], b[nest.b_offset], c[nest.c_offset]));
         return Some(out);
@@ -843,7 +846,7 @@ mod tests {
         let b_data = vec![10.0f32, 20.0, 30.0];
         let c_data = vec![100.0f32, 200.0, 300.0, 400.0, 500.0, 600.0];
 
-        let got: Vec<f32> = zip3_map(
+        let got: FlexBuf<f32> = zip3_map(
             &a_data,
             &a_layout,
             &b_data,

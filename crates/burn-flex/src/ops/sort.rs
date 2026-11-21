@@ -11,7 +11,7 @@ use bytemuck::Pod;
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
 
-use crate::{FlexTensor, Layout};
+use crate::{FlexBuf, FlexTensor, Layout};
 
 use super::INDEX_DTYPE;
 #[cfg(feature = "rayon")]
@@ -116,7 +116,7 @@ fn sort_typed<E: Element + Pod + Copy + Send>(
         return tensor;
     }
 
-    let mut data: Vec<E> = tensor.storage::<E>().to_vec();
+    let mut data: FlexBuf<E> = FlexBuf::from_slice(tensor.storage::<E>());
 
     if shape.num_dims() == 1 {
         if descending {
@@ -128,7 +128,7 @@ fn sort_typed<E: Element + Pod + Copy + Send>(
         sort_along_dim(&mut data, &shape, dim, descending, cmp);
     }
 
-    FlexTensor::new(Bytes::from_elems(data), Layout::contiguous(shape), dtype)
+    FlexTensor::new(FlexBuf::into_bytes(data), Layout::contiguous(shape), dtype)
 }
 
 fn sort_with_indices_typed<E: Element + Pod + Copy + Send>(
@@ -142,13 +142,13 @@ fn sort_with_indices_typed<E: Element + Pod + Copy + Send>(
     let dtype = tensor.dtype();
     let n = shape.num_elements();
     if validate_sort_args(&shape, dim) {
-        let idx = make_index_tensor(Vec::new(), shape.clone());
+        let idx = make_index_tensor(FlexBuf::with_capacity(0), shape.clone());
         return (tensor, idx);
     }
 
     let src: &[E] = tensor.storage();
-    let mut values: Vec<E> = src.to_vec();
-    let mut indices: Vec<isize> = vec![0; n];
+    let mut values: FlexBuf<E> = FlexBuf::from_slice(src);
+    let mut indices: FlexBuf<isize> = FlexBuf::from_elem(0, n);
 
     if shape.num_dims() == 1 {
         sort_1d_with_indices(&mut values, &mut indices, descending, cmp);
@@ -157,7 +157,11 @@ fn sort_with_indices_typed<E: Element + Pod + Copy + Send>(
     }
 
     let idx_tensor = make_index_tensor(indices, shape.clone());
-    let val_tensor = FlexTensor::new(Bytes::from_elems(values), Layout::contiguous(shape), dtype);
+    let val_tensor = FlexTensor::new(
+        FlexBuf::into_bytes(values),
+        Layout::contiguous(shape),
+        dtype,
+    );
     (val_tensor, idx_tensor)
 }
 
@@ -172,11 +176,11 @@ fn argsort_typed<E: Element + Pod + Copy + Sync>(
     let shape = tensor.layout().shape().clone();
     let n = shape.num_elements();
     if validate_sort_args(&shape, dim) {
-        return make_index_tensor(Vec::new(), shape);
+        return make_index_tensor(FlexBuf::with_capacity(0), shape);
     }
 
     let src: &[E] = tensor.storage();
-    let mut indices: Vec<isize> = vec![0; n];
+    let mut indices: FlexBuf<isize> = FlexBuf::from_elem(0, n);
 
     if shape.num_dims() == 1 {
         let mut idx_vec: Vec<usize> = (0..n).collect();
@@ -459,8 +463,15 @@ fn sort_half<H: Element + Pod + Copy>(
         sort_along_dim(&mut f32_data, &shape, dim, descending, f32::total_cmp);
     }
 
-    let result: Vec<H> = f32_data.iter().map(|&v| from_f32(v)).collect();
-    FlexTensor::new(Bytes::from_elems(result), Layout::contiguous(shape), dtype)
+    let result: FlexBuf<H> = f32_data
+        .iter()
+        .map(|&v| from_f32(v))
+        .collect::<FlexBuf<_>>();
+    FlexTensor::new(
+        FlexBuf::into_bytes(result),
+        Layout::contiguous(shape),
+        dtype,
+    )
 }
 
 fn sort_with_indices_half<H: Element + Pod + Copy>(
@@ -475,12 +486,12 @@ fn sort_with_indices_half<H: Element + Pod + Copy>(
     let dtype = tensor.dtype();
     let n = shape.num_elements();
     if validate_sort_args(&shape, dim) {
-        let idx = make_index_tensor(Vec::new(), shape.clone());
+        let idx = make_index_tensor(FlexBuf::with_capacity(0), shape.clone());
         return (tensor, idx);
     }
     let src: &[H] = tensor.storage();
     let mut f32_data: Vec<f32> = src.iter().map(|&v| to_f32(v)).collect();
-    let mut indices: Vec<isize> = vec![0; n];
+    let mut indices: FlexBuf<isize> = FlexBuf::from_elem(0, n);
 
     if shape.num_dims() == 1 {
         sort_1d_with_indices(&mut f32_data, &mut indices, descending, f32::total_cmp);
@@ -495,9 +506,12 @@ fn sort_with_indices_half<H: Element + Pod + Copy>(
         );
     }
 
-    let result: Vec<H> = f32_data.iter().map(|&v| from_f32(v)).collect();
+    let result: FlexBuf<H> = f32_data
+        .iter()
+        .map(|&v| from_f32(v))
+        .collect::<FlexBuf<_>>();
     let val_tensor = FlexTensor::new(
-        Bytes::from_elems(result),
+        FlexBuf::into_bytes(result),
         Layout::contiguous(shape.clone()),
         dtype,
     );
@@ -515,11 +529,11 @@ fn argsort_half<H: Element + Pod + Copy>(
     let shape = tensor.layout().shape().clone();
     let n = shape.num_elements();
     if validate_sort_args(&shape, dim) {
-        return make_index_tensor(Vec::new(), shape);
+        return make_index_tensor(FlexBuf::with_capacity(0), shape);
     }
     let src: &[H] = tensor.storage();
     let f32_data: Vec<f32> = src.iter().map(|&v| to_f32(v)).collect();
-    let mut indices: Vec<isize> = vec![0; n];
+    let mut indices: FlexBuf<isize> = FlexBuf::from_elem(0, n);
 
     if shape.num_dims() == 1 {
         let mut idx_vec: Vec<usize> = (0..n).collect();
@@ -557,8 +571,8 @@ fn slice_base_offset(slice_idx: usize, shape: &Shape, strides: &[usize], dim: us
     crate::layout::slice_base_offset(slice_idx, shape, strides, dim)
 }
 
-fn make_index_tensor(indices: Vec<isize>, shape: Shape) -> FlexTensor {
-    let bytes = Bytes::from_elems(indices);
+fn make_index_tensor(indices: FlexBuf<isize>, shape: Shape) -> FlexTensor {
+    let bytes = FlexBuf::into_bytes(indices);
     FlexTensor::new(bytes, Layout::contiguous(shape), INDEX_DTYPE)
 }
 

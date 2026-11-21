@@ -1,6 +1,6 @@
 //! Shared macros and helpers for forward and transposed convolution.
 
-use crate::{FlexTensor, Layout};
+use crate::{FlexBuf, FlexTensor, Layout};
 use alloc::vec::Vec;
 use burn_backend::DType;
 use burn_std::{Bytes, Element, ElementAdd, Shape, bf16};
@@ -66,9 +66,9 @@ pub(crate) fn squeeze_3d_to_2d(tensor: FlexTensor) -> FlexTensor {
 pub(crate) fn convert_bf16_to_f32(tensor: &FlexTensor) -> FlexTensor {
     let tensor = tensor.to_contiguous();
     let data: &[bf16] = tensor.storage();
-    let f32_data: Vec<f32> = data.iter().map(|x| x.to_f32()).collect();
+    let f32_data: FlexBuf<f32> = data.iter().map(|x| x.to_f32()).collect::<FlexBuf<_>>();
     FlexTensor::new(
-        Bytes::from_elems(f32_data),
+        FlexBuf::into_bytes(f32_data),
         Layout::contiguous(tensor.layout().shape().clone()),
         DType::F32,
     )
@@ -76,9 +76,12 @@ pub(crate) fn convert_bf16_to_f32(tensor: &FlexTensor) -> FlexTensor {
 
 pub(crate) fn convert_f32_to_bf16(tensor: &FlexTensor) -> FlexTensor {
     let data: &[f32] = tensor.storage();
-    let bf16_data: Vec<bf16> = data.iter().map(|x| bf16::from_f32(*x)).collect();
+    let bf16_data: FlexBuf<bf16> = data
+        .iter()
+        .map(|x| bf16::from_f32(*x))
+        .collect::<FlexBuf<_>>();
     FlexTensor::new(
-        Bytes::from_elems(bf16_data),
+        FlexBuf::into_bytes(bf16_data),
         Layout::contiguous(tensor.layout().shape().clone()),
         DType::BF16,
     )

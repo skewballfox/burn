@@ -8,7 +8,7 @@ use burn_std::{BoolDType, Bytes, bf16, f16};
 use num_traits::Float;
 
 use crate::layout::StridedBlocks;
-use crate::{FlexTensor, Layout};
+use crate::{FlexBuf, FlexTensor, Layout};
 
 /// Apply a float predicate element-wise, producing a boolean tensor.
 ///
@@ -29,7 +29,7 @@ where
     let shape = tensor.layout().shape().clone();
     let n = shape.num_elements();
 
-    let result: Vec<u8> = match tensor.dtype() {
+    let result: FlexBuf<u8> = match tensor.dtype() {
         DType::F32 => {
             let s: &[f32] = tensor.storage();
             s[..n].iter().map(|&x| f32_pred(x) as u8).collect()
@@ -98,17 +98,17 @@ where
     // Iterate in storage order (contiguous) and preserve original layout.
     // Only valid when all strides are positive.
     if !has_negative_strides && layout.start_offset() == 0 && src.len() == n {
-        let result: Vec<E> = src.iter().map(|&x| op(x)).collect();
-        let bytes = Bytes::from_elems(result);
+        let result: FlexBuf<E> = src.iter().map(|&x| op(x)).collect::<FlexBuf<_>>();
+        let bytes = FlexBuf::into_bytes(result);
         return FlexTensor::new(bytes, layout, E::dtype());
     }
 
     // Fallback for negative strides: use StridedIter for correct element order
     if has_negative_strides {
-        let result: Vec<E> = crate::strided_index::StridedIter::new(&layout)
+        let result: FlexBuf<E> = crate::strided_index::StridedIter::new(&layout)
             .map(|idx| op(src[idx]))
-            .collect();
-        let bytes = Bytes::from_elems(result);
+            .collect::<FlexBuf<_>>();
+        let bytes = FlexBuf::into_bytes(result);
         return FlexTensor::new(
             bytes,
             Layout::contiguous(layout.shape().clone()),
@@ -131,7 +131,7 @@ where
         } => {
             let block_len = *block_len;
             let num_blocks = *num_blocks;
-            let mut result = Vec::with_capacity(n);
+            let mut result = FlexBuf::with_capacity(n);
 
             if block_len == 1 {
                 for block_start in blocks.block_starts() {
@@ -149,7 +149,7 @@ where
         }
     };
 
-    let bytes = Bytes::from_elems(result);
+    let bytes = FlexBuf::into_bytes(result);
     FlexTensor::new(
         bytes,
         Layout::contiguous(layout.shape().clone()),
@@ -178,7 +178,7 @@ where
     };
     let out = crate::simd::map_to_vec(src, op);
     Ok(FlexTensor::new(
-        Bytes::from_elems(out),
+        FlexBuf::into_bytes(out),
         Layout::contiguous(tensor.layout().shape().clone()),
         E::dtype(),
     ))

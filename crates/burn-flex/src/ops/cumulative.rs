@@ -6,7 +6,7 @@ use burn_std::Bytes;
 use bytemuck::Pod;
 use num_traits::{Bounded, Num};
 
-use crate::{FlexTensor, Layout};
+use crate::{FlexBuf, FlexTensor, Layout};
 
 /// Cumulative sum along a dimension.
 ///
@@ -54,7 +54,7 @@ where
 
     let data: &[E] = tensor.storage();
     let total_size = shape.num_elements();
-    let mut result = vec![E::default(); total_size];
+    let mut result = FlexBuf::from_elem(E::default(), total_size);
 
     let dim_size = shape[dim];
     // Contiguous block size after the cumulative dimension
@@ -90,7 +90,7 @@ where
         }
     }
 
-    let bytes = Bytes::from_elems(result);
+    let bytes = FlexBuf::into_bytes(result);
     FlexTensor::new(bytes, Layout::contiguous(shape), E::dtype())
 }
 
@@ -119,7 +119,7 @@ where
 
     let data: &[E] = tensor.storage();
     let total_size = shape.num_elements();
-    let mut result = vec![E::default(); total_size];
+    let mut result = FlexBuf::from_elem(E::default(), total_size);
 
     let dim_size = shape[dim];
     let inner_size: usize = shape[dim + 1..].iter().product();
@@ -144,7 +144,7 @@ where
         }
     }
 
-    let bytes = Bytes::from_elems(result);
+    let bytes = FlexBuf::into_bytes(result);
     FlexTensor::new(bytes, Layout::contiguous(shape), E::dtype())
 }
 
