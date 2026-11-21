@@ -7,8 +7,10 @@
 //! allocates while the recorder is armed. Run it without `rayon`:
 //!
 //! ```sh
-//! cargo test -p burn-flex --no-default-features --features std,buffer-allocator --test buffer_allocator
+//! cargo test -p burn-flex --no-default-features --features std,buffer-allocator,fft --test buffer_allocator
 //! ```
+//!
+//! Without the `fft` feature, the FFT operations are left out.
 //!
 //! Set `BURN_FLEX_TRACE_BYPASS=1` to print the backtrace of each buffer that bypasses it.
 
@@ -28,7 +30,7 @@ use burn_std::{AllocationError, BoolDType, BufferAllocator, FromGlobalAlloc};
 const METADATA_BYTES: usize = 2 * size_of::<FlexTensor>() + 64;
 
 /// The number of outputs of [`infer`].
-const OUTPUTS: usize = 8;
+const OUTPUTS: usize = 8 + if cfg!(feature = "fft") { 5 } else { 0 };
 
 /// Passes every allocation to [`System`], and records those above [`METADATA_BYTES`] while armed.
 ///
@@ -132,6 +134,8 @@ struct Inputs {
     indices: TensorData,
     image: TensorData,
     kernel: TensorData,
+    #[cfg(feature = "fft")]
+    x_f64: TensorData,
 }
 
 impl Inputs {
@@ -144,6 +148,8 @@ impl Inputs {
             indices: TensorData::new((0..8 * 64).map(|i: i64| i * 7 % 64).collect(), [8, 64]),
             image: ramp(&[1, 4, 16, 16], 0.19),
             kernel: ramp(&[8, 4, 3, 3], 0.29),
+            #[cfg(feature = "fft")]
+            x_f64: ramp(&[8, 64], 0.11).convert::<f64>(),
         }
     }
 }
@@ -193,6 +199,21 @@ fn infer(inputs: Inputs, outputs: &mut Vec<FlexTensor>) {
     outputs.extend([
         probs, summed, joined, masked, contiguous, conv, pooled, q_product,
     ]);
+
+    #[cfg(feature = "fft")]
+    fft(normed, FlexTensor::from_data(inputs.x_f64), outputs);
+}
+
+/// The FFT along the last dimension and along another one, in both directions.
+#[cfg(feature = "fft")]
+fn fft(signal: FlexTensor, signal_f64: FlexTensor, outputs: &mut Vec<FlexTensor>) {
+    use burn_flex::ops::fft::{irfft_f32, rfft_f32, rfft_f64};
+
+    let (re, im) = rfft_f32(signal.clone(), 1, None);
+    let inverse = irfft_f32(re.clone(), im, 1, None);
+    let (re_dim0, im_dim0) = rfft_f32(signal, 0, None);
+    let (re_f64, _) = rfft_f64(signal_f64, 1, None);
+    outputs.extend([re, inverse, re_dim0, im_dim0, re_f64]);
 }
 
 fn run(inputs: Inputs) -> Vec<FlexTensor> {

@@ -282,9 +282,9 @@ Reports also include the measured cost of a kernel launch.
   application registers once with `burn_flex::set_allocator`, for example an arena in a fixed
   memory region of a microcontroller. The outputs and kernel scratch of inference and quantized
   operations come from it, and `from_data` copies global-heap bytes into it, while shared and static
-  bytes (weights in flash) stay zero-copy. An exhausted allocator panics. Backward-only operations,
-  the FFT, and the packing buffers of large matrix multiplications still use the global allocator. Without the feature, or without a registered
-  allocator, nothing changes.
+  bytes (weights in flash) stay zero-copy. An exhausted allocator panics. Backward-only operations
+  and the packing buffers of large matrix multiplications still use the global allocator. Without
+  the feature, or without a registered allocator, nothing changes.
 
 #### Fusion
 

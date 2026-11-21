@@ -89,7 +89,7 @@ burn_flex::set_allocator(&TENSORS);
 The outputs and kernel scratch of inference and quantized operations then come from `TENSORS`.
 Weights loaded zero-copy (shared or static bytes, such as a model in flash) stay where they are;
 other tensor data passed to `from_data` is copied into `TENSORS`. When `TENSORS` runs out of memory,
-the operation panics. Backward-only operations, the FFT, the packing buffers of large matrix
+the operation panics. Backward-only operations, the packing buffers of large matrix
 multiplications, and per-tensor metadata still use the global allocator, so a global heap is still
 needed.
 
