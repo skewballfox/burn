@@ -54,6 +54,7 @@ pub(crate) fn into_registered(bytes: Bytes) -> Bytes {
 #[cfg(feature = "simd")]
 pub(crate) enum Accumulator<E> {
     Aligned(crate::simd::aligned::AlignedVec<E>),
+    #[cfg(feature = "buffer-allocator")]
     Buf(FlexBuf<E>),
 }
 
@@ -72,6 +73,7 @@ impl<E: bytemuck::Pod + Send + Sync> Accumulator<E> {
     pub(crate) fn into_buf(self) -> FlexBuf<E> {
         match self {
             Self::Aligned(sums) => FlexBuf::from_slice(&sums),
+            #[cfg(feature = "buffer-allocator")]
             Self::Buf(sums) => sums,
         }
     }
@@ -84,6 +86,7 @@ impl<E> Deref for Accumulator<E> {
     fn deref(&self) -> &[E] {
         match self {
             Self::Aligned(sums) => sums,
+            #[cfg(feature = "buffer-allocator")]
             Self::Buf(sums) => sums,
         }
     }
@@ -94,6 +97,7 @@ impl<E> DerefMut for Accumulator<E> {
     fn deref_mut(&mut self) -> &mut [E] {
         match self {
             Self::Aligned(sums) => sums,
+            #[cfg(feature = "buffer-allocator")]
             Self::Buf(sums) => sums,
         }
     }
