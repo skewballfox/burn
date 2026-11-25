@@ -89,9 +89,13 @@ burn_flex::set_allocator(&TENSORS);
 The outputs and kernel scratch of inference and quantized operations then come from `TENSORS`.
 Weights loaded zero-copy (shared or static bytes, such as a model in flash) stay where they are;
 other tensor data passed to `from_data` is copied into `TENSORS`. When `TENSORS` runs out of memory,
-the operation panics. Backward-only operations, the packing buffers of large matrix
-multiplications, and per-tensor metadata still use the global allocator, so a global heap is still
-needed.
+the operation panics. Backward-only operations, the packing buffers of matrix multiplications, and
+per-tensor metadata still use the global allocator, so a global heap is still needed.
+
+Without `std`, `gemm` takes up to 512 KiB for the packing buffers of one small matrix multiplication.
+The `microgemm` feature of Flex multiplies with the `microgemm` crate instead, in at most 24 KiB of
+scratch for f32, which comes from `TENSORS`. It has no SIMD kernels and runs each product on one
+thread, so use it only for targets like these.
 
 ### Define the Device
 

@@ -33,6 +33,7 @@ compile_error!(
 mod allocator;
 mod backend;
 mod buffer;
+mod gemm;
 mod layout;
 mod qtensor;
 mod quant_codes;

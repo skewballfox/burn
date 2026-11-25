@@ -38,6 +38,9 @@ tracing = ["burn-std/tracing", "burn-backend/tracing", "burn-ir/tracing"]
 # Tensor storage and kernel scratch from an allocator registered with `set_allocator`,
 # instead of the global allocator. For embedded targets with an arena of their own.
 buffer-allocator = ["dep:spin"]
+# Matrix multiplication in portable code that allocates only through `buffer-allocator`, instead of
+# `gemm`. For embedded targets: slower on hosts, one thread per product.
+microgemm = ["dep:microgemm"]
 critical-section = [
     "dep:once_cell",
     "once_cell/critical-section",
@@ -64,6 +67,9 @@ num-traits = { workspace = true }
 
 # Matmul
 gemm = { workspace = true, features = ["f16"] }
+
+# Portable matmul (`microgemm`)
+microgemm = { workspace = true, optional = true }
 
 # SIMD
 aligned-vec = { workspace = true, optional = true }

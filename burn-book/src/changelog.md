@@ -286,6 +286,10 @@ Reports also include the measured cost of a kernel launch.
   and the packing buffers of large matrix multiplications still use the global allocator. Without
   the feature, or without a registered allocator, nothing changes.
 
+- With the new `microgemm` feature, Flex multiplies matrices with the `microgemm` crate instead of
+  `gemm`. The scratch for one f32 product is at most 24 KiB and comes from the registered allocator,
+  where `gemm` without `std` takes up to 512 KiB from the global one. It is slower on hosts.
+
 #### Fusion
 
 - Reduce fusion's CPU overhead by skipping unnecessary reduction-fuser resets.

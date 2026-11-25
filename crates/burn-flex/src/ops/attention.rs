@@ -449,7 +449,7 @@ macro_rules! impl_flash_gemm {
         impl FlashGemm for $ty {
             unsafe fn block_gemm(a: BlockGemmArgs<Self>) {
                 unsafe {
-                    gemm::gemm(
+                    crate::gemm::gemm(
                         a.m,
                         a.n,
                         a.k,
@@ -465,10 +465,7 @@ macro_rules! impl_flash_gemm {
                         a.rhs_rs,
                         a.alpha,
                         a.beta,
-                        false,
-                        false,
-                        false,
-                        gemm::Parallelism::None,
+                        crate::gemm::Parallelism::None,
                     );
                 }
             }

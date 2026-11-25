@@ -364,7 +364,7 @@ pub fn deform_conv2d_f32(
 fn gemm_f32(a: &[f32], b: &[f32], m: usize, k: usize, n: usize) -> FlexBuf<f32> {
     let mut c = FlexBuf::from_elem(0.0f32, m * n);
     unsafe {
-        gemm::gemm(
+        crate::gemm::gemm(
             m,
             n,
             k,
@@ -380,10 +380,7 @@ fn gemm_f32(a: &[f32], b: &[f32], m: usize, k: usize, n: usize) -> FlexBuf<f32> 
             n as isize, // rhs_rs: row stride = n (row-major)
             0.0,        // alpha: dst = alpha*dst + beta*lhs*rhs
             1.0,        // beta
-            false,
-            false,
-            false,
-            gemm::Parallelism::None,
+            crate::gemm::Parallelism::None,
         );
     }
     c
@@ -944,7 +941,7 @@ pub fn deform_conv2d_f64(
 fn gemm_f64(a: &[f64], b: &[f64], m: usize, k: usize, n: usize) -> FlexBuf<f64> {
     let mut c = FlexBuf::from_elem(0.0f64, m * n);
     unsafe {
-        gemm::gemm(
+        crate::gemm::gemm(
             m,
             n,
             k,
@@ -960,10 +957,7 @@ fn gemm_f64(a: &[f64], b: &[f64], m: usize, k: usize, n: usize) -> FlexBuf<f64> 
             n as isize,
             0.0,
             1.0,
-            false,
-            false,
-            false,
-            gemm::Parallelism::None,
+            crate::gemm::Parallelism::None,
         );
     }
     c

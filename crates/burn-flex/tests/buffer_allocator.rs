@@ -30,7 +30,8 @@ use burn_std::{AllocationError, BoolDType, BufferAllocator, FromGlobalAlloc};
 const METADATA_BYTES: usize = 2 * size_of::<FlexTensor>() + 64;
 
 /// The number of outputs of [`infer`].
-const OUTPUTS: usize = 8 + if cfg!(feature = "fft") { 5 } else { 0 };
+const OUTPUTS: usize =
+    8 + if cfg!(feature = "fft") { 5 } else { 0 } + if cfg!(feature = "microgemm") { 3 } else { 0 };
 
 /// Passes every allocation to [`System`], and records those above [`METADATA_BYTES`] while armed.
 ///
@@ -134,6 +135,8 @@ struct Inputs {
     indices: TensorData,
     image: TensorData,
     kernel: TensorData,
+    #[cfg(feature = "microgemm")]
+    products: [TensorData; 4],
     #[cfg(feature = "fft")]
     x_f64: TensorData,
 }
@@ -148,6 +151,13 @@ impl Inputs {
             indices: TensorData::new((0..8 * 64).map(|i: i64| i * 7 % 64).collect(), [8, 64]),
             image: ramp(&[1, 4, 16, 16], 0.19),
             kernel: ramp(&[8, 4, 3, 3], 0.29),
+            #[cfg(feature = "microgemm")]
+            products: [
+                ramp(&[64, 384], 0.13),
+                ramp(&[384, 2], 0.17),
+                ramp(&[96, 256], 0.23),
+                ramp(&[256, 128], 0.31),
+            ],
             #[cfg(feature = "fft")]
             x_f64: ramp(&[8, 64], 0.11).convert::<f64>(),
         }
@@ -200,8 +210,25 @@ fn infer(inputs: Inputs, outputs: &mut Vec<FlexTensor>) {
         probs, summed, joined, masked, contiguous, conv, pooled, q_product,
     ]);
 
+    #[cfg(feature = "microgemm")]
+    products(inputs.products, outputs);
+
     #[cfg(feature = "fft")]
     fft(normed, FlexTensor::from_data(inputs.x_f64), outputs);
+}
+
+/// Products whose operands are packed: one that `gemm` gives a fixed slab without `std`, a larger
+/// one, and one with a flipped operand.
+#[cfg(feature = "microgemm")]
+fn products([a, b, c, d]: [TensorData; 4], outputs: &mut Vec<FlexTensor>) {
+    let (a, b) = (FlexTensor::from_data(a), FlexTensor::from_data(b));
+    let (c, d) = (FlexTensor::from_data(c), FlexTensor::from_data(d));
+    let flipped = Flex::float_flip(b.clone(), &[0]);
+    outputs.extend([
+        Flex::float_matmul(a.clone(), b),
+        Flex::float_matmul(c, d),
+        Flex::float_matmul(a, flipped),
+    ]);
 }
 
 /// The FFT along the last dimension and along another one, in both directions.

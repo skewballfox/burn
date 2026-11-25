@@ -660,16 +660,16 @@ where
 
                 #[cfg(feature = "rayon")]
                 let parallelism = if c_out_group * n * col_len >= 32 * 32 * 32 {
-                    gemm::Parallelism::Rayon(0)
+                    crate::gemm::Parallelism::Rayon(0)
                 } else {
-                    gemm::Parallelism::None
+                    crate::gemm::Parallelism::None
                 };
                 #[cfg(not(feature = "rayon"))]
-                let parallelism = gemm::Parallelism::None;
+                let parallelism = crate::gemm::Parallelism::None;
 
                 // out_group[:, start..start + n] = w_group[c_out_group, col_len] @ col[col_len, n]
                 unsafe {
-                    gemm::gemm(
+                    crate::gemm::gemm(
                         c_out_group,
                         n,
                         col_len,
@@ -685,9 +685,6 @@ where
                         n as isize,
                         zero,
                         T::from_elem(1.0f32),
-                        false,
-                        false,
-                        false,
                         parallelism,
                     );
                 }
@@ -893,12 +890,12 @@ fn conv3d_1x1_impl<
     // C is [out_channels_per_group, spatial] row-major
     #[cfg(feature = "rayon")]
     let parallelism = if m.saturating_mul(n).saturating_mul(k) >= 192 * 192 * 192 {
-        gemm::Parallelism::Rayon(0)
+        crate::gemm::Parallelism::Rayon(0)
     } else {
-        gemm::Parallelism::None
+        crate::gemm::Parallelism::None
     };
     #[cfg(not(feature = "rayon"))]
-    let parallelism = gemm::Parallelism::None;
+    let parallelism = crate::gemm::Parallelism::None;
 
     let mut output = FlexBuf::from_elem(zero, total_output);
 
@@ -916,7 +913,7 @@ fn conv3d_1x1_impl<
                         b * channels_out * spatial + g * out_channels_per_group * spatial;
 
                     unsafe {
-                        gemm::gemm(
+                        crate::gemm::gemm(
                             m,
                             n,
                             k,
@@ -932,9 +929,6 @@ fn conv3d_1x1_impl<
                             n as isize, // rhs_rs
                             zero,
                             one,
-                            false,
-                            false,
-                            false,
                             parallelism,
                         );
                     }
@@ -951,7 +945,7 @@ fn conv3d_1x1_impl<
                         b * channels_out * spatial + g * out_channels_per_group * spatial;
 
                     unsafe {
-                        gemm::gemm(
+                        crate::gemm::gemm(
                             m,
                             n,
                             k,
@@ -967,9 +961,6 @@ fn conv3d_1x1_impl<
                             n as isize,
                             zero,
                             one,
-                            false,
-                            false,
-                            false,
                             parallelism,
                         );
                     }
@@ -1875,12 +1866,12 @@ fn conv3d_direct_impl<
 
     #[cfg(feature = "rayon")]
     let parallelism = if m.saturating_mul(n).saturating_mul(gemm_k) >= 192 * 192 * 192 {
-        gemm::Parallelism::Rayon(0)
+        crate::gemm::Parallelism::Rayon(0)
     } else {
-        gemm::Parallelism::None
+        crate::gemm::Parallelism::None
     };
     #[cfg(not(feature = "rayon"))]
-    let parallelism = gemm::Parallelism::None;
+    let parallelism = crate::gemm::Parallelism::None;
 
     let total_output = batch_size
         .checked_mul(channels_out)
@@ -1902,7 +1893,7 @@ fn conv3d_direct_impl<
                 for k in 0..kernel_w {
                     unsafe {
                         let x_base = x_data.as_ptr().add(b * batch_x_len);
-                        gemm::gemm(
+                        crate::gemm::gemm(
                             m,
                             n,
                             gemm_k,
@@ -1918,9 +1909,6 @@ fn conv3d_direct_impl<
                             rhs_rs,
                             one,
                             one,
-                            false,
-                            false,
-                            false,
                             parallelism,
                         );
                     }
@@ -1935,7 +1923,7 @@ fn conv3d_direct_impl<
                 for k in 0..kernel_w {
                     unsafe {
                         let x_base = x_data.as_ptr().add(b * batch_x_len);
-                        gemm::gemm(
+                        crate::gemm::gemm(
                             m,
                             n,
                             gemm_k,
@@ -1951,9 +1939,6 @@ fn conv3d_direct_impl<
                             rhs_rs,
                             one,
                             one,
-                            false,
-                            false,
-                            false,
                             parallelism,
                         );
                     }
@@ -1991,14 +1976,14 @@ macro_rules! gemm_typed {
             let mut c = FlexBuf::from_elem($zero, m * n);
             #[cfg(feature = "rayon")]
             let parallelism = if m * n * k >= 192 * 192 * 192 {
-                gemm::Parallelism::Rayon(0)
+                crate::gemm::Parallelism::Rayon(0)
             } else {
-                gemm::Parallelism::None
+                crate::gemm::Parallelism::None
             };
             #[cfg(not(feature = "rayon"))]
-            let parallelism = gemm::Parallelism::None;
+            let parallelism = crate::gemm::Parallelism::None;
             unsafe {
-                gemm::gemm(
+                crate::gemm::gemm(
                     m,
                     n,
                     k,
@@ -2014,9 +1999,6 @@ macro_rules! gemm_typed {
                     1,
                     $zero,
                     $one,
-                    false,
-                    false,
-                    false,
                     parallelism,
                 );
             }

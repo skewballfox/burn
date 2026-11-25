@@ -63,19 +63,19 @@ const PARALLEL_THRESHOLD: usize = 192 * 192 * 192;
 const BATCH_PARALLEL_THRESHOLD: usize = 128 * 128 * 128; // ~2M ops total
 
 /// Get parallelism setting based on matrix size.
-fn get_parallelism(m: usize, n: usize, k: usize) -> gemm::Parallelism {
+fn get_parallelism(m: usize, n: usize, k: usize) -> crate::gemm::Parallelism {
     let ops = m.saturating_mul(n).saturating_mul(k);
     if ops >= PARALLEL_THRESHOLD {
         #[cfg(feature = "rayon")]
         {
-            gemm::Parallelism::Rayon(0) // 0 = use all available threads
+            crate::gemm::Parallelism::Rayon(0) // 0 = use all available threads
         }
         #[cfg(not(feature = "rayon"))]
         {
-            gemm::Parallelism::None
+            crate::gemm::Parallelism::None
         }
     } else {
-        gemm::Parallelism::None
+        crate::gemm::Parallelism::None
     }
 }
 
@@ -303,10 +303,10 @@ unsafe fn gemm_call<T: GemmScalar>(
     rhs: *const T,
     rhs_cs: isize,
     rhs_rs: isize,
-    parallelism: gemm::Parallelism,
+    parallelism: crate::gemm::Parallelism,
 ) {
     unsafe {
-        gemm::gemm(
+        crate::gemm::gemm(
             m,
             n,
             k,
@@ -322,9 +322,6 @@ unsafe fn gemm_call<T: GemmScalar>(
             rhs_rs,
             T::zero(),
             T::one(),
-            false,
-            false,
-            false,
             parallelism,
         );
     }
@@ -375,7 +372,7 @@ fn matmul_batched_gemm<T: GemmScalar>(lhs: FlexTensor, rhs: FlexTensor) -> FlexT
     let per_matrix_ops = m.saturating_mul(n).saturating_mul(k);
 
     // Closure: run gemm for one batch slice at the given pointers
-    let run_one = |out_ptr: *mut T, b: usize, parallelism: gemm::Parallelism| {
+    let run_one = |out_ptr: *mut T, b: usize, parallelism: crate::gemm::Parallelism| {
         let lhs_off = lhs_start + batch_elem_offset(b, &broadcast_shape, &lhs_batch_strides);
         let rhs_off = rhs_start + batch_elem_offset(b, &broadcast_shape, &rhs_batch_strides);
         unsafe {
@@ -407,7 +404,7 @@ fn matmul_batched_gemm<T: GemmScalar>(lhs: FlexTensor, rhs: FlexTensor) -> FlexT
         let prefer_batch_parallel = batch_size >= 4 && total_ops >= BATCH_PARALLEL_THRESHOLD;
 
         if per_matrix_ops >= PARALLEL_THRESHOLD && !prefer_batch_parallel {
-            let parallelism = gemm::Parallelism::Rayon(0);
+            let parallelism = crate::gemm::Parallelism::Rayon(0);
             for b in 0..batch_size {
                 run_one(out_data[b * out_matrix_size..].as_mut_ptr(), b, parallelism);
             }
@@ -418,14 +415,14 @@ fn matmul_batched_gemm<T: GemmScalar>(lhs: FlexTensor, rhs: FlexTensor) -> FlexT
                 .par_chunks_mut(out_matrix_size)
                 .enumerate()
                 .for_each(|(b, out_chunk)| {
-                    run_one(out_chunk.as_mut_ptr(), b, gemm::Parallelism::None);
+                    run_one(out_chunk.as_mut_ptr(), b, crate::gemm::Parallelism::None);
                 });
         } else {
             for b in 0..batch_size {
                 run_one(
                     out_data[b * out_matrix_size..].as_mut_ptr(),
                     b,
-                    gemm::Parallelism::None,
+                    crate::gemm::Parallelism::None,
                 );
             }
         }
@@ -438,7 +435,7 @@ fn matmul_batched_gemm<T: GemmScalar>(lhs: FlexTensor, rhs: FlexTensor) -> FlexT
             run_one(
                 out_data[b * out_matrix_size..].as_mut_ptr(),
                 b,
-                gemm::Parallelism::None,
+                crate::gemm::Parallelism::None,
             );
         }
     }

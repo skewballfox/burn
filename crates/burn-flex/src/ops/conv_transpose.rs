@@ -560,14 +560,14 @@ macro_rules! conv_transpose_gemm_typed {
             debug_assert!(k == 0 || b.len() >= (k - 1) * b_stride + n);
             #[cfg(feature = "rayon")]
             let parallelism = if m * n * k >= GEMM_PARALLEL_WORK {
-                gemm::Parallelism::Rayon(0)
+                crate::gemm::Parallelism::Rayon(0)
             } else {
-                gemm::Parallelism::None
+                crate::gemm::Parallelism::None
             };
             #[cfg(not(feature = "rayon"))]
-            let parallelism = gemm::Parallelism::None;
+            let parallelism = crate::gemm::Parallelism::None;
             unsafe {
-                gemm::gemm(
+                crate::gemm::gemm(
                     m,
                     n,
                     k,
@@ -583,9 +583,6 @@ macro_rules! conv_transpose_gemm_typed {
                     b_stride as isize, // rhs_rs
                     $zero,
                     $one,
-                    false,
-                    false,
-                    false,
                     parallelism,
                 );
             }
