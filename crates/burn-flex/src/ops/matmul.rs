@@ -8,9 +8,9 @@
 use alloc::vec;
 use alloc::vec::Vec;
 use burn_backend::{DType, Element};
-use burn_std::{Bytes, Shape, bf16, f16};
+use burn_std::{Shape, bf16, f16};
 
-use crate::{FlexTensor, Layout};
+use crate::{FlexBuf, FlexTensor, Layout};
 
 /// Types that can be used with gemm-based matmul.
 /// Only implement for types that `gemm::gemm` dispatches on via TypeId (f32, f64, f16).
@@ -63,19 +63,19 @@ const PARALLEL_THRESHOLD: usize = 192 * 192 * 192;
 const BATCH_PARALLEL_THRESHOLD: usize = 128 * 128 * 128; // ~2M ops total
 
 /// Get parallelism setting based on matrix size.
-fn get_parallelism(m: usize, n: usize, k: usize) -> gemm::Parallelism {
+fn get_parallelism(m: usize, n: usize, k: usize) -> crate::gemm::Parallelism {
     let ops = m.saturating_mul(n).saturating_mul(k);
     if ops >= PARALLEL_THRESHOLD {
         #[cfg(feature = "rayon")]
         {
-            gemm::Parallelism::Rayon(0) // 0 = use all available threads
+            crate::gemm::Parallelism::Rayon(0) // 0 = use all available threads
         }
         #[cfg(not(feature = "rayon"))]
         {
-            gemm::Parallelism::None
+            crate::gemm::Parallelism::None
         }
     } else {
-        gemm::Parallelism::None
+        crate::gemm::Parallelism::None
     }
 }
 
@@ -303,10 +303,10 @@ unsafe fn gemm_call<T: GemmScalar>(
     rhs: *const T,
     rhs_cs: isize,
     rhs_rs: isize,
-    parallelism: gemm::Parallelism,
+    parallelism: crate::gemm::Parallelism,
 ) {
     unsafe {
-        gemm::gemm(
+        crate::gemm::gemm(
             m,
             n,
             k,
@@ -322,9 +322,6 @@ unsafe fn gemm_call<T: GemmScalar>(
             rhs_rs,
             T::zero(),
             T::one(),
-            false,
-            false,
-            false,
             parallelism,
         );
     }
@@ -375,7 +372,7 @@ fn matmul_batched_gemm<T: GemmScalar>(lhs: FlexTensor, rhs: FlexTensor) -> FlexT
     let per_matrix_ops = m.saturating_mul(n).saturating_mul(k);
 
     // Closure: run gemm for one batch slice at the given pointers
-    let run_one = |out_ptr: *mut T, b: usize, parallelism: gemm::Parallelism| {
+    let run_one = |out_ptr: *mut T, b: usize, parallelism: crate::gemm::Parallelism| {
         let lhs_off = lhs_start + batch_elem_offset(b, &broadcast_shape, &lhs_batch_strides);
         let rhs_off = rhs_start + batch_elem_offset(b, &broadcast_shape, &rhs_batch_strides);
         unsafe {
@@ -407,7 +404,7 @@ fn matmul_batched_gemm<T: GemmScalar>(lhs: FlexTensor, rhs: FlexTensor) -> FlexT
         let prefer_batch_parallel = batch_size >= 4 && total_ops >= BATCH_PARALLEL_THRESHOLD;
 
         if per_matrix_ops >= PARALLEL_THRESHOLD && !prefer_batch_parallel {
-            let parallelism = gemm::Parallelism::Rayon(0);
+            let parallelism = crate::gemm::Parallelism::Rayon(0);
             for b in 0..batch_size {
                 run_one(out_data[b * out_matrix_size..].as_mut_ptr(), b, parallelism);
             }
@@ -418,14 +415,14 @@ fn matmul_batched_gemm<T: GemmScalar>(lhs: FlexTensor, rhs: FlexTensor) -> FlexT
                 .par_chunks_mut(out_matrix_size)
                 .enumerate()
                 .for_each(|(b, out_chunk)| {
-                    run_one(out_chunk.as_mut_ptr(), b, gemm::Parallelism::None);
+                    run_one(out_chunk.as_mut_ptr(), b, crate::gemm::Parallelism::None);
                 });
         } else {
             for b in 0..batch_size {
                 run_one(
                     out_data[b * out_matrix_size..].as_mut_ptr(),
                     b,
-                    gemm::Parallelism::None,
+                    crate::gemm::Parallelism::None,
                 );
             }
         }
@@ -438,7 +435,7 @@ fn matmul_batched_gemm<T: GemmScalar>(lhs: FlexTensor, rhs: FlexTensor) -> FlexT
             run_one(
                 out_data[b * out_matrix_size..].as_mut_ptr(),
                 b,
-                gemm::Parallelism::None,
+                crate::gemm::Parallelism::None,
             );
         }
     }
@@ -458,17 +455,25 @@ fn matmul_bf16(lhs: FlexTensor, rhs: FlexTensor) -> FlexTensor {
     let rhs_shape = rhs.layout().shape();
 
     // Convert bf16 -> f32
-    let lhs_f32: Vec<f32> = lhs.storage::<bf16>().iter().map(|x| x.to_f32()).collect();
-    let rhs_f32: Vec<f32> = rhs.storage::<bf16>().iter().map(|x| x.to_f32()).collect();
+    let lhs_f32: FlexBuf<f32> = lhs
+        .storage::<bf16>()
+        .iter()
+        .map(|x| x.to_f32())
+        .collect::<FlexBuf<_>>();
+    let rhs_f32: FlexBuf<f32> = rhs
+        .storage::<bf16>()
+        .iter()
+        .map(|x| x.to_f32())
+        .collect::<FlexBuf<_>>();
 
     // Create f32 tensors
     let lhs_f32_tensor = FlexTensor::new(
-        Bytes::from_elems(lhs_f32),
+        FlexBuf::into_bytes(lhs_f32),
         Layout::contiguous(lhs_shape.clone()),
         DType::F32,
     );
     let rhs_f32_tensor = FlexTensor::new(
-        Bytes::from_elems(rhs_f32),
+        FlexBuf::into_bytes(rhs_f32),
         Layout::contiguous(rhs_shape.clone()),
         DType::F32,
     );
@@ -477,14 +482,14 @@ fn matmul_bf16(lhs: FlexTensor, rhs: FlexTensor) -> FlexTensor {
     let result_f32 = matmul_gemm::<f32>(lhs_f32_tensor, rhs_f32_tensor);
 
     // Convert f32 -> bf16
-    let result_bf16: Vec<bf16> = result_f32
+    let result_bf16: FlexBuf<bf16> = result_f32
         .storage::<f32>()
         .iter()
         .map(|x| bf16::from_f32(*x))
-        .collect();
+        .collect::<FlexBuf<_>>();
 
     FlexTensor::new(
-        Bytes::from_elems(result_bf16),
+        FlexBuf::into_bytes(result_bf16),
         result_f32.layout().clone(),
         DType::BF16,
     )
@@ -555,7 +560,7 @@ fn matmul_2d_i32(lhs: &FlexTensor, rhs: &FlexTensor) -> FlexTensor {
         }
     }
 
-    let mut output = vec![0i32; m * n];
+    let mut output = FlexBuf::from_elem(0i32, m * n);
 
     #[cfg(feature = "rayon")]
     if m * k * n >= PARALLEL_THRESHOLD && m > 1 && n > 0 {
@@ -581,7 +586,7 @@ fn matmul_2d_i32(lhs: &FlexTensor, rhs: &FlexTensor) -> FlexTensor {
 
     let out_shape = Shape::from(vec![m, n]);
     FlexTensor::new(
-        Bytes::from_elems(output),
+        FlexBuf::into_bytes(output),
         Layout::contiguous(out_shape),
         DType::I32,
     )
@@ -710,7 +715,7 @@ fn matmul_batched_i32(lhs: FlexTensor, rhs: FlexTensor) -> FlexTensor {
         }
     }
 
-    let mut output = vec![0i32; batch_size * out_matrix_size];
+    let mut output = FlexBuf::from_elem(0i32, batch_size * out_matrix_size);
 
     let run_one = |b: usize, out_slice: &mut [i32]| {
         let lhs_batch_idx = batch_index_to_offset(b, &broadcast_shape, &lhs_strides);
@@ -747,7 +752,7 @@ fn matmul_batched_i32(lhs: FlexTensor, rhs: FlexTensor) -> FlexTensor {
     }
 
     FlexTensor::new(
-        Bytes::from_elems(output),
+        FlexBuf::into_bytes(output),
         Layout::contiguous(out_shape),
         DType::I32,
     )
@@ -782,7 +787,7 @@ fn matmul_2d_i64(lhs: &FlexTensor, rhs: &FlexTensor) -> FlexTensor {
     let lhs_data: &[i64] = lhs.storage();
     let rhs_data: &[i64] = rhs.storage();
 
-    let mut output = vec![0i64; m * n];
+    let mut output = FlexBuf::from_elem(0i64, m * n);
 
     let run_row = |i: usize, row_out: &mut [i64]| {
         let lhs_row = &lhs_data[i * k..(i + 1) * k];
@@ -816,7 +821,7 @@ fn matmul_2d_i64(lhs: &FlexTensor, rhs: &FlexTensor) -> FlexTensor {
 
     let out_shape = Shape::from(vec![m, n]);
     FlexTensor::new(
-        Bytes::from_elems(output),
+        FlexBuf::into_bytes(output),
         Layout::contiguous(out_shape),
         DType::I64,
     )
@@ -852,7 +857,7 @@ fn matmul_batched_i64(lhs: FlexTensor, rhs: FlexTensor) -> FlexTensor {
     let lhs_data: &[i64] = lhs.storage();
     let rhs_data: &[i64] = rhs.storage();
 
-    let mut output = vec![0i64; batch_size * out_matrix_size];
+    let mut output = FlexBuf::from_elem(0i64, batch_size * out_matrix_size);
 
     let run_one = |b: usize, out_slice: &mut [i64]| {
         let lhs_batch_idx = batch_index_to_offset(b, &broadcast_shape, &lhs_strides);
@@ -893,7 +898,7 @@ fn matmul_batched_i64(lhs: FlexTensor, rhs: FlexTensor) -> FlexTensor {
     }
 
     FlexTensor::new(
-        Bytes::from_elems(output),
+        FlexBuf::into_bytes(output),
         Layout::contiguous(out_shape),
         DType::I64,
     )

@@ -35,6 +35,12 @@ x86-v4 = ["gemm/x86-v4"]
 # Apple AMX matrix coprocessor (M-series). Experimental upstream; requires std.
 apple-amx = ["std", "gemm/experimental-apple-amx"]
 tracing = ["burn-std/tracing", "burn-backend/tracing", "burn-ir/tracing"]
+# Tensor storage and kernel scratch from an allocator registered with `set_allocator`,
+# instead of the global allocator. For embedded targets with an arena of their own.
+buffer-allocator = ["dep:spin"]
+# Matrix multiplication in portable code that allocates only through `buffer-allocator`, instead of
+# `gemm`. For embedded targets: slower on hosts, one thread per product.
+microgemm = ["dep:microgemm"]
 critical-section = [
     "dep:once_cell",
     "once_cell/critical-section",
@@ -62,9 +68,15 @@ num-traits = { workspace = true }
 # Matmul
 gemm = { workspace = true, features = ["f16"] }
 
+# Portable matmul (`microgemm`)
+microgemm = { workspace = true, optional = true }
+
 # SIMD
 aligned-vec = { workspace = true, optional = true }
 macerator = { workspace = true, optional = true }
+
+# Allocator registration (`buffer-allocator`)
+spin = { workspace = true, features = ["once"], optional = true }
 
 # Parallel
 rayon = { workspace = true, optional = true }
@@ -75,6 +87,10 @@ portable-atomic = { workspace = true, optional = true }
 
 [dev-dependencies]
 realfft = { workspace = true }
+
+[[test]]
+name = "buffer_allocator"
+required-features = ["buffer-allocator"]
 
 [package.metadata.docs.rs]
 features = ["doc"]

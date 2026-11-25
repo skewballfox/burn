@@ -54,6 +54,7 @@ float-cmp = "0.10.0"
 futures = "0.3"
 futures-util = "0.3"
 gemm = { version = "0.19", default-features = false }
+microgemm = { version = "0.4", default-features = false }
 gix-tempfile = { version = "25.0.0", features = ["signals"] }
 globwalk = "0.9.1"
 hashbrown = "0.16"
@@ -245,3 +246,28 @@ cubek = { git = "https://github.com/tracel-ai/cubek", default-features = false, 
 
 [profile.dev]
 debug = 1 # Speed up compilation time and not necessary.
+
+# TODO: drop this patch and bump the cubecl rev once tracel-ai/cubecl#1896 (`BufferAllocator`) merges.
+[patch."https://github.com/tracel-ai/cubecl"]
+cubecl = { git = "https://github.com/skewballfox/cubecl", rev = "9e5f653ca985a6d6f4d681c89c7599ea9a9da358" }
+cubecl-common = { git = "https://github.com/skewballfox/cubecl", rev = "9e5f653ca985a6d6f4d681c89c7599ea9a9da358" }
+cubecl-core = { git = "https://github.com/skewballfox/cubecl", rev = "9e5f653ca985a6d6f4d681c89c7599ea9a9da358" }
+cubecl-cpp = { git = "https://github.com/skewballfox/cubecl", rev = "9e5f653ca985a6d6f4d681c89c7599ea9a9da358" }
+cubecl-cpu = { git = "https://github.com/skewballfox/cubecl", rev = "9e5f653ca985a6d6f4d681c89c7599ea9a9da358" }
+cubecl-cuda = { git = "https://github.com/skewballfox/cubecl", rev = "9e5f653ca985a6d6f4d681c89c7599ea9a9da358" }
+cubecl-environment = { git = "https://github.com/skewballfox/cubecl", rev = "9e5f653ca985a6d6f4d681c89c7599ea9a9da358" }
+cubecl-hip = { git = "https://github.com/skewballfox/cubecl", rev = "9e5f653ca985a6d6f4d681c89c7599ea9a9da358" }
+cubecl-ir = { git = "https://github.com/skewballfox/cubecl", rev = "9e5f653ca985a6d6f4d681c89c7599ea9a9da358" }
+cubecl-llvm = { git = "https://github.com/skewballfox/cubecl", rev = "9e5f653ca985a6d6f4d681c89c7599ea9a9da358" }
+cubecl-macros = { git = "https://github.com/skewballfox/cubecl", rev = "9e5f653ca985a6d6f4d681c89c7599ea9a9da358" }
+cubecl-macros-internal = { git = "https://github.com/skewballfox/cubecl", rev = "9e5f653ca985a6d6f4d681c89c7599ea9a9da358" }
+cubecl-metal = { git = "https://github.com/skewballfox/cubecl", rev = "9e5f653ca985a6d6f4d681c89c7599ea9a9da358" }
+cubecl-monitoring = { git = "https://github.com/skewballfox/cubecl", rev = "9e5f653ca985a6d6f4d681c89c7599ea9a9da358" }
+cubecl-opt = { git = "https://github.com/skewballfox/cubecl", rev = "9e5f653ca985a6d6f4d681c89c7599ea9a9da358" }
+cubecl-runtime = { git = "https://github.com/skewballfox/cubecl", rev = "9e5f653ca985a6d6f4d681c89c7599ea9a9da358" }
+cubecl-server = { git = "https://github.com/skewballfox/cubecl", rev = "9e5f653ca985a6d6f4d681c89c7599ea9a9da358" }
+cubecl-spirv = { git = "https://github.com/skewballfox/cubecl", rev = "9e5f653ca985a6d6f4d681c89c7599ea9a9da358" }
+cubecl-std = { git = "https://github.com/skewballfox/cubecl", rev = "9e5f653ca985a6d6f4d681c89c7599ea9a9da358" }
+cubecl-tile = { git = "https://github.com/skewballfox/cubecl", rev = "9e5f653ca985a6d6f4d681c89c7599ea9a9da358" }
+cubecl-wgpu = { git = "https://github.com/skewballfox/cubecl", rev = "9e5f653ca985a6d6f4d681c89c7599ea9a9da358" }
+cubecl-zspace = { git = "https://github.com/skewballfox/cubecl", rev = "9e5f653ca985a6d6f4d681c89c7599ea9a9da358" }

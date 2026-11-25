@@ -9,12 +9,11 @@
 //! - SIMD-vectorized butterflies via macerator
 //! - Rayon parallelism across independent fibers
 
-use alloc::vec;
 use alloc::vec::Vec;
-use burn_std::{Bytes, Shape};
+use burn_std::Shape;
+use bytemuck::Pod;
 
-use crate::layout::{contiguous_strides_usize, slice_base_offset};
-use crate::{FlexTensor, Layout};
+use crate::{FlexBuf, FlexTensor, Layout};
 
 // ============================================================================
 // Const-evaluable sin/cos via Taylor series (13 terms, ~13 digit accuracy)
@@ -119,9 +118,9 @@ enum TwiddleRef {
         offsets: &'static [usize],
     },
     Owned {
-        re: Vec<f32>,
-        im: Vec<f32>,
-        offsets: Vec<usize>,
+        re: FlexBuf<f32>,
+        im: FlexBuf<f32>,
+        offsets: FlexBuf<usize>,
     },
 }
 
@@ -170,12 +169,12 @@ fn get_twiddles(n: usize) -> TwiddleRef {
     )
 }
 
-fn precompute_twiddles_runtime(n: usize) -> (Vec<f32>, Vec<f32>, Vec<usize>) {
+fn precompute_twiddles_runtime(n: usize) -> (FlexBuf<f32>, FlexBuf<f32>, FlexBuf<usize>) {
     let num_stages = n.trailing_zeros() as usize;
     let total = n - 1;
-    let mut re = Vec::with_capacity(total);
-    let mut im = Vec::with_capacity(total);
-    let mut offsets = Vec::with_capacity(num_stages + 1);
+    let mut re = FlexBuf::with_capacity(total);
+    let mut im = FlexBuf::with_capacity(total);
+    let mut offsets = FlexBuf::with_capacity(num_stages + 1);
     let mut len = 2;
     for _ in 0..num_stages {
         offsets.push(re.len());
@@ -728,19 +727,131 @@ fn unpack_rfft(
 // Tensor helpers
 // ============================================================================
 
-fn make_tensors_typed<E: burn_backend::Element + bytemuck::Pod>(
-    re: Vec<E>,
-    im: Vec<E>,
+fn make_tensors_typed<E: burn_backend::Element + Pod>(
+    re: FlexBuf<E>,
+    im: FlexBuf<E>,
     shape: Shape,
 ) -> (FlexTensor, FlexTensor) {
     let dtype = E::dtype();
-    let re_t = FlexTensor::new(
-        Bytes::from_elems(re),
-        Layout::contiguous(shape.clone()),
-        dtype,
-    );
-    let im_t = FlexTensor::new(Bytes::from_elems(im), Layout::contiguous(shape), dtype);
+    let re_t = FlexTensor::new(re.into_bytes(), Layout::contiguous(shape.clone()), dtype);
+    let im_t = FlexTensor::new(im.into_bytes(), Layout::contiguous(shape), dtype);
     (re_t, im_t)
+}
+
+/// The fibers along `dim` of a contiguous tensor: `outer` slabs, each holding `inner` interleaved
+/// fibers. Element `k` of fiber `i` in slab `o` is at `(o * len + k) * inner + i`, where `len` is
+/// the size of `dim`.
+#[derive(Clone, Copy)]
+struct Fibers {
+    outer: usize,
+    inner: usize,
+}
+
+impl Fibers {
+    fn new(shape: &Shape, dim: usize) -> Self {
+        let dims = shape.as_slice();
+        Self {
+            outer: dims[..dim].iter().product(),
+            inner: dims[dim + 1..].iter().product(),
+        }
+    }
+
+    fn count(self) -> usize {
+        self.outer * self.inner
+    }
+
+    /// Whether to spread the slabs of an `n`-point transform across threads.
+    #[cfg(feature = "rayon")]
+    fn parallel(self, n: usize) -> bool {
+        self.outer > 1 && self.count() >= 4 && n >= 64
+    }
+}
+
+/// The scratch of one real FFT task: the signal packed as `n / 2` complex values, and the output
+/// of one fiber when the output fibers are strided.
+struct RfftScratch<E> {
+    z_re: FlexBuf<E>,
+    z_im: FlexBuf<E>,
+    fiber_re: FlexBuf<E>,
+    fiber_im: FlexBuf<E>,
+}
+
+impl<E: Pod + Send + Sync> RfftScratch<E> {
+    fn new(half: usize, out_len: usize, fibers: Fibers) -> Self {
+        let staged = if fibers.inner > 1 { out_len } else { 0 };
+        Self {
+            z_re: FlexBuf::zeroed(half.max(1)),
+            z_im: FlexBuf::zeroed(half.max(1)),
+            fiber_re: FlexBuf::zeroed(staged),
+            fiber_im: FlexBuf::zeroed(staged),
+        }
+    }
+}
+
+/// A real FFT of one fiber: `(signal, out_re, out_im, z_re, z_im)`, reading the signal with the
+/// fiber stride and writing `n / 2 + 1` contiguous bins.
+type RfftFiber<'a, E> = dyn Fn(&[E], &mut [E], &mut [E], &mut [E], &mut [E]) + Sync + 'a;
+
+/// The real FFT of every fiber of `data` (`sig_dim` long along the transformed dimension), as
+/// contiguous real and imaginary outputs with `out_len` bins per fiber.
+fn rfft_fibers<E: Pod + Send + Sync>(
+    data: &[E],
+    sig_dim: usize,
+    fibers: Fibers,
+    half: usize,
+    out_len: usize,
+    fiber: &RfftFiber<'_, E>,
+) -> (FlexBuf<E>, FlexBuf<E>) {
+    let total = fibers.count() * out_len;
+    let mut re = FlexBuf::zeroed(total);
+    let mut im = FlexBuf::zeroed(total);
+    if total == 0 {
+        return (re, im);
+    }
+    let inner = fibers.inner;
+    let slab_len = out_len * inner;
+    let scratch = || RfftScratch::new(half, out_len, fibers);
+    let run = |s: &mut RfftScratch<E>, (slab, (re, im)): (usize, (&mut [E], &mut [E]))| {
+        let input = &data[slab * sig_dim * inner..];
+        if inner == 1 {
+            fiber(input, re, im, &mut s.z_re, &mut s.z_im);
+            return;
+        }
+        for i in 0..inner {
+            fiber(
+                &input[i..],
+                &mut s.fiber_re,
+                &mut s.fiber_im,
+                &mut s.z_re,
+                &mut s.z_im,
+            );
+            s.fiber_re
+                .iter()
+                .zip(s.fiber_im.iter())
+                .enumerate()
+                .for_each(|(k, (&bin_re, &bin_im))| {
+                    re[k * inner + i] = bin_re;
+                    im[k * inner + i] = bin_im;
+                });
+        }
+    };
+
+    #[cfg(feature = "rayon")]
+    if fibers.parallel(2 * half) {
+        use rayon::prelude::*;
+        re.par_chunks_mut(slab_len)
+            .zip(im.par_chunks_mut(slab_len))
+            .enumerate()
+            .for_each_init(scratch, run);
+        return (re, im);
+    }
+
+    let mut s = scratch();
+    re.chunks_mut(slab_len)
+        .zip(im.chunks_mut(slab_len))
+        .enumerate()
+        .for_each(|item| run(&mut s, item));
+    (re, im)
 }
 
 // ============================================================================
@@ -830,30 +941,11 @@ pub fn rfft_f32(tensor: FlexTensor, dim: usize, n: Option<usize>) -> (FlexTensor
     let mut out_dims: Vec<usize> = shape.as_slice().to_vec();
     out_dims[dim] = out_len;
     let out_shape = Shape::from(out_dims);
-    let total_out = out_shape.num_elements();
-    let num_fibers = shape.num_elements() / shape[dim];
+    let fibers = Fibers::new(&shape, dim);
 
     let data: &[f32] = tensor.storage();
-    let in_strides = contiguous_strides_usize(&shape);
-    let out_strides = contiguous_strides_usize(&out_shape);
-
-    // N=1: each element is its own DFT, no twiddles needed
-    if n == 1 {
-        let mut re_out = vec![0.0f32; total_out];
-        let im_out = vec![0.0f32; total_out];
-        if sig_len >= 1 {
-            for fiber_idx in 0..num_fibers {
-                let base = slice_base_offset(fiber_idx, &shape, &in_strides, dim);
-                let out_base = slice_base_offset(fiber_idx, &out_shape, &out_strides, dim);
-                re_out[out_base] = data[base];
-            }
-        }
-        return make_tensors_typed(re_out, im_out, out_shape);
-    }
-
     let half = n / 2;
     let tw_half = get_twiddles(half);
-
     let tw_full = get_twiddles(n);
     let full_offsets = tw_full.offsets();
     let last_stage_off = if full_offsets.len() >= 2 {
@@ -864,85 +956,29 @@ pub fn rfft_f32(tensor: FlexTensor, dim: usize, n: Option<usize>) -> (FlexTensor
     let unpack_tw_re = &tw_full.re()[last_stage_off..];
     let unpack_tw_im = &tw_full.im()[last_stage_off..];
 
-    let mut re_out = vec![0.0f32; total_out];
-    let mut im_out = vec![0.0f32; total_out];
-
-    let in_stride = in_strides[dim];
-    let out_stride = out_strides[dim];
-
-    #[cfg(feature = "rayon")]
-    if num_fibers >= 4 && n >= 64 {
-        use rayon::prelude::*;
-
-        let fiber_results: Vec<(usize, Vec<f32>, Vec<f32>)> = (0..num_fibers)
-            .into_par_iter()
-            .map(|fiber_idx| {
-                let base_offset = slice_base_offset(fiber_idx, &shape, &in_strides, dim);
-                let mut z_re = vec![0.0f32; half.max(1)];
-                let mut z_im = vec![0.0f32; half.max(1)];
-                let mut fiber_re = vec![0.0f32; out_len];
-                let mut fiber_im = vec![0.0f32; out_len];
-
-                rfft_fiber(
-                    &data[base_offset..],
-                    in_stride,
-                    n,
-                    sig_len,
-                    &mut fiber_re,
-                    &mut fiber_im,
-                    &tw_half,
-                    unpack_tw_re,
-                    unpack_tw_im,
-                    &mut z_re,
-                    &mut z_im,
-                );
-                (fiber_idx, fiber_re, fiber_im)
-            })
-            .collect();
-
-        for (fiber_idx, fiber_re, fiber_im) in fiber_results {
-            let out_base = slice_base_offset(fiber_idx, &out_shape, &out_strides, dim);
-            for k in 0..out_len {
-                re_out[out_base + k * out_stride] = fiber_re[k];
-                im_out[out_base + k * out_stride] = fiber_im[k];
-            }
-        }
-
-        let (re, im) = make_tensors_typed(re_out, im_out, out_shape);
-        return (re, im);
-    }
-
-    let mut z_re_buf = vec![0.0f32; half.max(1)];
-    let mut z_im_buf = vec![0.0f32; half.max(1)];
-    let mut fiber_re = vec![0.0f32; out_len];
-    let mut fiber_im = vec![0.0f32; out_len];
-
-    for fiber_idx in 0..num_fibers {
-        let base_offset = slice_base_offset(fiber_idx, &shape, &in_strides, dim);
-        let out_base = slice_base_offset(fiber_idx, &out_shape, &out_strides, dim);
-
-        rfft_fiber(
-            &data[base_offset..],
-            in_stride,
-            n,
-            sig_len,
-            &mut fiber_re,
-            &mut fiber_im,
-            &tw_half,
-            unpack_tw_re,
-            unpack_tw_im,
-            &mut z_re_buf,
-            &mut z_im_buf,
-        );
-
-        for k in 0..out_len {
-            re_out[out_base + k * out_stride] = fiber_re[k];
-            im_out[out_base + k * out_stride] = fiber_im[k];
-        }
-    }
-
-    let (re, im) = make_tensors_typed(re_out, im_out, out_shape);
-    (re, im)
+    let (re, im) = rfft_fibers(
+        data,
+        shape[dim],
+        fibers,
+        half,
+        out_len,
+        &|signal, out_re, out_im, z_re, z_im| {
+            rfft_fiber(
+                signal,
+                fibers.inner,
+                n,
+                sig_len,
+                out_re,
+                out_im,
+                &tw_half,
+                unpack_tw_re,
+                unpack_tw_im,
+                z_re,
+                z_im,
+            );
+        },
+    );
+    make_tensors_typed(re, im, out_shape)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1041,12 +1077,9 @@ pub fn rfft_f64(tensor: FlexTensor, dim: usize, n: Option<usize>) -> (FlexTensor
     let mut out_dims: Vec<usize> = shape.as_slice().to_vec();
     out_dims[dim] = out_len;
     let out_shape = Shape::from(out_dims);
-    let total_out = out_shape.num_elements();
-    let num_fibers = shape.num_elements() / shape[dim];
+    let fibers = Fibers::new(&shape, dim);
 
     let data: &[f64] = tensor.storage();
-    let in_strides = contiguous_strides_usize(&shape);
-    let out_strides = contiguous_strides_usize(&out_shape);
     let half = n / 2;
 
     let tw_half = get_twiddles(half);
@@ -1060,94 +1093,32 @@ pub fn rfft_f64(tensor: FlexTensor, dim: usize, n: Option<usize>) -> (FlexTensor
     let unpack_re = &tw_full.re()[last_stage_off..];
     let unpack_im = &tw_full.im()[last_stage_off..];
 
-    let mut re_out = vec![0.0f64; total_out];
-    let mut im_out = vec![0.0f64; total_out];
-    let in_stride = in_strides[dim];
-    let out_stride = out_strides[dim];
-
-    let tw_half_re = tw_half.re();
-    let tw_half_im = tw_half.im();
-    let tw_half_offsets = tw_half.offsets();
-
-    #[cfg(feature = "rayon")]
-    if num_fibers >= 4 && n >= 64 {
-        use rayon::prelude::*;
-
-        let fiber_results: Vec<(usize, Vec<f64>, Vec<f64>)> = (0..num_fibers)
-            .into_par_iter()
-            .map(|fiber_idx| {
-                let base_offset = slice_base_offset(fiber_idx, &shape, &in_strides, dim);
-                let mut z_re = vec![0.0f64; half.max(1)];
-                let mut z_im = vec![0.0f64; half.max(1)];
-                let mut fiber_re = vec![0.0f64; out_len];
-                let mut fiber_im = vec![0.0f64; out_len];
-
-                rfft_fiber_f64(
-                    &data[base_offset..],
-                    in_stride,
-                    n,
-                    sig_len,
-                    half,
-                    &mut fiber_re,
-                    &mut fiber_im,
-                    tw_half_re,
-                    tw_half_im,
-                    tw_half_offsets,
-                    unpack_re,
-                    unpack_im,
-                    &mut z_re,
-                    &mut z_im,
-                );
-                (fiber_idx, fiber_re, fiber_im)
-            })
-            .collect();
-
-        for (fiber_idx, fiber_re, fiber_im) in fiber_results {
-            let out_base = slice_base_offset(fiber_idx, &out_shape, &out_strides, dim);
-            for k in 0..out_len {
-                re_out[out_base + k * out_stride] = fiber_re[k];
-                im_out[out_base + k * out_stride] = fiber_im[k];
-            }
-        }
-
-        let (re, im) = make_tensors_typed(re_out, im_out, out_shape);
-        return (re, im);
-    }
-
-    let mut z_re = vec![0.0f64; half.max(1)];
-    let mut z_im = vec![0.0f64; half.max(1)];
-    let mut fiber_re = vec![0.0f64; out_len];
-    let mut fiber_im = vec![0.0f64; out_len];
-
-    for fiber_idx in 0..num_fibers {
-        let base_offset = slice_base_offset(fiber_idx, &shape, &in_strides, dim);
-        let out_base = slice_base_offset(fiber_idx, &out_shape, &out_strides, dim);
-
-        rfft_fiber_f64(
-            &data[base_offset..],
-            in_stride,
-            n,
-            sig_len,
-            half,
-            &mut fiber_re,
-            &mut fiber_im,
-            tw_half_re,
-            tw_half_im,
-            tw_half_offsets,
-            unpack_re,
-            unpack_im,
-            &mut z_re,
-            &mut z_im,
-        );
-
-        for k in 0..out_len {
-            re_out[out_base + k * out_stride] = fiber_re[k];
-            im_out[out_base + k * out_stride] = fiber_im[k];
-        }
-    }
-
-    let (re, im) = make_tensors_typed(re_out, im_out, out_shape);
-    (re, im)
+    let (re, im) = rfft_fibers(
+        data,
+        shape[dim],
+        fibers,
+        half,
+        out_len,
+        &|signal, out_re, out_im, z_re, z_im| {
+            rfft_fiber_f64(
+                signal,
+                fibers.inner,
+                n,
+                sig_len,
+                half,
+                out_re,
+                out_im,
+                tw_half.re(),
+                tw_half.im(),
+                tw_half.offsets(),
+                unpack_re,
+                unpack_im,
+                z_re,
+                z_im,
+            );
+        },
+    );
+    make_tensors_typed(re, im, out_shape)
 }
 
 /// f64 complex FFT using f32 twiddle table (widened in inner loop).
@@ -1423,13 +1394,11 @@ pub fn irfft_f32(
     let mut out_dims: Vec<usize> = shape.as_slice().to_vec();
     out_dims[dim] = n;
     let out_shape = Shape::from(out_dims);
-    let total_out = out_shape.num_elements();
-    let num_fibers = shape.num_elements() / half_plus_1;
+    let fibers = Fibers::new(&shape, dim);
+    let inner = fibers.inner;
 
     let re_data: &[f32] = spectrum_re.storage();
     let im_data: &[f32] = spectrum_im.storage();
-    let in_strides = contiguous_strides_usize(&shape);
-    let out_strides = contiguous_strides_usize(&out_shape);
 
     // Twiddles for N/2-point inverse complex FFT
     let tw_half = get_twiddles(half);
@@ -1445,97 +1414,54 @@ pub fn irfft_f32(
     let unpack_tw_re = &tw_full.re()[last_stage_off..];
     let unpack_tw_im = &tw_full.im()[last_stage_off..];
 
-    let mut signal_out = vec![0.0f32; total_out];
-    let in_stride = in_strides[dim];
-    let out_stride = out_strides[dim];
-
-    #[cfg(feature = "rayon")]
-    if num_fibers >= 4 && n >= 64 {
-        use rayon::prelude::*;
-
-        let fiber_results: Vec<(usize, Vec<f32>)> = (0..num_fibers)
-            .into_par_iter()
-            .map(|fiber_idx| {
-                let re_base = slice_base_offset(fiber_idx, &shape, &in_strides, dim);
-                let mut z_re = vec![0.0f32; half.max(1)];
-                let mut z_im = vec![0.0f32; half.max(1)];
-                let mut spec_re = vec![0.0f32; half + 1];
-                let mut spec_im = vec![0.0f32; half + 1];
-                let mut fiber_out = vec![0.0f32; n];
-
-                irfft_fiber(
-                    &re_data[re_base..],
-                    &im_data[re_base..],
-                    in_stride,
-                    half,
-                    spec_bins,
-                    &mut fiber_out,
-                    1,
-                    &tw_half,
-                    unpack_tw_re,
-                    unpack_tw_im,
-                    &mut z_re,
-                    &mut z_im,
-                    &mut spec_re,
-                    &mut spec_im,
-                );
-                (fiber_idx, fiber_out)
-            })
-            .collect();
-
-        for (fiber_idx, fiber_out) in fiber_results {
-            let out_base = slice_base_offset(fiber_idx, &out_shape, &out_strides, dim);
-            for k in 0..n {
-                signal_out[out_base + k * out_stride] = fiber_out[k];
-            }
+    let mut signal_out = FlexBuf::<f32>::zeroed(fibers.count() * n);
+    let slab_len = n * inner;
+    let scratch = || IrfftScratch::new(half);
+    // Each fiber writes its samples into the slab directly, with the fiber stride.
+    let run = |s: &mut IrfftScratch, (slab, out): (usize, &mut [f32])| {
+        let base = slab * spec_bins * inner;
+        for i in 0..inner {
+            irfft_fiber(
+                &re_data[base + i..],
+                &im_data[base + i..],
+                inner,
+                half,
+                spec_bins,
+                &mut out[i..],
+                inner,
+                &tw_half,
+                unpack_tw_re,
+                unpack_tw_im,
+                &mut s.z_re,
+                &mut s.z_im,
+                &mut s.spec_re,
+                &mut s.spec_im,
+            );
         }
+    };
 
-        let result = FlexTensor::new(
-            Bytes::from_elems(signal_out),
-            Layout::contiguous(out_shape),
-            burn_backend::DType::F32,
-        );
-        return if fft_size > requested_n {
-            result.narrow(dim, 0, requested_n)
-        } else {
-            result
-        };
-    }
-
-    let mut z_re = vec![0.0f32; half.max(1)];
-    let mut z_im = vec![0.0f32; half.max(1)];
-    let mut spec_re = vec![0.0f32; half + 1];
-    let mut spec_im = vec![0.0f32; half + 1];
-    let mut fiber_out = vec![0.0f32; n];
-
-    for fiber_idx in 0..num_fibers {
-        let re_base = slice_base_offset(fiber_idx, &shape, &in_strides, dim);
-        let out_base = slice_base_offset(fiber_idx, &out_shape, &out_strides, dim);
-
-        irfft_fiber(
-            &re_data[re_base..],
-            &im_data[re_base..],
-            in_stride,
-            half,
-            spec_bins,
-            &mut fiber_out,
-            1,
-            &tw_half,
-            unpack_tw_re,
-            unpack_tw_im,
-            &mut z_re,
-            &mut z_im,
-            &mut spec_re,
-            &mut spec_im,
-        );
-
-        for k in 0..n {
-            signal_out[out_base + k * out_stride] = fiber_out[k];
+    'fill: {
+        if slab_len == 0 {
+            break 'fill;
         }
+        #[cfg(feature = "rayon")]
+        if fibers.parallel(n) {
+            use rayon::prelude::*;
+            signal_out
+                .par_chunks_mut(slab_len)
+                .enumerate()
+                .for_each_init(scratch, run);
+            break 'fill;
+        }
+        let mut s = scratch();
+        signal_out
+            .chunks_mut(slab_len)
+            .enumerate()
+            .for_each(|item| run(&mut s, item));
     }
 
     let result = FlexTensor::new(
-        Bytes::from_elems(signal_out),
+        signal_out.into_bytes(),
         Layout::contiguous(out_shape),
         burn_backend::DType::F32,
     );
@@ -1543,6 +1469,26 @@ pub fn irfft_f32(
         result.narrow(dim, 0, requested_n)
     } else {
         result
+    }
+}
+
+/// The scratch of one inverse real FFT task: the spectrum of one fiber, and its repacking as
+/// `n / 2` complex values.
+struct IrfftScratch {
+    z_re: FlexBuf<f32>,
+    z_im: FlexBuf<f32>,
+    spec_re: FlexBuf<f32>,
+    spec_im: FlexBuf<f32>,
+}
+
+impl IrfftScratch {
+    fn new(half: usize) -> Self {
+        Self {
+            z_re: FlexBuf::zeroed(half.max(1)),
+            z_im: FlexBuf::zeroed(half.max(1)),
+            spec_re: FlexBuf::zeroed(half + 1),
+            spec_im: FlexBuf::zeroed(half + 1),
+        }
     }
 }
 
@@ -1599,6 +1545,7 @@ pub fn irfft_bf16(
 mod tests {
     use super::*;
     use burn_backend::{DType, TensorData, Tolerance};
+    use burn_std::Bytes;
 
     fn make_f32(data: Vec<f32>, shape: Vec<usize>) -> FlexTensor {
         FlexTensor::from_data(TensorData::new(data, shape))
@@ -1957,5 +1904,63 @@ mod tests {
                 );
             }
         }
+    }
+
+    // ---- batches of fibers ----
+
+    fn values(tensor: FlexTensor) -> Vec<f32> {
+        tensor
+            .into_data()
+            .convert::<f32>()
+            .try_into_vec::<f32>()
+            .unwrap()
+    }
+
+    /// Checks that `op` along dim 1 of a `[outer, len, inner]` tensor gives each fiber what `op`
+    /// gives that fiber alone. With the `rayon` feature the shapes take the parallel path, once
+    /// with contiguous and once with strided output fibers.
+    fn assert_batch_matches_fibers(len: usize, op: impl Fn(FlexTensor, usize) -> Vec<FlexTensor>) {
+        for [outer, inner] in [[4, 1], [2, 3]] {
+            let data: Vec<f32> = (0..outer * len * inner)
+                .map(|i| (f32::from(u16::try_from(i).unwrap()) * 0.37).sin())
+                .collect();
+            let batch: Vec<Vec<f32>> = op(make_f32(data.clone(), vec![outer, len, inner]), 1)
+                .into_iter()
+                .map(values)
+                .collect();
+            for (o, i) in (0..outer).flat_map(|o| (0..inner).map(move |i| (o, i))) {
+                let fiber = (0..len).map(|k| data[(o * len + k) * inner + i]).collect();
+                for (out, alone) in batch.iter().zip(op(make_f32(fiber, vec![len]), 0)) {
+                    let alone = values(alone);
+                    let n = alone.len();
+                    let got: Vec<f32> = (0..n).map(|k| out[(o * n + k) * inner + i]).collect();
+                    assert_eq!(got, alone, "fiber ({o}, {i}) of [{outer}, {len}, {inner}]");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn rfft_f32_batch_matches_fibers() {
+        assert_batch_matches_fibers(128, |signal, dim| {
+            let (re, im) = rfft_f32(signal, dim, None);
+            vec![re, im]
+        });
+    }
+
+    #[test]
+    fn rfft_f64_batch_matches_fibers() {
+        assert_batch_matches_fibers(128, |signal, dim| {
+            let signal = FlexTensor::from_data(signal.into_data().convert::<f64>());
+            let (re, im) = rfft_f64(signal, dim, None);
+            vec![re, im]
+        });
+    }
+
+    #[test]
+    fn irfft_f32_batch_matches_fibers() {
+        assert_batch_matches_fibers(65, |spectrum, dim| {
+            vec![irfft_f32(spectrum.clone(), spectrum, dim, None)]
+        });
     }
 }

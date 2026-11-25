@@ -29,9 +29,9 @@ use alloc::vec::Vec;
 use burn_backend::ops::ConvOptions;
 use burn_backend::ops::conv::calculate_conv_output_size;
 use burn_backend::{DType, ElementConversion};
-use burn_std::{Bytes, Shape, f16};
+use burn_std::{Shape, f16};
 
-use crate::{FlexTensor, Layout};
+use crate::{FlexBuf, FlexTensor, Layout};
 
 use super::conv_common::{add_bias, squeeze_3d_to_1d, squeeze_3d_to_2d};
 
@@ -244,7 +244,7 @@ fn conv3d_impl<
     options: &ConvOptions<3>,
     dtype: DType,
     zero: T,
-    gemm_fn: fn(&[T], &[T], usize, usize, usize) -> Vec<T>,
+    gemm_fn: fn(&[T], &[T], usize, usize, usize) -> FlexBuf<T>,
 ) -> FlexTensor {
     let x = x.to_contiguous();
     let weight = weight.to_contiguous();
@@ -324,7 +324,7 @@ fn conv3d_impl<
     // nested formulation had a 10-term index expression LLVM wouldn't
     // autovectorize.
     let k_spatial = kernel_d * kernel_h * kernel_w;
-    let mut w_flat = vec![zero; channels_out * col_len];
+    let mut w_flat = FlexBuf::from_elem(zero, channels_out * col_len);
     for c_out in 0..channels_out {
         let src_base = c_out * channels_per_group * k_spatial;
         let dst_base = c_out * col_len;
@@ -347,7 +347,7 @@ fn conv3d_impl<
         channels_in,
         1,
     );
-    let mut x_nhwc = vec![zero; batch_size * in_d * in_h * in_w * channels_in];
+    let mut x_nhwc = FlexBuf::from_elem(zero, batch_size * in_d * in_h * in_w * channels_in);
     for b in 0..batch_size {
         for d in 0..in_d {
             for h in 0..in_h {
@@ -376,7 +376,7 @@ fn conv3d_impl<
         {
             use rayon::prelude::*;
 
-            let mut dst = vec![zero; batch_size * channels_out * spatial_out];
+            let mut dst = FlexBuf::from_elem(zero, batch_size * channels_out * spatial_out);
             let dst_ptr = crate::ops::SendMutPtr::new(dst.as_mut_ptr());
 
             // Process batches and tiles in parallel (nested parallelism)
@@ -392,7 +392,7 @@ fn conv3d_impl<
                         let out_c_start = g * out_channels_per_group;
 
                         // Build im2col for this tile and group
-                        let mut col_tile = vec![zero; col_len * tile_size];
+                        let mut col_tile = FlexBuf::from_elem(zero, col_len * tile_size);
 
                         im2col_3d_tile(
                             &mut col_tile,
@@ -460,7 +460,8 @@ fn conv3d_impl<
         #[cfg(not(feature = "rayon"))]
         {
             // Sequential path with tiling
-            let mut output = vec![zero; batch_size * channels_out * spatial_out];
+            let mut output: FlexBuf<_> =
+                FlexBuf::from_elem(zero, batch_size * channels_out * spatial_out);
 
             for b in 0..batch_size {
                 for tile_idx in 0..num_tiles {
@@ -473,7 +474,7 @@ fn conv3d_impl<
                         let in_c_start = g * channels_per_group;
                         let out_c_start = g * out_channels_per_group;
 
-                        let mut col_tile = vec![zero; col_len * tile_size];
+                        let mut col_tile = FlexBuf::from_elem(zero, col_len * tile_size);
 
                         im2col_3d_tile(
                             &mut col_tile,
@@ -547,7 +548,7 @@ fn conv3d_impl<
 fn conv_output<
     T: bytemuck::Pod + Copy + burn_backend::Element + burn_backend::ElementAdd + Send + Sync,
 >(
-    mut output: Vec<T>,
+    mut output: FlexBuf<T>,
     bias: Option<FlexTensor>,
     shape: [usize; 5],
     dtype: DType,
@@ -566,7 +567,7 @@ fn conv_output<
     }
 
     FlexTensor::new(
-        Bytes::from_elems(output),
+        FlexBuf::into_bytes(output),
         Layout::contiguous(Shape::from(shape.to_vec())),
         dtype,
     )
@@ -593,7 +594,7 @@ fn conv2d_im2col_nchw<T>(
     [dilation_h, dilation_w]: [usize; 2],
     groups: usize,
     max_col_elems: usize,
-) -> Vec<T>
+) -> FlexBuf<T>
 where
     T: bytemuck::Pod + Copy + Send + Sync + ElementConversion + 'static,
 {
@@ -603,14 +604,14 @@ where
     let col_len = c_in_group * kernel_h * kernel_w;
     let in_plane = in_h * in_w;
 
-    let mut output = vec![zero; batch * c_out * spatial_out];
+    let mut output = FlexBuf::from_elem(zero, batch * c_out * spatial_out);
     if spatial_out == 0 || col_len == 0 || c_out_group == 0 {
         return output;
     }
 
     let tile = (max_col_elems / col_len).clamp(1, spatial_out);
     // [col_len, tile], reused for every (batch, group, tile)
-    let mut col = vec![zero; col_len * tile];
+    let mut col = FlexBuf::from_elem(zero, col_len * tile);
 
     for b in 0..batch {
         for g in 0..groups {
@@ -659,16 +660,16 @@ where
 
                 #[cfg(feature = "rayon")]
                 let parallelism = if c_out_group * n * col_len >= 32 * 32 * 32 {
-                    gemm::Parallelism::Rayon(0)
+                    crate::gemm::Parallelism::Rayon(0)
                 } else {
-                    gemm::Parallelism::None
+                    crate::gemm::Parallelism::None
                 };
                 #[cfg(not(feature = "rayon"))]
-                let parallelism = gemm::Parallelism::None;
+                let parallelism = crate::gemm::Parallelism::None;
 
                 // out_group[:, start..start + n] = w_group[c_out_group, col_len] @ col[col_len, n]
                 unsafe {
-                    gemm::gemm(
+                    crate::gemm::gemm(
                         c_out_group,
                         n,
                         col_len,
@@ -684,9 +685,6 @@ where
                         n as isize,
                         zero,
                         T::from_elem(1.0f32),
-                        false,
-                        false,
-                        false,
                         parallelism,
                     );
                 }
@@ -892,14 +890,14 @@ fn conv3d_1x1_impl<
     // C is [out_channels_per_group, spatial] row-major
     #[cfg(feature = "rayon")]
     let parallelism = if m.saturating_mul(n).saturating_mul(k) >= 192 * 192 * 192 {
-        gemm::Parallelism::Rayon(0)
+        crate::gemm::Parallelism::Rayon(0)
     } else {
-        gemm::Parallelism::None
+        crate::gemm::Parallelism::None
     };
     #[cfg(not(feature = "rayon"))]
-    let parallelism = gemm::Parallelism::None;
+    let parallelism = crate::gemm::Parallelism::None;
 
-    let mut output = vec![zero; total_output];
+    let mut output = FlexBuf::from_elem(zero, total_output);
 
     {
         #[cfg(feature = "rayon")]
@@ -915,7 +913,7 @@ fn conv3d_1x1_impl<
                         b * channels_out * spatial + g * out_channels_per_group * spatial;
 
                     unsafe {
-                        gemm::gemm(
+                        crate::gemm::gemm(
                             m,
                             n,
                             k,
@@ -931,9 +929,6 @@ fn conv3d_1x1_impl<
                             n as isize, // rhs_rs
                             zero,
                             one,
-                            false,
-                            false,
-                            false,
                             parallelism,
                         );
                     }
@@ -950,7 +945,7 @@ fn conv3d_1x1_impl<
                         b * channels_out * spatial + g * out_channels_per_group * spatial;
 
                     unsafe {
-                        gemm::gemm(
+                        crate::gemm::gemm(
                             m,
                             n,
                             k,
@@ -966,9 +961,6 @@ fn conv3d_1x1_impl<
                             n as isize,
                             zero,
                             one,
-                            false,
-                            false,
-                            false,
                             parallelism,
                         );
                     }
@@ -991,7 +983,7 @@ fn conv3d_1x1_impl<
         x_shape[4],
     ]);
     FlexTensor::new(
-        Bytes::from_elems(output),
+        FlexBuf::into_bytes(output),
         Layout::contiguous(out_shape),
         dtype,
     )
@@ -1246,7 +1238,7 @@ fn conv_plane_accumulate_oh_outer<T: num_traits::Float + Copy>(
 
     // out_plane is a per-(batch, channel) slice of shape [out_h, out_w]
     // stored contiguously; both call sites produce it by disjoint splitting
-    // of a `vec![zero; batch * channels * out_h * out_w]` allocation, so
+    // of a `FlexBuf::from_elem(zero, batch * channels * out_h * out_w)` allocation, so
     // the length is always an exact multiple of `out_w`. The `debug_assert`
     // turns that documentary invariant into an enforceable one.
     debug_assert_eq!(
@@ -1451,7 +1443,7 @@ where
         .map(|kw| valid_out_range(kw, dilation_w, pad_w, stride_w, in_w, out_w))
         .collect();
 
-    let mut output = vec![zero; total];
+    let mut output = FlexBuf::from_elem(zero, total);
 
     // Per-plane work for one `(batch, channel)` pair. Output slice is passed
     // in so the rayon and sequential dispatch paths can source it differently
@@ -1516,7 +1508,7 @@ where
 
     let out_shape = Shape::from(vec![batch_size, channels, 1, out_h, out_w]);
     FlexTensor::new(
-        Bytes::from_elems(output),
+        FlexBuf::into_bytes(output),
         Layout::contiguous(out_shape),
         dtype,
     )
@@ -1678,7 +1670,7 @@ where
         .map(|kw| valid_out_range(kw, dilation_w, pad_w, stride_w, in_w, out_w))
         .collect();
 
-    let mut output = vec![zero; total];
+    let mut output = FlexBuf::from_elem(zero, total);
 
     // Per-plane work for one `(batch, out_channel)` pair. Accumulates
     // `sum over ci of conv2d(in[b, ci], w[co, ci])` into `out_plane` by
@@ -1757,7 +1749,7 @@ where
 
     let out_shape = Shape::from(vec![batch_size, channels_out, 1, out_h, out_w]);
     FlexTensor::new(
-        Bytes::from_elems(output),
+        FlexBuf::into_bytes(output),
         Layout::contiguous(out_shape),
         dtype,
     )
@@ -1874,18 +1866,18 @@ fn conv3d_direct_impl<
 
     #[cfg(feature = "rayon")]
     let parallelism = if m.saturating_mul(n).saturating_mul(gemm_k) >= 192 * 192 * 192 {
-        gemm::Parallelism::Rayon(0)
+        crate::gemm::Parallelism::Rayon(0)
     } else {
-        gemm::Parallelism::None
+        crate::gemm::Parallelism::None
     };
     #[cfg(not(feature = "rayon"))]
-    let parallelism = gemm::Parallelism::None;
+    let parallelism = crate::gemm::Parallelism::None;
 
     let total_output = batch_size
         .checked_mul(channels_out)
         .and_then(|x| x.checked_mul(out_w))
         .expect("conv direct: output dimensions overflow");
-    let mut output = vec![zero; total_output];
+    let mut output = FlexBuf::from_elem(zero, total_output);
 
     let batch_x_len = channels_in * in_w;
 
@@ -1901,7 +1893,7 @@ fn conv3d_direct_impl<
                 for k in 0..kernel_w {
                     unsafe {
                         let x_base = x_data.as_ptr().add(b * batch_x_len);
-                        gemm::gemm(
+                        crate::gemm::gemm(
                             m,
                             n,
                             gemm_k,
@@ -1917,9 +1909,6 @@ fn conv3d_direct_impl<
                             rhs_rs,
                             one,
                             one,
-                            false,
-                            false,
-                            false,
                             parallelism,
                         );
                     }
@@ -1934,7 +1923,7 @@ fn conv3d_direct_impl<
                 for k in 0..kernel_w {
                     unsafe {
                         let x_base = x_data.as_ptr().add(b * batch_x_len);
-                        gemm::gemm(
+                        crate::gemm::gemm(
                             m,
                             n,
                             gemm_k,
@@ -1950,9 +1939,6 @@ fn conv3d_direct_impl<
                             rhs_rs,
                             one,
                             one,
-                            false,
-                            false,
-                            false,
                             parallelism,
                         );
                     }
@@ -1969,7 +1955,7 @@ fn conv3d_direct_impl<
 
     let out_shape = Shape::from(vec![batch_size, channels_out, 1, 1, out_w]);
     FlexTensor::new(
-        Bytes::from_elems(output),
+        FlexBuf::into_bytes(output),
         Layout::contiguous(out_shape),
         dtype,
     )
@@ -1986,18 +1972,18 @@ fn conv3d_direct_impl<
 
 macro_rules! gemm_typed {
     ($fn_name:ident, $T:ty, $zero:expr, $one:expr) => {
-        fn $fn_name(a: &[$T], b: &[$T], m: usize, k: usize, n: usize) -> Vec<$T> {
-            let mut c = vec![$zero; m * n];
+        fn $fn_name(a: &[$T], b: &[$T], m: usize, k: usize, n: usize) -> FlexBuf<$T> {
+            let mut c = FlexBuf::from_elem($zero, m * n);
             #[cfg(feature = "rayon")]
             let parallelism = if m * n * k >= 192 * 192 * 192 {
-                gemm::Parallelism::Rayon(0)
+                crate::gemm::Parallelism::Rayon(0)
             } else {
-                gemm::Parallelism::None
+                crate::gemm::Parallelism::None
             };
             #[cfg(not(feature = "rayon"))]
-            let parallelism = gemm::Parallelism::None;
+            let parallelism = crate::gemm::Parallelism::None;
             unsafe {
-                gemm::gemm(
+                crate::gemm::gemm(
                     m,
                     n,
                     k,
@@ -2013,9 +1999,6 @@ macro_rules! gemm_typed {
                     1,
                     $zero,
                     $one,
-                    false,
-                    false,
-                    false,
                     parallelism,
                 );
             }

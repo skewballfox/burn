@@ -7,12 +7,12 @@ use burn_backend::{
     ops::IntTensorOps,
     tensor::{BoolTensor, Device, FloatTensor, IntTensor},
 };
-use burn_std::{Bytes, Element, IntDType, Shape, Slice, bf16, f16};
+use burn_std::{Element, IntDType, Shape, Slice, bf16, f16};
 use num_traits::{AsPrimitive, ToPrimitive, WrappingShl, WrappingShr};
 
 use crate::Layout;
 use crate::ops::binary::{binary_op_typed, int_binary_op, int_scalar_op, scalar_op_typed};
-use crate::{Flex, FlexTensor, ops::matmul};
+use crate::{Flex, FlexBuf, FlexTensor, ops::matmul};
 
 /// Python/PyTorch-style remainder: result has same sign as divisor.
 #[inline]
@@ -811,20 +811,20 @@ impl IntTensorOps<Flex> for Flex {
 
         match out_dtype {
             FloatDType::F64 => {
-                let data: Vec<f64> = read_ints!(|x| x as f64);
-                FlexTensor::new(Bytes::from_elems(data), Layout::contiguous(shape), out_dt)
+                let data: FlexBuf<f64> = read_ints!(|x| x as f64);
+                FlexTensor::new(FlexBuf::into_bytes(data), Layout::contiguous(shape), out_dt)
             }
             FloatDType::F32 | FloatDType::Flex32 => {
-                let data: Vec<f32> = read_ints!(|x| x as f32);
-                FlexTensor::new(Bytes::from_elems(data), Layout::contiguous(shape), out_dt)
+                let data: FlexBuf<f32> = read_ints!(|x| x as f32);
+                FlexTensor::new(FlexBuf::into_bytes(data), Layout::contiguous(shape), out_dt)
             }
             FloatDType::F16 => {
-                let data: Vec<f16> = read_ints!(|x| f16::from_f32(x as f32));
-                FlexTensor::new(Bytes::from_elems(data), Layout::contiguous(shape), out_dt)
+                let data: FlexBuf<f16> = read_ints!(|x| f16::from_f32(x as f32));
+                FlexTensor::new(FlexBuf::into_bytes(data), Layout::contiguous(shape), out_dt)
             }
             FloatDType::BF16 => {
-                let data: Vec<bf16> = read_ints!(|x| bf16::from_f32(x as f32));
-                FlexTensor::new(Bytes::from_elems(data), Layout::contiguous(shape), out_dt)
+                let data: FlexBuf<bf16> = read_ints!(|x| bf16::from_f32(x as f32));
+                FlexTensor::new(FlexBuf::into_bytes(data), Layout::contiguous(shape), out_dt)
             }
         }
     }
@@ -1028,11 +1028,11 @@ impl IntTensorOps<Flex> for Flex {
         // Helper macro to convert between types
         macro_rules! cast_impl {
             ($storage:ident, $dst_type:ty) => {{
-                Some(Bytes::from_elems(
+                Some(FlexBuf::into_bytes(
                     $storage
                         .iter()
                         .map(|&x| x as $dst_type)
-                        .collect::<Vec<$dst_type>>(),
+                        .collect::<FlexBuf<$dst_type>>(),
                 ))
             }};
         }
@@ -1239,7 +1239,7 @@ impl IntTensorOps<Flex> for Flex {
                 let data: &[$ty] = sum_result.storage();
                 let mean_val = (data[0] as i64 / n as i64) as $ty;
                 FlexTensor::new(
-                    Bytes::from_elems(alloc::vec![mean_val]),
+                    FlexBuf::from_slice(&[mean_val]).into_bytes(),
                     Layout::contiguous(Shape::from(alloc::vec![1])),
                     dtype,
                 )
@@ -1457,9 +1457,12 @@ impl IntTensorOps<Flex> for Flex {
 
         macro_rules! arange_typed {
             ($ty:ty) => {{
-                let data: Vec<$ty> = range.step_by(step).map(|v| v as $ty).collect();
+                let data: FlexBuf<$ty> = range
+                    .step_by(step)
+                    .map(|v| v as $ty)
+                    .collect::<FlexBuf<_>>();
                 let shape = Shape::from(alloc::vec![data.len()]);
-                FlexTensor::new(Bytes::from_elems(data), Layout::contiguous(shape), dt)
+                FlexTensor::new(FlexBuf::into_bytes(data), Layout::contiguous(shape), dt)
             }};
         }
 

@@ -14,6 +14,14 @@ fn init_device_settings() {
                 .int_dtype(<IntElem as Element>::dtype()),
         )
         .unwrap();
+
+    // Every Flex tensor buffer comes from the registered allocator, so the suite checks that path.
+    #[cfg(feature = "flex-buffer-allocator")]
+    {
+        static SYSTEM: burn_flex::FromGlobalAlloc<std::alloc::System> =
+            burn_flex::FromGlobalAlloc(std::alloc::System);
+        burn_flex::set_allocator(&SYSTEM);
+    }
 }
 
 /// Collection of types used across tests

@@ -8,14 +8,14 @@ use burn_backend::{
     ops::{FloatTensorOps, GridSampleOptions, IntTensorOps},
     tensor::{BoolTensor, Device, FloatTensor, IntTensor},
 };
-use burn_std::{Bytes, IntDType, Shape, Slice, bf16, f16};
+use burn_std::{IntDType, Shape, Slice, bf16, f16};
 use num_traits::{Float, ToPrimitive};
 
 use crate::Layout;
 use crate::ops::binary::{BinaryOp, binary_op, scalar_op};
 use crate::ops::matmul;
 use crate::ops::unary;
-use crate::{Flex, FlexTensor};
+use crate::{Flex, FlexBuf, FlexTensor};
 
 /// Python/PyTorch-style remainder: result has same sign as divisor.
 #[inline]
@@ -134,8 +134,8 @@ impl FloatTensorOps<Flex> for Flex {
 
         macro_rules! convert {
             ($int_ty:ty) => {{
-                let data: Vec<$int_ty> = read_floats!(|x| x as $int_ty);
-                FlexTensor::new(Bytes::from_elems(data), Layout::contiguous(shape), out_dt)
+                let data: FlexBuf<$int_ty> = read_floats!(|x| x as $int_ty);
+                FlexTensor::new(FlexBuf::into_bytes(data), Layout::contiguous(shape), out_dt)
             }};
         }
 
@@ -934,7 +934,7 @@ impl FloatTensorOps<Flex> for Flex {
 
     fn float_cast(tensor: FloatTensor<Flex>, dtype: FloatDType) -> FloatTensor<Flex> {
         use crate::Layout;
-        use burn_std::{Bytes, bf16, f16};
+        use burn_std::{bf16, f16};
 
         let src_dtype = tensor.dtype();
         let target_dtype = DType::from(dtype);
@@ -949,13 +949,13 @@ impl FloatTensorOps<Flex> for Flex {
 
         fn cast_slice<Src: Element + bytemuck::Pod, Dst: Element + bytemuck::Pod>(
             src: &[Src],
-        ) -> Vec<Dst> {
+        ) -> FlexBuf<Dst> {
             use core::any::TypeId;
             if TypeId::of::<Src>() == TypeId::of::<f64>()
                 && TypeId::of::<Dst>() == TypeId::of::<f16>()
             {
                 let f64_slice: &[f64] = bytemuck::cast_slice(src);
-                let mut out = vec![Dst::default(); src.len()];
+                let mut out = FlexBuf::from_elem(Dst::default(), src.len());
                 let f16_slice: &mut [f16] = bytemuck::cast_slice_mut(&mut out);
                 for (dst, &v) in f16_slice.iter_mut().zip(f64_slice.iter()) {
                     *dst = f16::from_f64(v);
@@ -966,7 +966,7 @@ impl FloatTensorOps<Flex> for Flex {
                 && TypeId::of::<Dst>() == TypeId::of::<bf16>()
             {
                 let f64_slice: &[f64] = bytemuck::cast_slice(src);
-                let mut out = vec![Dst::default(); src.len()];
+                let mut out = FlexBuf::from_elem(Dst::default(), src.len());
                 let bf16_slice: &mut [bf16] = bytemuck::cast_slice_mut(&mut out);
                 for (dst, &v) in bf16_slice.iter_mut().zip(f64_slice.iter()) {
                     *dst = bf16::from_f64(v);
@@ -981,33 +981,33 @@ impl FloatTensorOps<Flex> for Flex {
                 let src: &[$src_ty] = tensor.storage();
                 match target_dtype {
                     DType::F32 => {
-                        let result = cast_slice::<$src_ty, f32>(src);
+                        let result: FlexBuf<_> = cast_slice::<$src_ty, f32>(src);
                         FlexTensor::new(
-                            Bytes::from_elems(result),
+                            FlexBuf::into_bytes(result),
                             Layout::contiguous(shape),
                             DType::F32,
                         )
                     }
                     DType::F64 => {
-                        let result = cast_slice::<$src_ty, f64>(src);
+                        let result: FlexBuf<_> = cast_slice::<$src_ty, f64>(src);
                         FlexTensor::new(
-                            Bytes::from_elems(result),
+                            FlexBuf::into_bytes(result),
                             Layout::contiguous(shape),
                             DType::F64,
                         )
                     }
                     DType::F16 => {
-                        let result = cast_slice::<$src_ty, f16>(src);
+                        let result: FlexBuf<_> = cast_slice::<$src_ty, f16>(src);
                         FlexTensor::new(
-                            Bytes::from_elems(result),
+                            FlexBuf::into_bytes(result),
                             Layout::contiguous(shape),
                             DType::F16,
                         )
                     }
                     DType::BF16 => {
-                        let result = cast_slice::<$src_ty, bf16>(src);
+                        let result: FlexBuf<_> = cast_slice::<$src_ty, bf16>(src);
                         FlexTensor::new(
-                            Bytes::from_elems(result),
+                            FlexBuf::into_bytes(result),
                             Layout::contiguous(shape),
                             DType::BF16,
                         )

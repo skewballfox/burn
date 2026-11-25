@@ -29,7 +29,11 @@ compile_error!(
      burn-flex = { ..., features = [\"critical-section\"] }"
 );
 
+#[cfg(feature = "buffer-allocator")]
+mod allocator;
 mod backend;
+mod buffer;
+mod gemm;
 mod layout;
 mod qtensor;
 mod quant_codes;
@@ -43,7 +47,12 @@ pub mod ops;
 #[doc(hidden)]
 pub mod simd;
 
+#[cfg(feature = "buffer-allocator")]
+pub use allocator::{allocator, set_allocator};
 pub use backend::{Flex, FlexDevice};
+pub use buffer::FlexBuf;
+#[cfg(feature = "buffer-allocator")]
+pub use burn_std::{AllocationError, BufferAllocator, FromGlobalAlloc};
 pub use layout::Layout;
 pub use qtensor::FlexQTensor;
 pub use tensor::FlexTensor;

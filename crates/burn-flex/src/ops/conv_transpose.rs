@@ -15,9 +15,9 @@ use alloc::vec;
 use burn_backend::DType;
 use burn_backend::ops::ConvTransposeOptions;
 use burn_backend::ops::conv::calculate_conv_transpose_output_size;
-use burn_std::{Bytes, Shape, f16};
+use burn_std::{Shape, f16};
 
-use crate::{FlexTensor, Layout};
+use crate::{FlexBuf, FlexTensor, Layout};
 
 use super::conv_common::{add_bias, squeeze_3d_to_1d, squeeze_3d_to_2d};
 
@@ -332,7 +332,7 @@ fn conv_transpose3d_impl<
             dtype,
         );
     }
-    let mut output = vec![zero; output_size];
+    let mut output = FlexBuf::from_elem(zero, output_size);
 
     let group_chunk_len = out_channels_per_group * out_spatial;
     #[cfg(feature = "rayon")]
@@ -534,7 +534,7 @@ fn conv_transpose3d_impl<
 
     let out_shape = Shape::from(vec![batch_size, out_channels, out_d, out_h, out_w]);
     FlexTensor::new(
-        Bytes::from_elems(output),
+        FlexBuf::into_bytes(output),
         Layout::contiguous(out_shape),
         dtype,
     )
@@ -560,14 +560,14 @@ macro_rules! conv_transpose_gemm_typed {
             debug_assert!(k == 0 || b.len() >= (k - 1) * b_stride + n);
             #[cfg(feature = "rayon")]
             let parallelism = if m * n * k >= GEMM_PARALLEL_WORK {
-                gemm::Parallelism::Rayon(0)
+                crate::gemm::Parallelism::Rayon(0)
             } else {
-                gemm::Parallelism::None
+                crate::gemm::Parallelism::None
             };
             #[cfg(not(feature = "rayon"))]
-            let parallelism = gemm::Parallelism::None;
+            let parallelism = crate::gemm::Parallelism::None;
             unsafe {
-                gemm::gemm(
+                crate::gemm::gemm(
                     m,
                     n,
                     k,
@@ -583,9 +583,6 @@ macro_rules! conv_transpose_gemm_typed {
                     b_stride as isize, // rhs_rs
                     $zero,
                     $one,
-                    false,
-                    false,
-                    false,
                     parallelism,
                 );
             }

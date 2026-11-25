@@ -21,7 +21,8 @@ default = []
 # ** Please make sure all dependencies support no_std **
 
 burn = { workspace = true, features = ["flex"] }
-burn-flex = { workspace = true }
+# `buffer-allocator`, `microgemm`: built for the embedded targets, so the features stay no_std.
+burn-flex = { workspace = true, features = ["buffer-allocator", "microgemm"] }
 
 burn-store = { workspace = true, features = ["safetensors"] }
 

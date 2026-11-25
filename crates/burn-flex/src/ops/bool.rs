@@ -7,9 +7,9 @@ use burn_backend::{
     ops::{BoolTensorOps, IntTensorOps},
     tensor::{BoolTensor, Device, FloatTensor, IndexingUpdateOp, IntTensor},
 };
-use burn_std::{BoolDType, BoolStore, Bytes, FloatDType, IntDType, Shape, Slice, bf16, f16};
+use burn_std::{BoolDType, BoolStore, FloatDType, IntDType, Shape, Slice, bf16, f16};
 
-use crate::{Flex, FlexTensor, Layout};
+use crate::{Flex, FlexBuf, FlexTensor, Layout};
 
 impl BoolTensorOps<Flex> for Flex {
     fn bool_from_data(data: TensorData, _device: &Device<Flex>) -> BoolTensor<Flex> {
@@ -75,9 +75,11 @@ impl BoolTensorOps<Flex> for Flex {
 
         macro_rules! convert {
             ($int_ty:ty) => {{
-                let data: Vec<$int_ty> =
-                    bools.iter().map(|&x| if x != 0 { 1 } else { 0 }).collect();
-                FlexTensor::new(Bytes::from_elems(data), Layout::contiguous(shape), out_dt)
+                let data: FlexBuf<$int_ty> = bools
+                    .iter()
+                    .map(|&x| if x != 0 { 1 } else { 0 })
+                    .collect::<FlexBuf<_>>();
+                FlexTensor::new(FlexBuf::into_bytes(data), Layout::contiguous(shape), out_dt)
             }};
         }
 
@@ -104,36 +106,36 @@ impl BoolTensorOps<Flex> for Flex {
 
         match out_dtype {
             FloatDType::F64 => {
-                let data: Vec<f64> = bools
+                let data: FlexBuf<f64> = bools
                     .iter()
                     .map(|&x| if x != 0 { 1.0 } else { 0.0 })
-                    .collect();
-                FlexTensor::new(Bytes::from_elems(data), Layout::contiguous(shape), out_dt)
+                    .collect::<FlexBuf<_>>();
+                FlexTensor::new(FlexBuf::into_bytes(data), Layout::contiguous(shape), out_dt)
             }
             FloatDType::F32 | FloatDType::Flex32 => {
-                let data: Vec<f32> = bools
+                let data: FlexBuf<f32> = bools
                     .iter()
                     .map(|&x| if x != 0 { 1.0 } else { 0.0 })
-                    .collect();
-                FlexTensor::new(Bytes::from_elems(data), Layout::contiguous(shape), out_dt)
+                    .collect::<FlexBuf<_>>();
+                FlexTensor::new(FlexBuf::into_bytes(data), Layout::contiguous(shape), out_dt)
             }
             FloatDType::F16 => {
                 let one = f16::from_f32(1.0);
                 let zero = f16::from_f32(0.0);
-                let data: Vec<f16> = bools
+                let data: FlexBuf<f16> = bools
                     .iter()
                     .map(|&x| if x != 0 { one } else { zero })
-                    .collect();
-                FlexTensor::new(Bytes::from_elems(data), Layout::contiguous(shape), out_dt)
+                    .collect::<FlexBuf<_>>();
+                FlexTensor::new(FlexBuf::into_bytes(data), Layout::contiguous(shape), out_dt)
             }
             FloatDType::BF16 => {
                 let one = bf16::from_f32(1.0);
                 let zero = bf16::from_f32(0.0);
-                let data: Vec<bf16> = bools
+                let data: FlexBuf<bf16> = bools
                     .iter()
                     .map(|&x| if x != 0 { one } else { zero })
-                    .collect();
-                FlexTensor::new(Bytes::from_elems(data), Layout::contiguous(shape), out_dt)
+                    .collect::<FlexBuf<_>>();
+                FlexTensor::new(FlexBuf::into_bytes(data), Layout::contiguous(shape), out_dt)
             }
         }
     }
@@ -165,7 +167,7 @@ impl BoolTensorOps<Flex> for Flex {
         let lhs_storage: &[u8] = lhs.bytes();
         let rhs_storage: &[u8] = rhs.bytes();
 
-        let result: Vec<u8> = match (
+        let result: FlexBuf<u8> = match (
             lhs.layout().contiguous_offsets(),
             rhs.layout().contiguous_offsets(),
         ) {
@@ -221,10 +223,10 @@ impl BoolTensorOps<Flex> for Flex {
         let shape = tensor.layout().shape().clone();
         let storage: &[u8] = tensor.bytes();
 
-        let result: Vec<u8> = match tensor.layout().contiguous_offsets() {
+        let result: FlexBuf<u8> = match tensor.layout().contiguous_offsets() {
             Some((start, end)) => {
                 let slice = &storage[start..end];
-                let mut out = vec![0u8; slice.len()];
+                let mut out = FlexBuf::from_elem(0u8, slice.len());
                 crate::simd::bool_not_u8(slice, &mut out);
                 out
             }
@@ -267,7 +269,7 @@ impl BoolTensorOps<Flex> for Flex {
         dtype: burn_std::BoolDType,
     ) -> BoolTensor<Flex> {
         let num_elements = shape.num_elements();
-        let data = vec![1u8; num_elements];
+        let data = FlexBuf::from_elem(1u8, num_elements);
         crate::ops::comparison::make_bool_tensor(data, shape, dtype)
     }
 
@@ -328,7 +330,7 @@ impl BoolTensorOps<Flex> for Flex {
         let rhs_bool: bool = rhs.elem();
         let rhs_val = rhs_bool as u8;
 
-        let result: Vec<u8> = match lhs.layout().contiguous_offsets() {
+        let result: FlexBuf<u8> = match lhs.layout().contiguous_offsets() {
             Some((start, end)) => storage[start..end]
                 .iter()
                 .map(|&v| (v == rhs_val) as u8)
@@ -419,7 +421,7 @@ impl BoolTensorOps<Flex> for Flex {
         let n = shape.num_elements();
 
         let count = data[..n].iter().filter(|&&v| v != 0).count();
-        let mut coords: Vec<isize> = Vec::with_capacity(count * ndims);
+        let mut coords: FlexBuf<isize> = FlexBuf::with_capacity(count * ndims);
         let strides = crate::layout::contiguous_strides_usize(&shape);
 
         for (flat_idx, &val) in data[..n].iter().enumerate() {
@@ -434,7 +436,7 @@ impl BoolTensorOps<Flex> for Flex {
 
         let out_shape = Shape::from(vec![count, ndims]);
         let result = FlexTensor::new(
-            Bytes::from_elems(coords),
+            FlexBuf::into_bytes(coords),
             Layout::contiguous(out_shape),
             crate::ops::INDEX_DTYPE,
         );
@@ -510,11 +512,11 @@ fn bool_binary_op_simd(lhs: FlexTensor, rhs: FlexTensor, op: BoolBinaryOp) -> Fl
     let lhs_storage: &[u8] = lhs.bytes();
     let rhs_storage: &[u8] = rhs.bytes();
 
-    let result: Vec<u8> = match (l_offsets, r_offsets) {
+    let result: FlexBuf<u8> = match (l_offsets, r_offsets) {
         (Some((l_start, l_end)), Some((r_start, r_end))) => {
             let l_slice = &lhs_storage[l_start..l_end];
             let r_slice = &rhs_storage[r_start..r_end];
-            let mut out = vec![0u8; l_slice.len()];
+            let mut out = FlexBuf::from_elem(0u8, l_slice.len());
             match op {
                 BoolBinaryOp::And => crate::simd::bool_and_u8(l_slice, r_slice, &mut out),
                 BoolBinaryOp::Or => crate::simd::bool_or_u8(l_slice, r_slice, &mut out),

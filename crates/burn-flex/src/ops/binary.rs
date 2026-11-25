@@ -1,9 +1,9 @@
 //! Binary tensor operations (add, sub, mul, div).
 
-use alloc::vec::Vec;
 use burn_backend::{DType, Element};
-use burn_std::{Bytes, Shape, bf16, f16};
+use burn_std::{Shape, bf16, f16};
 
+use crate::FlexBuf;
 use crate::FlexTensor;
 use crate::layout::Layout;
 use crate::strided_index::StridedIter;
@@ -100,7 +100,7 @@ where
     let b: &[E] = &rhs.storage()[r_start..r_end];
     let out = simd::zip_map_to_vec(a, b, op);
     Ok(FlexTensor::new(
-        Bytes::from_elems(out),
+        FlexBuf::into_bytes(out),
         Layout::contiguous(lhs.layout().shape().clone()),
         E::dtype(),
     ))
@@ -248,7 +248,7 @@ where
     let lhs_storage: &[E] = lhs.storage();
     let rhs_storage: &[E] = rhs.storage();
 
-    let result: Vec<E> = match (
+    let result: FlexBuf<E> = match (
         lhs.layout().contiguous_offsets(),
         rhs.layout().contiguous_offsets(),
     ) {
@@ -296,9 +296,10 @@ pub(crate) fn apply_2d_strided<E, R, Op>(
     lhs_layout: &Layout,
     rhs_layout: &Layout,
     op: Op,
-) -> Vec<R>
+) -> FlexBuf<R>
 where
     E: Copy,
+    R: bytemuck::Pod + Send + Sync,
     Op: Fn(E, E) -> R,
 {
     let (rows, cols, l_row_stride, l_col_stride) = lhs_layout.as_2d_strides().unwrap();
@@ -306,7 +307,7 @@ where
     let l_offset = lhs_layout.start_offset() as isize;
     let r_offset = rhs_layout.start_offset() as isize;
 
-    let mut result = Vec::with_capacity(rows * cols);
+    let mut result = FlexBuf::with_capacity(rows * cols);
 
     for row in 0..rows {
         let l_row_start = l_offset + row as isize * l_row_stride;
@@ -378,7 +379,7 @@ where
     let dtype = tensor.dtype();
     let storage: &[E] = tensor.storage();
 
-    let result: Vec<E> = match tensor.layout().contiguous_offsets() {
+    let result: FlexBuf<E> = match tensor.layout().contiguous_offsets() {
         Some((start, end)) => storage[start..end].iter().map(|&x| op(x, scalar)).collect(),
         None => StridedIter::new(tensor.layout())
             .map(|i| op(storage[i], scalar))
@@ -390,11 +391,11 @@ where
 
 /// Helper to construct a tensor from result data.
 fn make_tensor<E: bytemuck::Pod + Send + Sync>(
-    data: Vec<E>,
+    data: FlexBuf<E>,
     shape: Shape,
     dtype: DType,
 ) -> FlexTensor {
-    let bytes = Bytes::from_elems(data);
+    let bytes = FlexBuf::into_bytes(data);
     let layout = Layout::contiguous(shape);
     FlexTensor::new(bytes, layout, dtype)
 }

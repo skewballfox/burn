@@ -1,18 +1,16 @@
 //! Mask operations for conditional element replacement.
 
-use alloc::vec::Vec;
 use burn_backend::Element;
-use burn_std::{Bytes, bf16, f16};
+use burn_std::{bf16, f16};
 
-use crate::{FlexTensor, Layout};
+use crate::{FlexBuf, FlexTensor, Layout};
 
 /// Allocate a Vec of given length without zeroing.
 /// The caller must write every element before reading.
 #[cfg(feature = "simd")]
 #[inline]
-fn uninit_vec<T: Copy>(len: usize) -> Vec<T> {
-    let mut v = Vec::with_capacity(len);
-    #[allow(clippy::uninit_vec)]
+fn uninit_vec<T: bytemuck::Pod + Send + Sync>(len: usize) -> FlexBuf<T> {
+    let mut v = FlexBuf::with_capacity(len);
     unsafe {
         v.set_len(len);
     }
@@ -81,11 +79,15 @@ where
         mask.layout(),
         |elem, m| if m != 0 { value } else { elem },
     ) {
-        FlexTensor::new(Bytes::from_elems(result), Layout::contiguous(shape), dtype)
+        FlexTensor::new(
+            FlexBuf::into_bytes(result),
+            Layout::contiguous(shape),
+            dtype,
+        )
     } else {
         let t_iter = crate::strided_index::StridedIter::new(tensor.layout());
         let m_iter = crate::strided_index::StridedIter::new(mask.layout());
-        let mut result = Vec::with_capacity(numel);
+        let mut result: FlexBuf<_> = FlexBuf::with_capacity(numel);
         for (ti, mi) in t_iter.zip(m_iter) {
             result.push(if mask_bytes[mi] != 0 {
                 value
@@ -93,7 +95,11 @@ where
                 tensor_data[ti]
             });
         }
-        FlexTensor::new(Bytes::from_elems(result), Layout::contiguous(shape), dtype)
+        FlexTensor::new(
+            FlexBuf::into_bytes(result),
+            Layout::contiguous(shape),
+            dtype,
+        )
     }
 }
 
@@ -118,7 +124,7 @@ pub fn mask_fill_f32(tensor: FlexTensor, mask: FlexTensor, value: f32) -> FlexTe
                 &mut out,
             );
             return FlexTensor::new(
-                Bytes::from_elems(out),
+                FlexBuf::into_bytes(out),
                 Layout::contiguous(shape),
                 tensor.dtype(),
             );
@@ -152,7 +158,7 @@ pub fn mask_fill_f64(tensor: FlexTensor, mask: FlexTensor, value: f64) -> FlexTe
                 &mut out,
             );
             return FlexTensor::new(
-                Bytes::from_elems(out),
+                FlexBuf::into_bytes(out),
                 Layout::contiguous(shape),
                 tensor.dtype(),
             );
@@ -196,7 +202,7 @@ pub fn mask_fill_i64(tensor: FlexTensor, mask: FlexTensor, value: i64) -> FlexTe
                 &mut out,
             );
             return FlexTensor::new(
-                Bytes::from_elems(out),
+                FlexBuf::into_bytes(out),
                 Layout::contiguous(shape),
                 tensor.dtype(),
             );
@@ -373,12 +379,16 @@ where
         value.layout(),
         |m, t, v| if m != 0 { v } else { t },
     ) {
-        FlexTensor::new(Bytes::from_elems(result), Layout::contiguous(shape), dtype)
+        FlexTensor::new(
+            FlexBuf::into_bytes(result),
+            Layout::contiguous(shape),
+            dtype,
+        )
     } else {
         let m_iter = crate::strided_index::StridedIter::new(mask.layout());
         let t_iter = crate::strided_index::StridedIter::new(tensor.layout());
         let v_iter = crate::strided_index::StridedIter::new(value.layout());
-        let mut result = Vec::with_capacity(numel);
+        let mut result = FlexBuf::with_capacity(numel);
         for ((mi, ti), vi) in m_iter.zip(t_iter).zip(v_iter) {
             result.push(if mask_bytes[mi] != 0 {
                 value_data[vi]
@@ -386,7 +396,11 @@ where
                 tensor_data[ti]
             });
         }
-        FlexTensor::new(Bytes::from_elems(result), Layout::contiguous(shape), dtype)
+        FlexTensor::new(
+            FlexBuf::into_bytes(result),
+            Layout::contiguous(shape),
+            dtype,
+        )
     }
 }
 
@@ -446,7 +460,7 @@ pub fn mask_where_f32(tensor: FlexTensor, mask: FlexTensor, value: FlexTensor) -
                 &mut out,
             );
             return FlexTensor::new(
-                Bytes::from_elems(out),
+                FlexBuf::into_bytes(out),
                 Layout::contiguous(shape),
                 tensor.dtype(),
             );
@@ -486,7 +500,7 @@ pub fn mask_where_f64(tensor: FlexTensor, mask: FlexTensor, value: FlexTensor) -
                 &mut out,
             );
             return FlexTensor::new(
-                Bytes::from_elems(out),
+                FlexBuf::into_bytes(out),
                 Layout::contiguous(shape),
                 tensor.dtype(),
             );
@@ -536,7 +550,7 @@ pub fn mask_where_i64(tensor: FlexTensor, mask: FlexTensor, value: FlexTensor) -
                 &mut out,
             );
             return FlexTensor::new(
-                Bytes::from_elems(out),
+                FlexBuf::into_bytes(out),
                 Layout::contiguous(shape),
                 tensor.dtype(),
             );
@@ -591,6 +605,7 @@ pub fn mask_where_bool(tensor: FlexTensor, mask: FlexTensor, value: FlexTensor) 
 mod tests {
     use super::*;
     use burn_backend::TensorData;
+    use burn_std::Bytes;
 
     #[test]
     fn test_mask_where_preserves_bool_store_with_unique_value() {

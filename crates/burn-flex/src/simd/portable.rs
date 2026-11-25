@@ -3,7 +3,6 @@
 //! Replaces platform-specific implementations (neon.rs) with a single
 //! portable implementation that auto-dispatches to NEON/AVX2/SSE/SIMD128/scalar.
 
-use alloc::vec::Vec;
 use core::mem::MaybeUninit;
 
 use macerator::{
@@ -238,8 +237,11 @@ pub fn map_inplace<F: Scalar + Send, O: LaneOp<F>>(a: &mut [F], op: O) {
 /// Returns `op` of each element of `src`, computed in one pass into a new
 /// vector.
 #[inline]
-pub fn map_to_vec<F: Scalar + Send + Sync, O: LaneOp<F>>(src: &[F], op: O) -> Vec<F> {
-    let mut out = Vec::with_capacity(src.len());
+pub fn map_to_vec<F: Scalar + bytemuck::Pod + Send + Sync, O: LaneOp<F>>(
+    src: &[F],
+    op: O,
+) -> crate::FlexBuf<F> {
+    let mut out = crate::FlexBuf::with_capacity(src.len());
     let dst = &mut out.spare_capacity_mut()[..src.len()];
 
     #[cfg(feature = "rayon")]
@@ -359,9 +361,13 @@ pub fn zip_map_inplace<F: Scalar + Send + Sync, O: LaneOp2<F>>(a: &mut [F], b: &
 /// Returns `op(a[i], b[i])` for every `i`, computed in one pass into a new
 /// vector.
 #[inline]
-pub fn zip_map_to_vec<F: Scalar + Send + Sync, O: LaneOp2<F>>(a: &[F], b: &[F], op: O) -> Vec<F> {
+pub fn zip_map_to_vec<F: Scalar + bytemuck::Pod + Send + Sync, O: LaneOp2<F>>(
+    a: &[F],
+    b: &[F],
+    op: O,
+) -> crate::FlexBuf<F> {
     assert_eq!(a.len(), b.len());
-    let mut out = Vec::with_capacity(a.len());
+    let mut out = crate::FlexBuf::with_capacity(a.len());
     let dst = &mut out.spare_capacity_mut()[..a.len()];
 
     #[cfg(feature = "rayon")]
@@ -2934,13 +2940,13 @@ mod tests {
         // NaN, signed zeros, and finite inputs where x * x overflows, so the
         // density's exp sees -inf and must give 0 rather than NaN.
         let special = [f32::NAN, 0.0, -0.0, 1e20, -1e20];
-        let [nan, rest @ ..]: [f32; 5] = map_to_vec(&special, Gelu).try_into().unwrap();
+        let [nan, rest @ ..]: [f32; 5] = map_to_vec(&special, Gelu)[..].try_into().unwrap();
         assert!(nan.is_nan());
         assert_eq!(
             rest.map(f32::to_bits),
             [0.0, -0.0, 1e20, -0.0].map(f32::to_bits)
         );
-        let [nan, rest @ ..]: [f32; 5] = map_to_vec(&special, GeluGrad).try_into().unwrap();
+        let [nan, rest @ ..]: [f32; 5] = map_to_vec(&special, GeluGrad)[..].try_into().unwrap();
         assert!(nan.is_nan());
         assert_eq!(
             rest.map(f32::to_bits),

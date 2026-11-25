@@ -8,11 +8,10 @@
 //! Supported dtypes: f32, f64, f16 (native), bf16 (via f32 conversion)
 
 use alloc::vec;
-use alloc::vec::Vec;
 use burn_backend::{DType, Element};
 use burn_std::{Bytes, ElementAdd, Shape, bf16, f16};
 
-use crate::{FlexTensor, Layout};
+use crate::{FlexBuf, FlexTensor, Layout};
 
 // ============================================================================
 // Macros for dtype wrappers
@@ -325,8 +324,8 @@ where
         {
             use rayon::prelude::*;
 
-            let mut output = vec![neg_inf; batch_size * channels * spatial_out];
-            let mut indices = vec![-1i64; batch_size * channels * spatial_out];
+            let mut output = FlexBuf::from_elem(neg_inf, batch_size * channels * spatial_out);
+            let mut indices = FlexBuf::from_elem(-1i64, batch_size * channels * spatial_out);
             let out_ptr = crate::ops::SendMutPtr::new(output.as_mut_ptr());
             let idx_ptr = crate::ops::SendMutPtr::new(indices.as_mut_ptr());
 
@@ -357,8 +356,10 @@ where
         }
         #[cfg(not(feature = "rayon"))]
         {
-            let mut output = vec![neg_inf; batch_size * channels * spatial_out];
-            let mut indices = vec![-1i64; batch_size * channels * spatial_out];
+            let mut output: FlexBuf<_> =
+                FlexBuf::from_elem(neg_inf, batch_size * channels * spatial_out);
+            let mut indices: FlexBuf<_> =
+                FlexBuf::from_elem(-1i64, batch_size * channels * spatial_out);
 
             for b in 0..batch_size {
                 for c in 0..channels {
@@ -384,12 +385,12 @@ where
 
     let out_shape = Shape::from(vec![batch_size, channels, out_d, out_h, out_w]);
     let output_tensor = FlexTensor::new(
-        Bytes::from_elems(output),
+        FlexBuf::into_bytes(output),
         Layout::contiguous(out_shape.clone()),
         dtype,
     );
     let indices_tensor = FlexTensor::new(
-        Bytes::from_elems(indices),
+        FlexBuf::into_bytes(indices),
         Layout::contiguous(out_shape),
         DType::I64,
     );
@@ -757,7 +758,7 @@ where
         {
             use rayon::prelude::*;
 
-            let mut output = vec![zero; batch_size * channels * spatial_out];
+            let mut output = FlexBuf::from_elem(zero, batch_size * channels * spatial_out);
             let out_ptr = crate::ops::SendMutPtr::new(output.as_mut_ptr());
 
             let bc_total = batch_size * channels;
@@ -790,7 +791,8 @@ where
         }
         #[cfg(not(feature = "rayon"))]
         {
-            let mut output = vec![zero; batch_size * channels * spatial_out];
+            let mut output: FlexBuf<_> =
+                FlexBuf::from_elem(zero, batch_size * channels * spatial_out);
 
             for b in 0..batch_size {
                 for c in 0..channels {
@@ -821,7 +823,7 @@ where
 
     let out_shape = Shape::from(vec![batch_size, channels, out_d, out_h, out_w]);
     FlexTensor::new(
-        Bytes::from_elems(output),
+        FlexBuf::into_bytes(output),
         Layout::contiguous(out_shape),
         dtype,
     )
@@ -1021,7 +1023,7 @@ where
         {
             use rayon::prelude::*;
 
-            let mut output = vec![zero; batch_size * channels * spatial_out];
+            let mut output = FlexBuf::from_elem(zero, batch_size * channels * spatial_out);
             let out_ptr = crate::ops::SendMutPtr::new(output.as_mut_ptr());
 
             (0..batch_size).into_par_iter().for_each(|b| {
@@ -1070,7 +1072,8 @@ where
         }
         #[cfg(not(feature = "rayon"))]
         {
-            let mut output = vec![zero; batch_size * channels * spatial_out];
+            let mut output: FlexBuf<_> =
+                FlexBuf::from_elem(zero, batch_size * channels * spatial_out);
 
             for b in 0..batch_size {
                 for c in 0..channels {
@@ -1116,7 +1119,7 @@ where
 
     let out_shape = Shape::from(vec![batch_size, channels, out_d, out_h, out_w]);
     FlexTensor::new(
-        Bytes::from_elems(output),
+        FlexBuf::into_bytes(output),
         Layout::contiguous(out_shape),
         dtype,
     )
@@ -1776,9 +1779,9 @@ fn squeeze_3d_to_1d(x: FlexTensor) -> FlexTensor {
 fn convert_bf16_to_f32(tensor: &FlexTensor) -> FlexTensor {
     let tensor = tensor.to_contiguous();
     let data: &[bf16] = tensor.storage();
-    let f32_data: Vec<f32> = data.iter().map(|x| x.to_f32()).collect();
+    let f32_data: FlexBuf<f32> = data.iter().map(|x| x.to_f32()).collect::<FlexBuf<_>>();
     FlexTensor::new(
-        Bytes::from_elems(f32_data),
+        FlexBuf::into_bytes(f32_data),
         Layout::contiguous(tensor.layout().shape().clone()),
         DType::F32,
     )
@@ -1786,9 +1789,12 @@ fn convert_bf16_to_f32(tensor: &FlexTensor) -> FlexTensor {
 
 fn convert_f32_to_bf16(tensor: &FlexTensor) -> FlexTensor {
     let data: &[f32] = tensor.storage();
-    let bf16_data: Vec<bf16> = data.iter().map(|x| bf16::from_f32(*x)).collect();
+    let bf16_data: FlexBuf<bf16> = data
+        .iter()
+        .map(|x| bf16::from_f32(*x))
+        .collect::<FlexBuf<_>>();
     FlexTensor::new(
-        Bytes::from_elems(bf16_data),
+        FlexBuf::into_bytes(bf16_data),
         Layout::contiguous(tensor.layout().shape().clone()),
         DType::BF16,
     )

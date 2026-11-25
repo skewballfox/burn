@@ -3,13 +3,11 @@
 //! Each activation is implemented as a single-pass unary operation,
 //! replacing the default multi-op compositions from Burn's trait defaults.
 
-use alloc::vec;
-use alloc::vec::Vec;
 use burn_backend::Scalar;
 use burn_backend::ops::{ActivationOps, FloatTensorOps};
 use burn_backend::tensor::FloatTensor;
 use burn_backend::{DType, TensorMetadata};
-use burn_std::{Bytes, bf16, f16};
+use burn_std::{bf16, f16};
 #[cfg(not(feature = "std"))]
 #[allow(unused_imports)]
 use num_traits::Float;
@@ -17,7 +15,7 @@ use num_traits::ToPrimitive;
 
 use crate::ops::binary::binary_op;
 use crate::ops::unary::unary_op;
-use crate::{Flex, FlexTensor, Layout};
+use crate::{Flex, FlexBuf, FlexTensor, Layout};
 
 impl ActivationOps<Flex> for Flex {
     fn relu(tensor: FloatTensor<Flex>) -> FloatTensor<Flex> {
@@ -301,7 +299,7 @@ fn softmax_last_f32(tensor: FlexTensor) -> FlexTensor {
     // signature. The memset is a streaming write on a bandwidth-bound
     // kernel, so the overhead is small (~10% at the largest bench shape)
     // and the fused path remains well ahead of decomposed and candle.
-    let mut output: Vec<f32> = vec![0.0; n];
+    let mut output: FlexBuf<f32> = FlexBuf::from_elem(0.0, n);
     let out_slice = output.as_mut_slice();
 
     // Row-parallel via rayon: one macerator dispatch per chunk of rows,
@@ -322,7 +320,7 @@ fn softmax_last_f32(tensor: FlexTensor) -> FlexTensor {
     }
 
     FlexTensor::new(
-        Bytes::from_elems(output),
+        FlexBuf::into_bytes(output),
         Layout::contiguous(shape),
         DType::F32,
     )
@@ -477,7 +475,7 @@ macro_rules! softmax_last_dtype {
                 return tensor;
             }
             let input: &[$T] = tensor.storage();
-            let mut output: Vec<$T> = vec![$zero; input.len()];
+            let mut output: FlexBuf<$T> = FlexBuf::from_elem($zero, input.len());
 
             #[cfg(feature = "rayon")]
             {
@@ -503,7 +501,11 @@ macro_rules! softmax_last_dtype {
                 }
             }
 
-            FlexTensor::new(Bytes::from_elems(output), Layout::contiguous(shape), $dtype)
+            FlexTensor::new(
+                FlexBuf::into_bytes(output),
+                Layout::contiguous(shape),
+                $dtype,
+            )
         }
     };
 }
@@ -714,7 +716,7 @@ fn layer_norm_f64(
     let input_data: &[f64] = input.storage();
     let gamma_data: &[f64] = gamma.storage();
     let beta_data: Option<&[f64]> = beta.as_ref().map(|b| b.storage());
-    let mut output: Vec<f64> = vec![0.0; input_data.len()];
+    let mut output: FlexBuf<f64> = FlexBuf::from_elem(0.0, input_data.len());
 
     #[cfg(feature = "rayon")]
     {
@@ -764,7 +766,7 @@ fn layer_norm_f64(
     }
 
     FlexTensor::new(
-        Bytes::from_elems(output),
+        FlexBuf::into_bytes(output),
         Layout::contiguous(shape),
         DType::F64,
     )
@@ -838,7 +840,7 @@ fn layer_norm_f32(
     // `spare_capacity_mut` + `&mut [f32]` cast: the latter creates a
     // reference to uninitialized f32 values, which is UB under Rust's
     // aliasing model even with no intervening read.
-    let mut output: Vec<f32> = vec![0.0; n];
+    let mut output: FlexBuf<f32> = FlexBuf::from_elem(0.0, n);
     let out_slice = output.as_mut_slice();
 
     // `#[macerator::with_simd]` can't auto-lifetime through
@@ -884,7 +886,7 @@ fn layer_norm_f32(
     }
 
     FlexTensor::new(
-        Bytes::from_elems(output),
+        FlexBuf::into_bytes(output),
         Layout::contiguous(shape),
         DType::F32,
     )

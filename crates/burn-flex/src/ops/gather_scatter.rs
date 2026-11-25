@@ -1,17 +1,19 @@
 //! Gather and scatter operations for indexed tensor access.
 
+#[cfg(feature = "rayon")]
+use crate::buffer::ParCollectBuf;
 use alloc::borrow::Cow;
 use alloc::vec;
 use alloc::vec::Vec;
 use burn_backend::tensor::IndexingUpdateOp;
 use burn_backend::{DType, Element};
-use burn_std::{Bytes, Shape};
+use burn_std::Shape;
 use bytemuck::Pod;
 
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
 
-use crate::{FlexTensor, Layout};
+use crate::{FlexBuf, FlexTensor, Layout};
 
 #[cfg(feature = "rayon")]
 use super::PARALLEL_THRESHOLD;
@@ -203,7 +205,7 @@ pub fn gather<E: Element + Pod + Default + Copy + Send + Sync>(
 
     // Use specialized 2D implementation for common case
     if ndims == 2 {
-        let result = gather_2d::<E>(
+        let result: FlexBuf<_> = gather_2d::<E>(
             tensor_data,
             &indices_data,
             tensor_shape[0],
@@ -212,7 +214,7 @@ pub fn gather<E: Element + Pod + Default + Copy + Send + Sync>(
             indices_shape[1],
             dim,
         );
-        let bytes = Bytes::from_elems(result);
+        let bytes = FlexBuf::into_bytes(result);
         return FlexTensor::new(bytes, Layout::contiguous(indices_shape.clone()), E::dtype());
     }
 
@@ -222,7 +224,7 @@ pub fn gather<E: Element + Pod + Default + Copy + Send + Sync>(
     let gather_dim_size = tensor_shape[dim];
 
     #[cfg(feature = "rayon")]
-    let result: Vec<E> = if output_size >= PARALLEL_THRESHOLD {
+    let result: FlexBuf<E> = if output_size >= PARALLEL_THRESHOLD {
         (0..output_size)
             .into_par_iter()
             .map(|out_idx| {
@@ -238,7 +240,7 @@ pub fn gather<E: Element + Pod + Default + Copy + Send + Sync>(
                 );
                 tensor_data[src_idx]
             })
-            .collect()
+            .collect_buf()
     } else {
         (0..output_size)
             .map(|out_idx| {
@@ -258,7 +260,7 @@ pub fn gather<E: Element + Pod + Default + Copy + Send + Sync>(
     };
 
     #[cfg(not(feature = "rayon"))]
-    let result: Vec<E> = (0..output_size)
+    let result: FlexBuf<E> = (0..output_size)
         .map(|out_idx| {
             let index_val = checked_index(indices_data[out_idx], gather_dim_size);
             let src_idx = compute_gather_index(
@@ -274,7 +276,7 @@ pub fn gather<E: Element + Pod + Default + Copy + Send + Sync>(
         })
         .collect();
 
-    let bytes = Bytes::from_elems(result);
+    let bytes = FlexBuf::into_bytes(result);
     FlexTensor::new(bytes, Layout::contiguous(indices_shape.clone()), E::dtype())
 }
 
@@ -288,11 +290,11 @@ fn gather_2d<E: Element + Pod + Default + Copy + Send + Sync>(
     indices_rows: usize,
     indices_cols: usize,
     dim: usize,
-) -> Vec<E> {
+) -> FlexBuf<E> {
     let output_size = indices_rows * indices_cols;
     let dim_size = if dim == 0 { tensor_rows } else { tensor_cols };
 
-    let mut result = vec![E::default(); output_size];
+    let mut result = FlexBuf::from_elem(E::default(), output_size);
 
     #[cfg(feature = "rayon")]
     if output_size >= PARALLEL_THRESHOLD {
@@ -572,10 +574,10 @@ where
         return tensor;
     }
 
-    let mut result: Vec<E> = if let Some((start, end)) = tensor.layout().contiguous_offsets() {
-        tensor.storage::<E>()[start..end].to_vec()
+    let mut result: FlexBuf<E> = if let Some((start, end)) = tensor.layout().contiguous_offsets() {
+        FlexBuf::from_slice(&tensor.storage::<E>()[start..end])
     } else {
-        tensor.to_contiguous().storage::<E>().to_vec()
+        FlexBuf::from_slice(tensor.to_contiguous().storage::<E>())
     };
 
     if ndims == 2 {
@@ -608,7 +610,7 @@ where
         }
     }
 
-    let bytes = Bytes::from_elems(result);
+    let bytes = FlexBuf::into_bytes(result);
     FlexTensor::new(bytes, Layout::contiguous(tensor_shape), E::dtype())
 }
 
@@ -687,7 +689,7 @@ pub fn select<E: Element + Pod + Default + Copy + Send + Sync>(
 
     // Use optimized 2D implementation with bulk copies
     if ndims == 2 {
-        let result = select_2d::<E>(
+        let result: FlexBuf<_> = select_2d::<E>(
             tensor_data,
             &indices_data,
             tensor_shape[0],
@@ -695,7 +697,7 @@ pub fn select<E: Element + Pod + Default + Copy + Send + Sync>(
             num_indices,
             dim,
         );
-        let bytes = Bytes::from_elems(result);
+        let bytes = FlexBuf::into_bytes(result);
         return FlexTensor::new(bytes, Layout::contiguous(output_shape), E::dtype());
     }
 
@@ -713,7 +715,7 @@ pub fn select<E: Element + Pod + Default + Copy + Send + Sync>(
     if dim == ndims - 1 || slice_size == 1 {
         // Element-wise with parallelism
         #[cfg(feature = "rayon")]
-        let result: Vec<E> = if output_size >= PARALLEL_THRESHOLD {
+        let result: FlexBuf<E> = if output_size >= PARALLEL_THRESHOLD {
             (0..output_size)
                 .into_par_iter()
                 .map(|out_idx| {
@@ -731,7 +733,7 @@ pub fn select<E: Element + Pod + Default + Copy + Send + Sync>(
                     }
                     tensor_data[src_idx]
                 })
-                .collect()
+                .collect_buf()
         } else {
             (0..output_size)
                 .map(|out_idx| {
@@ -754,8 +756,8 @@ pub fn select<E: Element + Pod + Default + Copy + Send + Sync>(
 
         #[cfg(not(feature = "rayon"))]
         #[allow(clippy::needless_range_loop)]
-        let result: Vec<E> = {
-            let mut result = vec![E::default(); output_size];
+        let result: FlexBuf<E> = {
+            let mut result: FlexBuf<_> = FlexBuf::from_elem(E::default(), output_size);
             for out_idx in 0..output_size {
                 let mut remaining = out_idx;
                 let mut src_idx = 0;
@@ -774,12 +776,12 @@ pub fn select<E: Element + Pod + Default + Copy + Send + Sync>(
             result
         };
 
-        let bytes = Bytes::from_elems(result);
+        let bytes = FlexBuf::into_bytes(result);
         return FlexTensor::new(bytes, Layout::contiguous(output_shape), E::dtype());
     }
 
     // Use bulk copies for contiguous slices
-    let mut result = vec![E::default(); output_size];
+    let mut result = FlexBuf::from_elem(E::default(), output_size);
 
     // For each position in dimensions before `dim`
     let outer_count = if dim == 0 {
@@ -801,7 +803,7 @@ pub fn select<E: Element + Pod + Default + Copy + Send + Sync>(
         }
     }
 
-    let bytes = Bytes::from_elems(result);
+    let bytes = FlexBuf::into_bytes(result);
     FlexTensor::new(bytes, Layout::contiguous(output_shape), E::dtype())
 }
 
@@ -814,7 +816,7 @@ fn select_2d<E: Element + Pod + Default + Copy + Send + Sync>(
     tensor_cols: usize,
     num_indices: usize,
     dim: usize,
-) -> Vec<E> {
+) -> FlexBuf<E> {
     let dim_size = if dim == 0 { tensor_rows } else { tensor_cols };
     let (output_rows, output_cols) = if dim == 0 {
         (num_indices, tensor_cols)
@@ -839,11 +841,8 @@ fn select_2d<E: Element + Pod + Default + Copy + Send + Sync>(
         // SAFETY: the output has exactly num_indices * tensor_cols elements.
         // Both the parallel and serial paths below write every element exactly
         // once via non-overlapping row copies, so no element is left uninitialized.
-        let mut result = Vec::with_capacity(output_size);
-        #[allow(clippy::uninit_vec)]
-        unsafe {
-            result.set_len(output_size)
-        };
+        let mut result = FlexBuf::with_capacity(output_size);
+        unsafe { result.set_len(output_size) };
 
         #[cfg(feature = "rayon")]
         if output_size * size_of::<E>() >= PARALLEL_THRESHOLD_BYTES {
@@ -889,7 +888,7 @@ fn select_2d<E: Element + Pod + Default + Copy + Send + Sync>(
     } else {
         // dim == 1: gather individual elements per row (not contiguous).
         // Zero-init is fine here since the inner loop is per-element anyway.
-        let mut result = vec![E::default(); output_size];
+        let mut result = FlexBuf::from_elem(E::default(), output_size);
 
         #[cfg(feature = "rayon")]
         if output_size * size_of::<E>() >= PARALLEL_THRESHOLD_BYTES {
@@ -1125,10 +1124,10 @@ where
         return tensor;
     }
 
-    let mut result: Vec<E> = if let Some((start, end)) = tensor.layout().contiguous_offsets() {
-        tensor.storage::<E>()[start..end].to_vec()
+    let mut result: FlexBuf<E> = if let Some((start, end)) = tensor.layout().contiguous_offsets() {
+        FlexBuf::from_slice(&tensor.storage::<E>()[start..end])
     } else {
-        tensor.to_contiguous().storage::<E>().to_vec()
+        FlexBuf::from_slice(tensor.to_contiguous().storage::<E>())
     };
 
     // Use optimized 2D implementation
@@ -1143,7 +1142,7 @@ where
             dim,
             update,
         );
-        let bytes = Bytes::from_elems(result);
+        let bytes = FlexBuf::into_bytes(result);
         return FlexTensor::new(bytes, Layout::contiguous(tensor_shape), E::dtype());
     }
 
@@ -1168,7 +1167,7 @@ where
         update(&mut result[dst_idx], val);
     }
 
-    let bytes = Bytes::from_elems(result);
+    let bytes = FlexBuf::into_bytes(result);
     FlexTensor::new(bytes, Layout::contiguous(tensor_shape), E::dtype())
 }
 
@@ -1244,7 +1243,7 @@ pub fn scatter_nd<
     let idx_data = read_indices(&indices);
     let val_data: &[E] = values.storage();
 
-    let mut result: Vec<E> = data_data.to_vec();
+    let mut result: FlexBuf<E> = FlexBuf::from_slice(data_data);
 
     let strides = compute_strides(&data_shape);
 
@@ -1291,7 +1290,7 @@ pub fn scatter_nd<
     }
 
     let shape = Shape::from(data_shape);
-    let bytes = Bytes::from_elems(result);
+    let bytes = FlexBuf::into_bytes(result);
     FlexTensor::new(bytes, Layout::contiguous(shape), E::dtype())
 }
 
@@ -1321,7 +1320,7 @@ pub fn gather_nd<E: Element + Pod + Default + Copy>(
     let strides = compute_strides(&data_shape);
 
     let total = num_indices * slice_size;
-    let mut result = vec![E::default(); total];
+    let mut result = FlexBuf::from_elem(E::default(), total);
 
     for n in 0..num_indices {
         let mut base_offset = 0usize;
@@ -1335,7 +1334,7 @@ pub fn gather_nd<E: Element + Pod + Default + Copy>(
     }
 
     let shape = Shape::from(out_shape_vec);
-    let bytes = Bytes::from_elems(result);
+    let bytes = FlexBuf::into_bytes(result);
     FlexTensor::new(bytes, Layout::contiguous(shape), E::dtype())
 }
 

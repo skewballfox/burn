@@ -3,7 +3,7 @@
 //! These operations power neural network modules like convolutions and pooling.
 
 use crate::ops::{conv, conv_transpose, deform_conv, interpolate, pool};
-use crate::{Flex, FlexTensor, Layout};
+use crate::{Flex, FlexBuf, FlexTensor, Layout};
 use burn_backend::{
     DType, Element, TensorMetadata,
     ops::{
@@ -14,7 +14,7 @@ use burn_backend::{
     },
     tensor::{BoolTensor, FloatTensor, IntTensor},
 };
-use burn_std::{Bytes, IntDType, Shape};
+use burn_std::{IntDType, Shape};
 use bytemuck::Pod;
 
 /// Cast a tensor from half-precision type E to f32.
@@ -25,8 +25,8 @@ pub(crate) fn cast_to_f32<E: Element + Pod + Copy>(
     let tensor = tensor.to_contiguous();
     let shape = tensor.layout().shape().clone();
     let data: &[E] = tensor.storage();
-    let f32_data: alloc::vec::Vec<f32> = data.iter().map(|&v| to_f32(v)).collect();
-    let bytes = Bytes::from_elems(f32_data);
+    let f32_data: FlexBuf<f32> = data.iter().map(|&v| to_f32(v)).collect();
+    let bytes = FlexBuf::into_bytes(f32_data);
     FlexTensor::new(bytes, Layout::contiguous(shape), DType::F32)
 }
 
@@ -38,8 +38,8 @@ pub(crate) fn cast_from_f32<E: Element + Pod + Copy>(
     let tensor = tensor.to_contiguous();
     let shape = tensor.layout().shape().clone();
     let data: &[f32] = tensor.storage();
-    let half_data: alloc::vec::Vec<E> = data.iter().map(|&v| from_f32(v)).collect();
-    let bytes = Bytes::from_elems(half_data);
+    let half_data: FlexBuf<E> = data.iter().map(|&v| from_f32(v)).collect();
+    let bytes = FlexBuf::into_bytes(half_data);
     FlexTensor::new(bytes, Layout::contiguous(shape), E::dtype())
 }
 
