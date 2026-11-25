@@ -1013,6 +1013,7 @@ dependencies = [
  "burn-dispatch",
  "burn-flex",
  "burn-fusion",
+ "burn-ir",
  "burn-tensor",
  "ctor",
  "cubek",
@@ -2070,9 +2071,9 @@ dependencies = [
 
 [[package]]
 name = "cookie"
-version = "0.18.2"
+version = "0.18.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1a373e3602691c3cdea496d2f0ee5935151e6168fe87739483c463db1b2f2f87"
+checksum = "d55f2d6c30eeec7d5c6f98bd4395d4abb1895629eab97ee6522d340623615f8a"
 dependencies = [
  "percent-encoding",
  "time",
@@ -2330,7 +2331,7 @@ dependencies = [
 [[package]]
 name = "cubecl"
 version = "0.12.0-pre.2"
-source = "git+https://github.com/skewballfox/cubecl?rev=9e5f653ca985a6d6f4d681c89c7599ea9a9da358#9e5f653ca985a6d6f4d681c89c7599ea9a9da358"
+source = "git+https://github.com/skewballfox/cubecl?rev=8bd0d16ce28a200b46814754ade0859c59117c5b#8bd0d16ce28a200b46814754ade0859c59117c5b"
 dependencies = [
  "cubecl-core",
  "cubecl-cpu",
@@ -2350,7 +2351,7 @@ dependencies = [
 [[package]]
 name = "cubecl-common"
 version = "0.12.0-pre.2"
-source = "git+https://github.com/skewballfox/cubecl?rev=9e5f653ca985a6d6f4d681c89c7599ea9a9da358#9e5f653ca985a6d6f4d681c89c7599ea9a9da358"
+source = "git+https://github.com/skewballfox/cubecl?rev=8bd0d16ce28a200b46814754ade0859c59117c5b#8bd0d16ce28a200b46814754ade0859c59117c5b"
 dependencies = [
  "bytemuck",
  "cfg_aliases",
@@ -2374,7 +2375,7 @@ dependencies = [
 [[package]]
 name = "cubecl-core"
 version = "0.12.0-pre.2"
-source = "git+https://github.com/skewballfox/cubecl?rev=9e5f653ca985a6d6f4d681c89c7599ea9a9da358#9e5f653ca985a6d6f4d681c89c7599ea9a9da358"
+source = "git+https://github.com/skewballfox/cubecl?rev=8bd0d16ce28a200b46814754ade0859c59117c5b#8bd0d16ce28a200b46814754ade0859c59117c5b"
 dependencies = [
  "bitflags 2.13.2",
  "bytemuck",
@@ -2405,7 +2406,7 @@ dependencies = [
 [[package]]
 name = "cubecl-cpp"
 version = "0.12.0-pre.2"
-source = "git+https://github.com/skewballfox/cubecl?rev=9e5f653ca985a6d6f4d681c89c7599ea9a9da358#9e5f653ca985a6d6f4d681c89c7599ea9a9da358"
+source = "git+https://github.com/skewballfox/cubecl?rev=8bd0d16ce28a200b46814754ade0859c59117c5b#8bd0d16ce28a200b46814754ade0859c59117c5b"
 dependencies = [
  "bytemuck",
  "cubecl-common",
@@ -2427,7 +2428,7 @@ dependencies = [
 [[package]]
 name = "cubecl-cpu"
 version = "0.12.0-pre.2"
-source = "git+https://github.com/skewballfox/cubecl?rev=9e5f653ca985a6d6f4d681c89c7599ea9a9da358#9e5f653ca985a6d6f4d681c89c7599ea9a9da358"
+source = "git+https://github.com/skewballfox/cubecl?rev=8bd0d16ce28a200b46814754ade0859c59117c5b#8bd0d16ce28a200b46814754ade0859c59117c5b"
 dependencies = [
  "bytemuck",
  "crossbeam-utils",
@@ -2449,7 +2450,7 @@ dependencies = [
 [[package]]
 name = "cubecl-cuda"
 version = "0.12.0-pre.2"
-source = "git+https://github.com/skewballfox/cubecl?rev=9e5f653ca985a6d6f4d681c89c7599ea9a9da358#9e5f653ca985a6d6f4d681c89c7599ea9a9da358"
+source = "git+https://github.com/skewballfox/cubecl?rev=8bd0d16ce28a200b46814754ade0859c59117c5b#8bd0d16ce28a200b46814754ade0859c59117c5b"
 dependencies = [
  "bytemuck",
  "cubecl-common",
@@ -2470,7 +2471,7 @@ dependencies = [
 [[package]]
 name = "cubecl-environment"
 version = "0.12.0-pre.2"
-source = "git+https://github.com/skewballfox/cubecl?rev=9e5f653ca985a6d6f4d681c89c7599ea9a9da358#9e5f653ca985a6d6f4d681c89c7599ea9a9da358"
+source = "git+https://github.com/skewballfox/cubecl?rev=8bd0d16ce28a200b46814754ade0859c59117c5b#8bd0d16ce28a200b46814754ade0859c59117c5b"
 dependencies = [
  "async-channel",
  "backtrace",
@@ -2511,7 +2512,7 @@ dependencies = [
 [[package]]
 name = "cubecl-hip"
 version = "0.12.0-pre.2"
-source = "git+https://github.com/skewballfox/cubecl?rev=9e5f653ca985a6d6f4d681c89c7599ea9a9da358#9e5f653ca985a6d6f4d681c89c7599ea9a9da358"
+source = "git+https://github.com/skewballfox/cubecl?rev=8bd0d16ce28a200b46814754ade0859c59117c5b#8bd0d16ce28a200b46814754ade0859c59117c5b"
 dependencies = [
  "bytemuck",
  "cubecl-common",
@@ -2545,7 +2546,7 @@ dependencies = [
 [[package]]
 name = "cubecl-ir"
 version = "0.12.0-pre.2"
-source = "git+https://github.com/skewballfox/cubecl?rev=9e5f653ca985a6d6f4d681c89c7599ea9a9da358#9e5f653ca985a6d6f4d681c89c7599ea9a9da358"
+source = "git+https://github.com/skewballfox/cubecl?rev=8bd0d16ce28a200b46814754ade0859c59117c5b#8bd0d16ce28a200b46814754ade0859c59117c5b"
 dependencies = [
  "bumpalo",
  "cubecl-common",
@@ -2576,7 +2577,7 @@ dependencies = [
 [[package]]
 name = "cubecl-llvm"
 version = "0.12.0-pre.2"
-source = "git+https://github.com/skewballfox/cubecl?rev=9e5f653ca985a6d6f4d681c89c7599ea9a9da358#9e5f653ca985a6d6f4d681c89c7599ea9a9da358"
+source = "git+https://github.com/skewballfox/cubecl?rev=8bd0d16ce28a200b46814754ade0859c59117c5b#8bd0d16ce28a200b46814754ade0859c59117c5b"
 dependencies = [
  "cc",
  "cubecl-core",
@@ -2596,7 +2597,7 @@ dependencies = [
 [[package]]
 name = "cubecl-macros"
 version = "0.12.0-pre.2"
-source = "git+https://github.com/skewballfox/cubecl?rev=9e5f653ca985a6d6f4d681c89c7599ea9a9da358#9e5f653ca985a6d6f4d681c89c7599ea9a9da358"
+source = "git+https://github.com/skewballfox/cubecl?rev=8bd0d16ce28a200b46814754ade0859c59117c5b#8bd0d16ce28a200b46814754ade0859c59117c5b"
 dependencies = [
  "darling 0.24.1",
  "derive-new",
@@ -2613,7 +2614,7 @@ dependencies = [
 [[package]]
 name = "cubecl-macros-internal"
 version = "0.12.0-pre.2"
-source = "git+https://github.com/skewballfox/cubecl?rev=9e5f653ca985a6d6f4d681c89c7599ea9a9da358#9e5f653ca985a6d6f4d681c89c7599ea9a9da358"
+source = "git+https://github.com/skewballfox/cubecl?rev=8bd0d16ce28a200b46814754ade0859c59117c5b#8bd0d16ce28a200b46814754ade0859c59117c5b"
 dependencies = [
  "darling 0.24.1",
  "inflections",
@@ -2625,7 +2626,7 @@ dependencies = [
 [[package]]
 name = "cubecl-metal"
 version = "0.12.0-pre.2"
-source = "git+https://github.com/skewballfox/cubecl?rev=9e5f653ca985a6d6f4d681c89c7599ea9a9da358#9e5f653ca985a6d6f4d681c89c7599ea9a9da358"
+source = "git+https://github.com/skewballfox/cubecl?rev=8bd0d16ce28a200b46814754ade0859c59117c5b#8bd0d16ce28a200b46814754ade0859c59117c5b"
 dependencies = [
  "block2",
  "bytemuck",
@@ -2649,7 +2650,7 @@ dependencies = [
 [[package]]
 name = "cubecl-monitoring"
 version = "0.12.0-pre.2"
-source = "git+https://github.com/skewballfox/cubecl?rev=9e5f653ca985a6d6f4d681c89c7599ea9a9da358#9e5f653ca985a6d6f4d681c89c7599ea9a9da358"
+source = "git+https://github.com/skewballfox/cubecl?rev=8bd0d16ce28a200b46814754ade0859c59117c5b#8bd0d16ce28a200b46814754ade0859c59117c5b"
 dependencies = [
  "cfg_aliases",
  "cubecl-ir",
@@ -2662,7 +2663,7 @@ dependencies = [
 [[package]]
 name = "cubecl-opt"
 version = "0.12.0-pre.2"
-source = "git+https://github.com/skewballfox/cubecl?rev=9e5f653ca985a6d6f4d681c89c7599ea9a9da358#9e5f653ca985a6d6f4d681c89c7599ea9a9da358"
+source = "git+https://github.com/skewballfox/cubecl?rev=8bd0d16ce28a200b46814754ade0859c59117c5b#8bd0d16ce28a200b46814754ade0859c59117c5b"
 dependencies = [
  "cubecl-common",
  "cubecl-environment",
@@ -2683,7 +2684,7 @@ dependencies = [
 [[package]]
 name = "cubecl-runtime"
 version = "0.12.0-pre.2"
-source = "git+https://github.com/skewballfox/cubecl?rev=9e5f653ca985a6d6f4d681c89c7599ea9a9da358#9e5f653ca985a6d6f4d681c89c7599ea9a9da358"
+source = "git+https://github.com/skewballfox/cubecl?rev=8bd0d16ce28a200b46814754ade0859c59117c5b#8bd0d16ce28a200b46814754ade0859c59117c5b"
 dependencies = [
  "bytemuck",
  "cfg-if",
@@ -2715,7 +2716,7 @@ dependencies = [
 [[package]]
 name = "cubecl-server"
 version = "0.12.0-pre.2"
-source = "git+https://github.com/skewballfox/cubecl?rev=9e5f653ca985a6d6f4d681c89c7599ea9a9da358#9e5f653ca985a6d6f4d681c89c7599ea9a9da358"
+source = "git+https://github.com/skewballfox/cubecl?rev=8bd0d16ce28a200b46814754ade0859c59117c5b#8bd0d16ce28a200b46814754ade0859c59117c5b"
 dependencies = [
  "bytemuck",
  "cfg-if",
@@ -2744,7 +2745,7 @@ dependencies = [
 [[package]]
 name = "cubecl-spirv"
 version = "0.12.0-pre.2"
-source = "git+https://github.com/skewballfox/cubecl?rev=9e5f653ca985a6d6f4d681c89c7599ea9a9da358#9e5f653ca985a6d6f4d681c89c7599ea9a9da358"
+source = "git+https://github.com/skewballfox/cubecl?rev=8bd0d16ce28a200b46814754ade0859c59117c5b#8bd0d16ce28a200b46814754ade0859c59117c5b"
 dependencies = [
  "bitflags 2.13.2",
  "cubecl-common",
@@ -2767,7 +2768,7 @@ dependencies = [
 [[package]]
 name = "cubecl-std"
 version = "0.12.0-pre.2"
-source = "git+https://github.com/skewballfox/cubecl?rev=9e5f653ca985a6d6f4d681c89c7599ea9a9da358#9e5f653ca985a6d6f4d681c89c7599ea9a9da358"
+source = "git+https://github.com/skewballfox/cubecl?rev=8bd0d16ce28a200b46814754ade0859c59117c5b#8bd0d16ce28a200b46814754ade0859c59117c5b"
 dependencies = [
  "cubecl-common",
  "cubecl-core",
@@ -2784,7 +2785,7 @@ dependencies = [
 [[package]]
 name = "cubecl-tile"
 version = "0.12.0-pre.2"
-source = "git+https://github.com/skewballfox/cubecl?rev=9e5f653ca985a6d6f4d681c89c7599ea9a9da358#9e5f653ca985a6d6f4d681c89c7599ea9a9da358"
+source = "git+https://github.com/skewballfox/cubecl?rev=8bd0d16ce28a200b46814754ade0859c59117c5b#8bd0d16ce28a200b46814754ade0859c59117c5b"
 dependencies = [
  "cubecl-core",
  "cubecl-ir",
@@ -2798,7 +2799,7 @@ dependencies = [
 [[package]]
 name = "cubecl-wgpu"
 version = "0.12.0-pre.2"
-source = "git+https://github.com/skewballfox/cubecl?rev=9e5f653ca985a6d6f4d681c89c7599ea9a9da358#9e5f653ca985a6d6f4d681c89c7599ea9a9da358"
+source = "git+https://github.com/skewballfox/cubecl?rev=8bd0d16ce28a200b46814754ade0859c59117c5b#8bd0d16ce28a200b46814754ade0859c59117c5b"
 dependencies = [
  "ash",
  "bytemuck",
@@ -2833,7 +2834,7 @@ dependencies = [
 [[package]]
 name = "cubecl-zspace"
 version = "0.12.0-pre.2"
-source = "git+https://github.com/skewballfox/cubecl?rev=9e5f653ca985a6d6f4d681c89c7599ea9a9da358#9e5f653ca985a6d6f4d681c89c7599ea9a9da358"
+source = "git+https://github.com/skewballfox/cubecl?rev=8bd0d16ce28a200b46814754ade0859c59117c5b#8bd0d16ce28a200b46814754ade0859c59117c5b"
 dependencies = [
  "serde",
  "smallvec",
@@ -2842,7 +2843,7 @@ dependencies = [
 [[package]]
 name = "cubek"
 version = "0.4.0-pre.2"
-source = "git+https://github.com/tracel-ai/cubek?rev=c869ba3e736afa2850a0f9149c43a24872eec651#c869ba3e736afa2850a0f9149c43a24872eec651"
+source = "git+https://github.com/tracel-ai/cubek?rev=1a757b3a7ab29a4c350b8ba59f89f867afc62290#1a757b3a7ab29a4c350b8ba59f89f867afc62290"
 dependencies = [
  "cubecl",
  "cubek-attention",
@@ -2864,7 +2865,7 @@ dependencies = [
 [[package]]
 name = "cubek-attention"
 version = "0.4.0-pre.2"
-source = "git+https://github.com/tracel-ai/cubek?rev=c869ba3e736afa2850a0f9149c43a24872eec651#c869ba3e736afa2850a0f9149c43a24872eec651"
+source = "git+https://github.com/tracel-ai/cubek?rev=1a757b3a7ab29a4c350b8ba59f89f867afc62290#1a757b3a7ab29a4c350b8ba59f89f867afc62290"
 dependencies = [
  "bytemuck",
  "cubecl",
@@ -2879,7 +2880,7 @@ dependencies = [
 [[package]]
 name = "cubek-attention-backward"
 version = "0.4.0-pre.2"
-source = "git+https://github.com/tracel-ai/cubek?rev=c869ba3e736afa2850a0f9149c43a24872eec651#c869ba3e736afa2850a0f9149c43a24872eec651"
+source = "git+https://github.com/tracel-ai/cubek?rev=1a757b3a7ab29a4c350b8ba59f89f867afc62290#1a757b3a7ab29a4c350b8ba59f89f867afc62290"
 dependencies = [
  "cubecl",
  "cubek-matmul",
@@ -2891,13 +2892,14 @@ dependencies = [
 [[package]]
 name = "cubek-convolution"
 version = "0.4.0-pre.2"
-source = "git+https://github.com/tracel-ai/cubek?rev=c869ba3e736afa2850a0f9149c43a24872eec651#c869ba3e736afa2850a0f9149c43a24872eec651"
+source = "git+https://github.com/tracel-ai/cubek?rev=1a757b3a7ab29a4c350b8ba59f89f867afc62290#1a757b3a7ab29a4c350b8ba59f89f867afc62290"
 dependencies = [
  "bytemuck",
  "cubecl",
  "cubecl-common",
  "cubecl-ir",
  "cubek-matmul",
+ "cubek-microkernel",
  "cubek-std",
  "half",
  "serde",
@@ -2906,7 +2908,7 @@ dependencies = [
 [[package]]
 name = "cubek-fft"
 version = "0.4.0-pre.2"
-source = "git+https://github.com/tracel-ai/cubek?rev=c869ba3e736afa2850a0f9149c43a24872eec651#c869ba3e736afa2850a0f9149c43a24872eec651"
+source = "git+https://github.com/tracel-ai/cubek?rev=1a757b3a7ab29a4c350b8ba59f89f867afc62290#1a757b3a7ab29a4c350b8ba59f89f867afc62290"
 dependencies = [
  "cubecl",
  "thiserror 2.0.21",
@@ -2915,7 +2917,7 @@ dependencies = [
 [[package]]
 name = "cubek-interpolate"
 version = "0.4.0-pre.2"
-source = "git+https://github.com/tracel-ai/cubek?rev=c869ba3e736afa2850a0f9149c43a24872eec651#c869ba3e736afa2850a0f9149c43a24872eec651"
+source = "git+https://github.com/tracel-ai/cubek?rev=1a757b3a7ab29a4c350b8ba59f89f867afc62290#1a757b3a7ab29a4c350b8ba59f89f867afc62290"
 dependencies = [
  "cubecl",
  "cubecl-common",
@@ -2929,7 +2931,7 @@ dependencies = [
 [[package]]
 name = "cubek-matmul"
 version = "0.4.0-pre.2"
-source = "git+https://github.com/tracel-ai/cubek?rev=c869ba3e736afa2850a0f9149c43a24872eec651#c869ba3e736afa2850a0f9149c43a24872eec651"
+source = "git+https://github.com/tracel-ai/cubek?rev=1a757b3a7ab29a4c350b8ba59f89f867afc62290#1a757b3a7ab29a4c350b8ba59f89f867afc62290"
 dependencies = [
  "bytemuck",
  "cubecl",
@@ -2945,7 +2947,7 @@ dependencies = [
 [[package]]
 name = "cubek-microkernel"
 version = "0.4.0-pre.2"
-source = "git+https://github.com/tracel-ai/cubek?rev=c869ba3e736afa2850a0f9149c43a24872eec651#c869ba3e736afa2850a0f9149c43a24872eec651"
+source = "git+https://github.com/tracel-ai/cubek?rev=1a757b3a7ab29a4c350b8ba59f89f867afc62290#1a757b3a7ab29a4c350b8ba59f89f867afc62290"
 dependencies = [
  "cubecl",
  "cubek-std",
@@ -2955,7 +2957,7 @@ dependencies = [
 [[package]]
 name = "cubek-pool"
 version = "0.4.0-pre.2"
-source = "git+https://github.com/tracel-ai/cubek?rev=c869ba3e736afa2850a0f9149c43a24872eec651#c869ba3e736afa2850a0f9149c43a24872eec651"
+source = "git+https://github.com/tracel-ai/cubek?rev=1a757b3a7ab29a4c350b8ba59f89f867afc62290#1a757b3a7ab29a4c350b8ba59f89f867afc62290"
 dependencies = [
  "cubecl",
  "cubecl-common",
@@ -2967,7 +2969,7 @@ dependencies = [
 [[package]]
 name = "cubek-quant"
 version = "0.4.0-pre.2"
-source = "git+https://github.com/tracel-ai/cubek?rev=c869ba3e736afa2850a0f9149c43a24872eec651#c869ba3e736afa2850a0f9149c43a24872eec651"
+source = "git+https://github.com/tracel-ai/cubek?rev=1a757b3a7ab29a4c350b8ba59f89f867afc62290#1a757b3a7ab29a4c350b8ba59f89f867afc62290"
 dependencies = [
  "cubecl",
  "cubecl-common",
@@ -2979,7 +2981,7 @@ dependencies = [
 [[package]]
 name = "cubek-random"
 version = "0.4.0-pre.2"
-source = "git+https://github.com/tracel-ai/cubek?rev=c869ba3e736afa2850a0f9149c43a24872eec651#c869ba3e736afa2850a0f9149c43a24872eec651"
+source = "git+https://github.com/tracel-ai/cubek?rev=1a757b3a7ab29a4c350b8ba59f89f867afc62290#1a757b3a7ab29a4c350b8ba59f89f867afc62290"
 dependencies = [
  "cubecl",
  "cubecl-common",
@@ -2995,7 +2997,7 @@ dependencies = [
 [[package]]
 name = "cubek-reduce"
 version = "0.4.0-pre.2"
-source = "git+https://github.com/tracel-ai/cubek?rev=c869ba3e736afa2850a0f9149c43a24872eec651#c869ba3e736afa2850a0f9149c43a24872eec651"
+source = "git+https://github.com/tracel-ai/cubek?rev=1a757b3a7ab29a4c350b8ba59f89f867afc62290#1a757b3a7ab29a4c350b8ba59f89f867afc62290"
 dependencies = [
  "cubecl",
  "cubek-microkernel",
@@ -3008,7 +3010,7 @@ dependencies = [
 [[package]]
 name = "cubek-rms-norm"
 version = "0.4.0-pre.2"
-source = "git+https://github.com/tracel-ai/cubek?rev=c869ba3e736afa2850a0f9149c43a24872eec651#c869ba3e736afa2850a0f9149c43a24872eec651"
+source = "git+https://github.com/tracel-ai/cubek?rev=1a757b3a7ab29a4c350b8ba59f89f867afc62290#1a757b3a7ab29a4c350b8ba59f89f867afc62290"
 dependencies = [
  "cubecl",
  "cubek-matmul",
@@ -3020,7 +3022,7 @@ dependencies = [
 [[package]]
 name = "cubek-std"
 version = "0.4.0-pre.2"
-source = "git+https://github.com/tracel-ai/cubek?rev=c869ba3e736afa2850a0f9149c43a24872eec651#c869ba3e736afa2850a0f9149c43a24872eec651"
+source = "git+https://github.com/tracel-ai/cubek?rev=1a757b3a7ab29a4c350b8ba59f89f867afc62290#1a757b3a7ab29a4c350b8ba59f89f867afc62290"
 dependencies = [
  "cubecl",
  "cubecl-common",
@@ -3031,7 +3033,7 @@ dependencies = [
 [[package]]
 name = "cubek-swiglu"
 version = "0.4.0-pre.2"
-source = "git+https://github.com/tracel-ai/cubek?rev=c869ba3e736afa2850a0f9149c43a24872eec651#c869ba3e736afa2850a0f9149c43a24872eec651"
+source = "git+https://github.com/tracel-ai/cubek?rev=1a757b3a7ab29a4c350b8ba59f89f867afc62290#1a757b3a7ab29a4c350b8ba59f89f867afc62290"
 dependencies = [
  "cubecl",
  "cubek-matmul",
@@ -4099,9 +4101,9 @@ checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
 
 [[package]]
 name = "form_urlencoded"
-version = "1.2.2"
+version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb4cb245038516f5f85277875cdaa4f7d2c9a0fa0468de06ed190163b1581fcf"
+checksum = "afa489199eaffb1211795df1c6236ce1ad0d41a6fa45250add73e3b02420f06e"
 dependencies = [
  "percent-encoding",
 ]
@@ -11659,9 +11661,9 @@ dependencies = [
 
 [[package]]
 name = "url"
-version = "2.5.8"
+version = "2.5.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff67a8a4397373c3ef660812acab3268222035010ab8680ec4215f38ba3d0eed"
+checksum = "f00cd2407bb42c0ef17be88d4cf020f5cceffd121665bac9b8b9493a369b3b1a"
 dependencies = [
  "form_urlencoded",
  "idna",

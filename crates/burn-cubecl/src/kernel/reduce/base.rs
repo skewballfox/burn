@@ -9,10 +9,14 @@ use burn_backend::cubecl::{dtype_to_elem_type, dtype_to_storage_type, elem_type_
 use burn_backend::{DType, TensorMetadata};
 use burn_std::{BoolDType, Metadata};
 use burn_std::{Shape, Strides};
+use cubecl::bytes::Bytes;
+use cubecl::client::Client;
 use cubecl::prelude::InputScalar;
 use cubek::reduce::{
     ReduceError, ReduceOperation,
-    kernels::{ReduceElements, ReduceKernel, ReduceKernelHeuristic, ReduceOpStrategy},
+    kernels::{
+        ReduceElements, ReduceKernel, ReduceKernelHeuristic, ReduceOpStrategy, ReduceWorkspace,
+    },
 };
 
 /// The value a reduction over zero elements must produce, or `None` if there is none.
@@ -162,7 +166,7 @@ pub(super) fn reduce_dims_folded(
     config: ReduceOperation,
 ) -> Result<CubeTensor, ReduceError> {
     let rank = input.meta.num_dims();
-    let mut shape = input.meta.shape().clone();
+    let shape = input.meta.shape();
     let reduced: Vec<usize> = (0..rank).filter(|dim| dims.contains(dim)).collect();
 
     let empty: Vec<usize> = reduced
@@ -193,27 +197,12 @@ pub(super) fn reduce_dims_folded(
 
     for dim in empty {
         tensor = reduce_dim(tensor, output_dtype, dim, strategy.clone(), config)?;
-        shape[dim] = 1;
     }
 
     while !left.is_empty() {
         let run =
             largest_run_memory_holds_together(tensor.meta.shape(), tensor.meta.strides(), &left);
-        let rest = (0..rank).filter(|dim| !run.contains(dim));
-        let presented_dims: Vec<usize> = run.iter().copied().chain(rest).collect();
-
-        let mut presented = permute(tensor, &presented_dims);
-        fold_leading_dims(&mut presented, run.len());
-
-        tensor = reduce_dim(presented, output_dtype, 0, strategy.clone(), config)?;
-
-        // The reduction writes contiguously, the folded run first at length one
-        // and every other dimension after it in logical order — which is the
-        // logical shape again with the run's dimensions at length one.
-        for dim in &run {
-            shape[*dim] = 1;
-        }
-        *tensor.meta = Metadata::new(shape.clone(), burn_std::tensor::contiguous_strides(&shape));
+        tensor = reduce_folded_run(tensor, &run, output_dtype, strategy.clone(), config)?;
 
         left.retain(|dim| !run.contains(dim));
     }
@@ -221,7 +210,53 @@ pub(super) fn reduce_dims_folded(
     Ok(tensor)
 }
 
-#[cfg(feature = "autotune")]
+fn reduce_folded_run(
+    input: CubeTensor,
+    run: &[usize],
+    output_dtype: Option<DType>,
+    strategy: KernelReduceStrategy,
+    config: ReduceOperation,
+) -> Result<CubeTensor, ReduceError> {
+    let mut shape = input.meta.shape().clone();
+    let rest = (0..shape.num_dims()).filter(|dim| !run.contains(dim));
+    let order: Vec<_> = run.iter().copied().chain(rest).collect();
+    let mut presented = permute(input, &order);
+    fold_leading_dims(&mut presented, run.len());
+    let mut output = reduce_dim(presented, output_dtype, 0, strategy, config)?;
+
+    // The surviving axes were presented in logical order and the reduction writes contiguously.
+    for &dim in run {
+        shape[dim] = 1;
+    }
+    *output.meta = Metadata::new(shape.clone(), burn_std::tensor::contiguous_strides(&shape));
+    Ok(output)
+}
+
+/// Sums a nonempty tensor over nonempty `dims` without narrowing any intermediate sums.
+pub(crate) fn sum_dims_single_pass(
+    input: CubeTensor,
+    dims: &[usize],
+) -> Result<CubeTensor, ReduceError> {
+    let input = crate::kernel::untile(input);
+    let shape = input.meta.shape();
+    let run = largest_run_memory_holds_together(shape, input.meta.strides(), dims);
+    let active_dims = dims.iter().filter(|&&dim| shape[dim] > 1).count();
+
+    if run.len() < active_dims {
+        return reduce_dims_copy(input, dims, ReduceOperation::Sum);
+    }
+    if run.is_empty() {
+        return reduce_dim(
+            input,
+            None,
+            dims[0],
+            Default::default(),
+            ReduceOperation::Sum,
+        );
+    }
+    reduce_folded_run(input, &run, None, Default::default(), ReduceOperation::Sum)
+}
+
 /// Presents the input as `[kept_elements, reduced_elements]`, copying when required.
 /// Restores the input rank with reduced axes at size one after a single reduction.
 pub(super) fn reduce_dims_copy(
@@ -239,7 +274,7 @@ pub(super) fn reduce_dims_copy(
 
     let presented = permute(input, &order);
     let folded = crate::ops::reshape(presented, Shape::new([kept_len, reduced_len]));
-    let mut output = reduce_dim(folded, None, 1, KernelReduceStrategy::Autotune, config)?;
+    let mut output = reduce_dim(folded, None, 1, Default::default(), config)?;
 
     let mut output_shape = original_shape;
     for dim in reduced {
@@ -415,7 +450,9 @@ pub fn reduce_dim(
     }
 
     let device = input.device.clone();
+    let workspace = reduce_workspace(&client, &input, dim, config, elements, false);
     cubek::reduce::kernels::Reduce::new(strategy.into())
+        .with_workspace(workspace)
         .execute(
             &client,
             &device,
@@ -497,7 +534,9 @@ pub fn reduce_dim_with_indices(
     let client = input.client.clone();
 
     let device = input.device.clone();
+    let workspace = reduce_workspace(&client, &input, dim, config, elements, true);
     cubek::reduce::kernels::Reduce::new(strategy.into())
+        .with_workspace(workspace)
         .execute_with_indices(
             &client,
             &device,
@@ -510,6 +549,36 @@ pub fn reduce_dim_with_indices(
             dtype_to_elem_type(indices_dtype),
         )
         .map(|_| (values, indices))
+}
+
+/// The scratch cubek's reductions that split a row across cubes take for reducing `dim` of
+/// `input` by `config` in `elements`, `with_indices` where the indices go beside the values: cubek
+/// allocates none, so its caller does, sized for whichever kernel the strategy picks, its arrival
+/// counters zero.
+fn reduce_workspace(
+    client: &Client,
+    input: &CubeTensor,
+    dim: usize,
+    config: ReduceOperation,
+    elements: ReduceElements,
+    with_indices: bool,
+) -> ReduceWorkspace {
+    let bytes = ReduceWorkspace::bytes_for(
+        client,
+        input.meta.shape(),
+        dim,
+        config,
+        elements,
+        with_indices,
+    );
+    // A runtime may refuse an empty allocation: every buffer holds at least one counter.
+    let at_least_one = |bytes: u64| (bytes as usize).max(size_of::<u32>());
+    let counters = at_least_one(bytes.arrivals) / size_of::<u32>();
+    ReduceWorkspace {
+        partials: client.empty(at_least_one(bytes.partials)),
+        partial_indices: client.empty(at_least_one(bytes.partial_indices)),
+        arrivals: client.create(Bytes::from_elems(vec![0u32; counters])),
+    }
 }
 
 /// Creates an empty output tensor with the proper shape and decreasing strides to reduce the given `axis` of `input`
